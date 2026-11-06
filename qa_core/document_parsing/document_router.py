@@ -47,7 +47,10 @@ def has_grid(image_path: Path) -> bool:
     """A routing hint, not a claim that all table layouts can be detected."""
     try:
         import cv2
-        image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+        import numpy as np
+        # OpenCV's Windows file reader does not reliably accept Unicode paths.
+        payload = image_path.read_bytes()
+        image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_GRAYSCALE) if payload else None
         if image is None:
             return False
         mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
@@ -56,7 +59,7 @@ def has_grid(image_path: Path) -> bool:
         vertical = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(30, height // 5))))
         return int((horizontal.sum(axis=1) > width * 255 * 0.3).sum()) > 5 and int(
             (vertical.sum(axis=0) > height * 255 * 0.3).sum()) > 5
-    except ImportError:
+    except (ImportError, OSError):
         return False
 
 
@@ -117,7 +120,10 @@ class DocumentParser:
             blocks = [LayoutBlock(str(index), "text", text, reading_order=index,
                                   source_location={**source, "line": index + 1})
                       for index, text in enumerate(raw.splitlines())]
-            result.pages = [PageResult(1, "native_text", raw, normalize_text(raw), raw, blocks, source_location=source)]
+            normalized = normalize_text(raw)
+            result.pages = [PageResult(1, "native_text", raw, normalized, raw, blocks, source_location=source,
+                                      parsing_status="success" if normalized.strip() else "needs_review",
+                                      warnings=[] if normalized.strip() else ["文本没有可提取的正文，请核对原始文件。"])]
         elif path.suffix.lower() == ".pdf":
             self._parse_pdf(path, mode, result, source, page_numbers)
         else:
