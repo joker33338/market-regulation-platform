@@ -1,0 +1,4 @@
+# The core parser, SQLite demo and tests use only Python 3.12 standard library.
+psycopg2-binary>=2.9,<3
+PyMuPDF==1.26.7
+

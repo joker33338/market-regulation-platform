@@ -1,0 +1,11 @@
+*
+!requirements.txt
+!requirements-local.txt
+!requirements-ocr.txt
+!qa_core/**
+!scripts/**
+!scenarios/**
+!tests/**
+!query.py
+**/__pycache__
+**/*.pyc

@@ -1,0 +1,77 @@
+name: market-regulation
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD:?Set in .env.docker}
+      MYSQL_DATABASE: market_regulation
+      MYSQL_USER: market_app
+      MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD:?Set in .env.docker}
+    ports:
+      - "127.0.0.1:13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h 127.0.0.1 -u market_app -D market_regulation -e 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${DOCKER_REDIS_PASSWORD:?Set in .env.docker}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "127.0.0.1:16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: market_regulation
+      POSTGRES_USER: market_app
+      POSTGRES_PASSWORD: ${DOCKER_DB_PASSWORD:?Set DOCKER_DB_PASSWORD in .env.docker}
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market_app -d market_regulation"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  app:
+    image: market-regulation-app:local
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_DSN: postgresql://market_app:${DOCKER_DB_PASSWORD}@db:5432/market_regulation
+      MVP_TEST_PG_DSN: postgresql://market_app:${DOCKER_DB_PASSWORD}@db:5432/market_regulation
+      EMBEDDING_BACKEND: local
+      EMBEDDING_MODEL_PATH: /app/models/bge-m3
+      EMBEDDING_DIMENSION: "1024"
+      EMBEDDING_MAX_TOKENS: "2048"
+      SOURCE_PG_DSN: ${SOURCE_PG_DSN:-}
+      API_BASE: ${API_BASE:-}
+      API_KEY: ${API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    volumes:
+      - ./models:/app/models:ro
+      - ./reports:/app/reports
+      - ./data:/app/data:ro
+volumes:
+  mysql_data:
+  redis_data:
+  postgres_data:

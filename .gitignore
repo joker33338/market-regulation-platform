@@ -1,0 +1,74 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+models/**
+!models/README.md
+reports/**
+!reports/.gitkeep
+*.sqlite3*
+*.db
+
+
+.env.docker
+
+# Local environments and tools
+venv/
+env/
+.venv*/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
+*.swp
+*.tmp
+*.log
+# Credentials (examples remain portable)
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+# Local datasets, outputs, database dumps and model weights
+/data/
+/local/
+/outputs/
+/cache/
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*.rdb
+*.aof
+*.safetensors
+*.onnx
+*.pdiparams
+*.pdmodel
+*.pt
+*.pth
+*.bin
+# Real documents and image caches must not enter the baseline
+*.pdf
+*.doc
+*.docx
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+# Original local documentation and demo contain machine paths/case identifiers.
+# Preserve these files on disk pending a separate redaction review.
+/README.md
+/docs/Docker测试步骤.md
+/docs/MVP交付说明.md
+/docs/法律知识库离线入库迁移方案.md
+/docs/ocr-integration/01-现有项目分析.md
+/scripts/demo_mvp.py
