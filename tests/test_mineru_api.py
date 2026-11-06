@@ -89,3 +89,11 @@ class MinerUAPITests(unittest.TestCase):
         self.assertIn("上传并解析入库", response.text)
         self.assertNotIn("Bearer " + "a" * 32, response.text)
         self.assertNotIn("MINERU_API_KEY", response.text)
+
+    def test_service_info_identifies_mock_and_database_without_secrets(self):
+        self.assertEqual(self.client.get("/api/parse/info").status_code, 401)
+        response = self.client.get("/api/parse/info", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["mode"], "mock")
+        self.assertFalse(response.json()["database_enabled"])
+        self.assertNotIn("api_key", response.text)

@@ -104,6 +104,11 @@ def create_app(config=None, *, tokens=None, service=None):
                 return identity
         raise MinerUError("unauthorized", 401)
 
+    @app.get("/api/parse/info")
+    async def info(identity=Depends(owner)):
+        return {"mode": config.mode, "provider": config.provider, "enabled": config.enabled,
+                "database_enabled": service.result_sink is not None}
+
     def upload_root(identity):
         root = config.result_dir / "sources" / hashlib.sha256(identity.encode()).hexdigest()
         root.mkdir(parents=True, exist_ok=True)
