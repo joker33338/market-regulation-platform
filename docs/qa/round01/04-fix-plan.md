@@ -21,3 +21,13 @@ startup. Task repository validation uses separate SQLite; PostgreSQL changes rem
 an explicit design/delivery boundary until an isolated database is supplied.
 GAP-008 (general document/table ingestion) is pending scope confirmation.
 Mock completion is not remote, GPU, or PostgreSQL acceptance.
+
+## Confirmed scope update during implementation
+
+The user supplied an official API credential, requested direct official calls without
+server deployment, and prioritized upload through database inspection. The public
+official v4 protocol is implemented as a separate Provider, not confused with
+self-hosted 4.1 Tasks. The supplied local PostgreSQL test connection already has
+document_review tables; reuse requires no DDL. The user authorized isolated API
+dependencies and the PostgreSQL driver. Live validation uses generated synthetic
+PDFs only. Final code is `6981ac8`; actual outcomes are in 05-fix-report.md.
