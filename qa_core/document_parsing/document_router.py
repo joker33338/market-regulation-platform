@@ -35,6 +35,19 @@ def looks_multicolumn(page) -> bool:
     return False
 
 
+def has_vector_grid(page) -> bool:
+    """Detect ruled PDF layouts even when cells are empty and no table is extracted."""
+    horizontal = vertical = 0
+    for drawing in page.get_drawings():
+        for item in drawing.get('items', []):
+            if item[0] != 'l':
+                continue
+            start, end = item[1:3]
+            horizontal += abs(start.y - end.y) < 1 and abs(start.x - end.x) > 30
+            vertical += abs(start.x - end.x) < 1 and abs(start.y - end.y) > 30
+    return horizontal >= 2 and vertical >= 2
+
+
 def has_hidden_text_layer(page) -> bool:
     """Detect an existing invisible OCR layer, rather than visible PDF text."""
     traces = page.get_texttrace()
@@ -188,6 +201,7 @@ class DocumentParser:
                     area = max(page.rect.width * page.rect.height, 1)
                     image_fraction = max(((box[2] - box[0]) * (box[3] - box[1]) / area for box in image_rects), default=0)
                     if mode == "auto":
+                        page_source["complex_layout"] = looks_multicolumn(page) or has_vector_grid(page)
                         # A header on a scanned page must not suppress OCR of its image body.
                         text_length = len("".join(raw.split()))
                         scanned = text_length == 0 or (bool(image_rects) and (
@@ -200,6 +214,7 @@ class DocumentParser:
                             continue
                         if not scanned:
                             native = pdf_page(page, page_no, page_source)
+                            native.source_location["complex_layout"] = bool(native.tables) or page_source["complex_layout"]
                             if native.tables or not looks_multicolumn(page):
                                 native.processing_time = time.perf_counter() - page_started
                                 result.pages.append(native)

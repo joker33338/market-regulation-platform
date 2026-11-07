@@ -1,4 +1,5 @@
-param([string]$ConfigFile = 'local/parsing-runtime.json', [int]$Port = 8180)
+param([string]$ConfigFile = 'local/parsing-runtime.json', [int]$Port = 8180,
+      [string]$Python = '', [string]$ApiPackages = '')
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $workspaceRoot
@@ -6,8 +7,12 @@ $configuration = Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8 | Conv
 foreach ($property in $configuration.PSObject.Properties) {
     [Environment]::SetEnvironmentVariable($property.Name, [string]$property.Value, 'Process')
 }
-$pythonPath = Join-Path $workspaceRoot '.venv-api/Scripts/python.exe'
-if (-not (Test-Path -LiteralPath $pythonPath)) { throw 'Create the isolated API environment first; see integration documentation.' }
+$pythonPath = if ($Python) { $Python } else { Join-Path $workspaceRoot '.venv-api/Scripts/python.exe' }
+if (-not (Test-Path -LiteralPath $pythonPath)) { throw '请指定已验证的现有 Python 环境；此脚本不会安装依赖。' }
+if ($ApiPackages) {
+    if (-not (Test-Path -LiteralPath (Join-Path $ApiPackages 'fastapi'))) { throw '指定目录缺少现有 API 依赖。' }
+    $env:PYTHONPATH = (@($ApiPackages, $env:PYTHONPATH) | Where-Object { $_ }) -join [IO.Path]::PathSeparator
+}
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'Requested port is already in use; no service was stopped.' }
 $reportDirectory = Join-Path $workspaceRoot 'reports'
 New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null

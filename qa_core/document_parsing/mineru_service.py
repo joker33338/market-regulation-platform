@@ -23,18 +23,29 @@ def now():
 
 
 class MinerUService:
-    def __init__(self, config, repository: TaskRepository, client: MinerUClient | None = None, *, result_sink=None):
+    def __init__(self, config, repository: TaskRepository, client: MinerUClient | None = None, *, result_sink=None, dual_router=None):
         self.config, self.repository, self.client = config, repository, client
         self.result_sink = result_sink
+        self.dual_router = dual_router
+        if dual_router and (config.mode != 'local' or not dual_router.config.enabled):
+            raise MinerUError('dual_engine_requires_local_task_mode', 400)
         self.root = config.result_dir.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._locks = {}  # removed after execution; bounded by active workers
 
-    async def submit(self, owner, request_key, inputs):
+    async def submit(self, owner, request_key, inputs, *, parse_options=None):
         if not self.config.enabled:
             raise MinerUError("parser_disabled", 503)
         if not owner or not 1 <= len(request_key) <= 128 or not 1 <= len(inputs) <= self.config.max_files:
             raise MinerUError("invalid_submission", 400)
+        if parse_options is not None:
+            if not self.dual_router:
+                raise MinerUError("dual_engine_unconfigured", 400)
+            if (not isinstance(parse_options, dict) or set(parse_options) - {'strategy', 'allow_cloud_fallback', 'sensitive'}
+                    or not isinstance(parse_options.get('strategy', 'auto'), str)
+                    or parse_options.get('strategy', 'auto') not in {'auto', 'local', 'remote'}
+                    or any(type(parse_options.get(key, False)) is not bool for key in ('allow_cloud_fallback', 'sensitive'))):
+                raise MinerUError("invalid_parse_options", 400)
         files = []
         for item in inputs:
             name, path = item[:2]
@@ -60,6 +71,11 @@ class MinerUService:
                 "mode": self.config.mode, "api_identity": stable_hash(self.config.api_url),
                 "provider": self.config.provider,
                 "output_formats": list(self.config.output_formats)}
+        if self.dual_router:
+            task['parse_options'] = {'strategy': 'auto', 'allow_cloud_fallback': False, 'sensitive': False, **(parse_options or {})}
+            task['fingerprint'] = stable_hash(task['fingerprint'], task['parse_options'])
+            task['result_root'] = str(self.root)
+            task['routing_protocol'] = 'dual-engine-v1'
         return await asyncio.to_thread(self.repository.create, task, self.config.queue_size)
 
     def _snapshot(self, task, snapshot):
@@ -84,6 +100,9 @@ class MinerUService:
 
     async def _save(self, task):
         await asyncio.to_thread(self.repository.save, task)
+        if self.dual_router:
+            current = await asyncio.to_thread(self.repository.get, task['id'])
+            task['cancel_requested'] = current.get('cancel_requested', False)
 
     async def _upload(self, task, file):
         import httpx
@@ -145,6 +164,8 @@ class MinerUService:
                 return
             if (task["mode"] != self.config.mode or task.get("provider", "self_hosted") != self.config.provider
                     or task["api_identity"] != stable_hash(self.config.api_url) or task["output_formats"] != list(self.config.output_formats)):
+                raise MinerUError("resume_configuration_mismatch", 409)
+            if bool(task.get('routing_protocol')) != bool(self.dual_router):
                 raise MinerUError("resume_configuration_mismatch", 409)
             task["error"] = None
             if task.get("cancel_requested") and not task["remote_id"]:
@@ -237,6 +258,10 @@ class MinerUService:
         task["status"] = "running"
         await self._save(task)
         for file in task["files"]:
+            if task.get('cancel_requested'):
+                task['status'] = 'canceled'
+                task['completed_at'] = now()
+                return
             if file["status"] == "completed" and file.get("result_path"):
                 continue
             file["status"] = "running"
@@ -254,16 +279,36 @@ class MinerUService:
                     if result.document_id != file["sha256"]:
                         raise MinerUError("source_integrity_mismatch", 409)
                 else:
-                    def parse():
-                        with DocumentParser() as parser:
-                            return parser.parse(file["source_path"])
-                    result = await asyncio.to_thread(parse)
-                    if result.parsing_status in {"failed", "partial"}:
+                    if self.dual_router:
+                        result = await self.dual_router.parse(task, file, self._save)
+                        if task.get('cancel_requested'):
+                            file['status'] = 'canceled'
+                            task['status'] = 'canceled'
+                            task['completed_at'] = now()
+                            return
+                        if await asyncio.to_thread(file_sha256, file['source_path']) != file['sha256']:
+                            raise MinerUError('source_integrity_mismatch', 409)
+                    else:
+                        def parse():
+                            with DocumentParser() as parser:
+                                return parser.parse(file["source_path"])
+                        result = await asyncio.to_thread(parse)
+                    if not self.dual_router and result.parsing_status in {"failed", "partial"}:
                         raise MinerUError("local_parse_failed")
                     directory.mkdir(parents=True, exist_ok=True)
-                    await asyncio.to_thread(result_path.write_text, result.to_json(), encoding="utf-8")
+                    if self.dual_router:
+                        from .dual_engine import persist_result
+                        await asyncio.to_thread(persist_result, result_path, result)
+                    else:
+                        await asyncio.to_thread(result_path.write_text, result.to_json(), encoding="utf-8")
                     file["local_result_path"] = str(directory)
                     await self._save(task)
+                if self.dual_router:
+                    trace = result.quality['routing_trace']
+                    file.update(selected_engine=trace['selected_engine'], requires_review=result.requires_review,
+                                fallback_reason=trace.get('failure_reason') or trace['fallback_reason'])
+                if result.parsing_status in {"failed", "partial"}:
+                    raise MinerUError("local_parse_failed")
                 if self.result_sink:
                     file["database_parse_id"] = await asyncio.to_thread(self.result_sink.save, task, file, result)
                 file["result_path"] = str(directory)

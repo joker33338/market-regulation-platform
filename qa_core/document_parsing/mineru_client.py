@@ -40,6 +40,9 @@ class MinerUClient:
     async def close(self):
         await self.http.aclose()
 
+    async def before_request(self, method, url):
+        """Optional policy hook, applied to every HTTP attempt including redirects."""
+
     def _validate_url(self, url):
         if origin(url) not in self.allowed:
             raise MinerUError("untrusted_origin", 400)
@@ -55,6 +58,7 @@ class MinerUClient:
             headers["Authorization"] = "Bearer " + self.config.api_key
         for _ in range(4):
             self._validate_url(url)
+            await self.before_request(method, url)
             async with self.http.stream(method, url, headers=headers, content=content, json=body) as response:
                 if response.is_redirect:
                     if method != "GET" or "location" not in response.headers:

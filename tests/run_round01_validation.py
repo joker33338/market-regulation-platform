@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--database-only', action='store_true')
     parser.add_argument('--source-commit')
     parser.add_argument('--qa-test-commit')
+    parser.add_argument('--include-v02', action='store_true')
     args = parser.parse_args()
     source = args.source.resolve()
     if not (source / 'qa_core/document_parsing/mineru_service.py').is_file():
@@ -90,6 +91,8 @@ def main():
         suite.addTests(unittest.defaultTestLoader.loadTestsFromNames([
             'tests.test_parsing_postgres', 'tests.test_postgres_integration']))
     suite.addTests(qa_suite)
+    if args.include_v02:
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromName('tests.test_v02_dual_engine'))
     result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
     if args.result_json:
         failures = {getattr(test, 'test_case', test).id()

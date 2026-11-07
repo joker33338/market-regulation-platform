@@ -7,6 +7,7 @@
 <div class="steps"><span>1 选择文件</span><span>2 自动解析</span><span>3 保存数据库</span><span>4 查看结果</span></div>
 <section class="panel"><div class="grid"><label for="token">工作台访问码</label><input id="token" type="password" autocomplete="off" placeholder="输入工作台访问码"></div><p class="subtitle" id="service-status">填写访问码后可查看当前解析服务和入库状态。</p>
 <label id="drop">选择 PDF、JPG、PNG 或 DOCX 文件<br><input id="files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.docx"></label>
+<div id="routing-options" hidden><label for="strategy">解析策略</label> <select id="strategy"><option value="auto">自动 · 本地优先</option><option value="local">仅本地</option><option value="remote">请求云端增强</option></select><p><label><input id="allow-cloud" type="checkbox"> 允许已获授权的文件使用云端增强</label></p><p class="subtitle">是否允许外传由服务器逐文件核验；未获授权时保留本地结果。</p></div>
 <div class="grid"><button id="start">上传并解析入库</button><span class="subtitle">每批最多 20 个文件，每个不超过 100 MB</span></div><p id="message" role="status">请选择待处理文件。</p></section>
 <section class="panel"><h2 style="font-size:18px">处理进度</h2><table><thead><tr><th>文件</th><th>状态</th><th>数据库记录</th></tr></thead><tbody id="rows"><tr><td colspan="3">尚无任务</td></tr></tbody></table></section>
 <section class="panel" id="results"></section><footer>解析结果需要结合原始文件复核。数据库记录 ID 可用于在 DBX 中定位完整正文、Markdown 和结构化结果。</footer></main>
@@ -14,30 +15,32 @@
 const $=id=>document.getElementById(id);let active=null;let requestKey=null;let busy=false;let uploadedIds=[];
 const labels={created:'等待处理',uploading:'上传中',pending:'排队中',running:'解析与入库中',completed:'处理完成',partial:'部分完成',failed:'处理失败',canceled:'已取消',timed_out:'等待超时，可恢复'};
 async function api(path,options={}){const r=await fetch(path,{...options,headers:{Authorization:'Bearer '+$('token').value,...options.headers}});const data=await r.json();if(!r.ok)throw new Error(data.error?.code||'请求失败');return data;}
-function showTask(task){$('rows').replaceChildren();for(const file of task.files){const tr=document.createElement('tr');for(const text of [file.file_name,labels[file.status]||file.status,file.database_parse_id||'等待入库']){const td=document.createElement('td');td.textContent=text;tr.append(td);}$('rows').append(tr);}$('message').textContent='任务：'+task.task_id+'\n'+(labels[task.status]||task.status);}
+function showTask(task){$('rows').replaceChildren();for(const file of task.files){const tr=document.createElement('tr');let status=labels[file.status]||file.status;if(file.selected_engine)status+=' · '+file.selected_engine.join(' / ');if(file.requires_review)status+=' · 待人工复核';for(const text of [file.file_name,status,file.database_parse_id||'等待入库']){const td=document.createElement('td');td.textContent=text;tr.append(td);}$('rows').append(tr);}$('message').textContent='任务：'+task.task_id+'\n'+(labels[task.status]||task.status);}
 async function displayResults(){const output=await api('/api/parse/tasks/'+active+'/results');$('results').replaceChildren();for(const entry of output.results){const title=document.createElement('h3');title.textContent=entry.document.file_name;const text=document.createElement('pre');text.textContent=entry.document.quality?.markdown||entry.document.raw_text||'未提取到可展示正文，请核对原文件。';$('results').append(title,text);}}
 async function poll(){for(let i=0;i<300;i++){const task=await api('/api/parse/tasks/'+active);showTask(task);if(['completed','partial','failed','canceled','timed_out'].includes(task.status)){await displayResults();if(task.status==='timed_out'){$('message').textContent+='\n任务仍保留，可使用同一任务恢复查询。';}return;}await new Promise(r=>setTimeout(r,2000));}throw new Error('等待超过页面预算，请保留任务 ID 查询。');}
 function reset(){if(!busy){active=null;requestKey=null;uploadedIds=[];$('start').textContent='上传并解析入库';}}
-async function serviceInfo(){const info=await api('/api/parse/info');const label=info.mode==='mock'?'合成 Mock（不识别实际正文）':info.mode==='local'?'本地解析':info.provider==='official'?'MinerU 官网（所选文件将发送至官网）':'已配置的远程解析服务';$('service-status').textContent='解析服务：'+label+'；'+(info.database_enabled?'解析完成后写入 PostgreSQL。':'当前仅保存本地结果，未启用 PostgreSQL 入库。');return info;}
+async function serviceInfo(){const info=await api('/api/parse/info');$('routing-options').hidden=!info.dual_engine_enabled;const label=info.dual_engine_enabled?'双引擎 · 本地优先，云端增强需逐文件授权':info.mode==='mock'?'合成 Mock（不识别实际正文）':info.mode==='local'?'本地解析':info.provider==='official'?'MinerU 官网（所选文件将发送至官网）':'已配置的远程解析服务';$('service-status').textContent='解析服务：'+label+'；'+(info.database_enabled?'解析完成后写入 PostgreSQL。':'当前仅保存本地结果，未启用 PostgreSQL 入库。');return info;}
+$('strategy').onchange=reset;$('allow-cloud').onchange=reset;
 $('files').onchange=reset;$('token').onchange=()=>{reset();serviceInfo().catch(()=>{$('service-status').textContent='访问码验证未通过。';});};
 $('start').onclick=async()=>{
   if(busy)return;
   if(!$('token').value){$('message').textContent='请先输入工作台访问码。';return;}
   const files=[...$('files').files];
   if(!files.length||files.length>20||files.some(f=>!f.size||f.size>100*1024*1024)){$('message').textContent='请选择 1–20 个非空文件，每个不超过 100 MB。';return;}
-  busy=true;$('start').disabled=true;$('files').disabled=true;$('token').disabled=true;
+  busy=true;$('start').disabled=true;$('files').disabled=true;$('token').disabled=true;$('strategy').disabled=true;$('allow-cloud').disabled=true;
   try{
     const info=await serviceInfo();if(!info.enabled)throw new Error('解析服务尚未启用。');
     requestKey=requestKey||crypto.randomUUID();
     if(!active){
       for(let i=uploadedIds.length;i<files.length;i++){const file=files[i];$('message').textContent='正在上传：'+file.name;const result=await api('/api/parse/files?file_name='+encodeURIComponent(file.name),{method:'POST',body:file});uploadedIds.push(result.file_id);}
-      const task=await api('/api/parse/tasks',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':requestKey},body:JSON.stringify({file_ids:uploadedIds})});active=task.task_id;showTask(task);
+      const options=info.dual_engine_enabled?{strategy:$('strategy').value,allow_cloud_fallback:$('allow-cloud').checked}:{};
+      const task=await api('/api/parse/tasks',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':requestKey},body:JSON.stringify({file_ids:uploadedIds,...options})});active=task.task_id;showTask(task);
     }else{
       const task=await api('/api/parse/tasks/'+active);
       if(['timed_out','partial','failed'].includes(task.status)){await api('/api/parse/tasks/'+active+'/resume',{method:'POST'});}
     }
     await poll();
   }catch(e){$('message').textContent='处理未完成：'+e.message+(active?'\n请保留任务 ID：'+active:'');}
-  finally{busy=false;$('start').disabled=false;$('files').disabled=false;$('token').disabled=false;$('start').textContent='继续查看 / 恢复当前任务';}
+  finally{busy=false;$('start').disabled=false;$('files').disabled=false;$('token').disabled=false;$('strategy').disabled=false;$('allow-cloud').disabled=false;$('start').textContent='继续查看 / 恢复当前任务';}
 };
 </script></body></html>

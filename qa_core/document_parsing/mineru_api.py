@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,6 +22,8 @@ def public(task):
             "created_at": task["created_at"], "completed_at": task["completed_at"], "error": task["error"],
             "files": [{"file_id": file["id"], "file_name": file["file_name"], "sha256": file["sha256"],
                        "database_parse_id": file.get("database_parse_id"),
+                       "selected_engine": file.get('selected_engine'), "requires_review": file.get('requires_review'),
+                       "fallback_reason": file.get('fallback_reason'),
                        "status": file["status"], "error": file.get("error") or
                        ({"code": file.get("remote", {}).get("error", {}).get("code")} if file.get("remote", {}).get("error") else None)}
                       for file in task["files"]]}
@@ -35,16 +38,26 @@ def redact_paths(value):
     return value
 
 
-def create_app(config=None, *, tokens=None, service=None):
+def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None):
     # Optional API dependencies do not affect import of CLI/business modules.
     from fastapi import Depends, FastAPI, Request
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
     config = config or MinerUConfig.from_env()
+    from .dual_engine import DualEngineConfig, DualEngineRouter
+    dual_config = dual_config or DualEngineConfig.from_env()
     tokens = tokens if tokens is not None else json.loads(os.getenv("PARSING_API_TOKENS_JSON", "{}"))
     if not tokens or any(len(token) < 32 or not owner for token, owner in tokens.items()):
         raise MinerUError("api_auth_configuration_required", 503)
     if service is None:
+        dual_router = None
+        if dual_config.enabled:
+            remote_config = replace(config, mode='remote', provider='official', api_url='https://mineru.net/api', output_formats=('default',))
+            config = replace(config, mode='local', provider='self_hosted', api_url='')
+            if cloud_grants is None:
+                grant_file = os.getenv('DUAL_OCR_GRANTS_FILE')
+                cloud_grants = json.loads(Path(grant_file).read_text(encoding='utf-8')) if grant_file else {}
+            dual_router = DualEngineRouter(dual_config, remote_config, grants=cloud_grants)
         from .mineru_mock import mock_transport
         repository = TaskRepository(config.result_dir / "tasks.sqlite3")
         if config.provider == "official":
@@ -58,7 +71,7 @@ def create_app(config=None, *, tokens=None, service=None):
         if os.getenv("PARSING_RESULT_PG_DSN"):
             from qa_core.storage.parsing_results import PostgresResultSink
             sink = PostgresResultSink(os.environ["PARSING_RESULT_PG_DSN"])
-        service = MinerUService(config, repository, client, result_sink=sink)
+        service = MinerUService(config, repository, client, result_sink=sink, dual_router=dual_router)
     workers = []
 
     async def worker(index):
@@ -107,7 +120,7 @@ def create_app(config=None, *, tokens=None, service=None):
     @app.get("/api/parse/info")
     async def info(identity=Depends(owner)):
         return {"mode": config.mode, "provider": config.provider, "enabled": config.enabled,
-                "database_enabled": service.result_sink is not None}
+                "database_enabled": service.result_sink is not None, 'dual_engine_enabled': bool(service.dual_router)}
 
     def upload_root(identity):
         root = config.result_dir / "sources" / hashlib.sha256(identity.encode()).hexdigest()
@@ -164,7 +177,7 @@ def create_app(config=None, *, tokens=None, service=None):
         try:
             body = json.loads(data)
             ids = body["file_ids"]
-            if set(body) != {"file_ids"} or not isinstance(ids, list) or not 1 <= len(ids) <= config.max_files:
+            if set(body) - {"file_ids", "strategy", "allow_cloud_fallback", "sensitive"} or not isinstance(ids, list) or not 1 <= len(ids) <= config.max_files:
                 raise ValueError()
             paths = []
             for fid in ids:
@@ -175,7 +188,8 @@ def create_app(config=None, *, tokens=None, service=None):
         except (ValueError, KeyError, TypeError, OSError):
             raise MinerUError("invalid_file_ids", 400) from None
         key = request.headers.get("idempotency-key", "")
-        task, _ = await service.submit(identity, key, paths)
+        options = {key: value for key, value in body.items() if key != 'file_ids'}
+        task, _ = await service.submit(identity, key, paths, **({'parse_options': options} if options else {}))
         return public(task)
 
     @app.get("/api/parse/tasks/{task_id}")
@@ -199,8 +213,9 @@ def create_app(config=None, *, tokens=None, service=None):
         task = await asyncio.to_thread(service.repository.get, task_id, identity)
         values = []
         for file in task["files"]:
-            if file["result_path"] and file["status"] == "completed":
-                path = Path(file["result_path"]) / "normalized.json"
+            result_path = file["result_path"] or (file.get('local_result_path') if task.get('routing_protocol') else None)
+            if result_path:
+                path = Path(result_path) / "normalized.json"
                 if path.is_file():
                     value = json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
                     values.append({"file_id": file["id"], "document": redact_paths(value)})
