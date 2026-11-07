@@ -129,3 +129,18 @@ v0.1 本地集成 PASS，可按用户规定生成 v0.2.0 双引擎开发交接�
 已只读审阅Database.initialize：除随机测试schema外，还会创建law_chunks表/索引与VERSION_SCHEMA中的mr_*表/索引，并含CREATE EXTENSION IF NOT EXISTS vector。建议仅在既有独立qa_round01库创建新的随机mvp_test_<hex> schema，所有测试表/索引限定在新schema，预先确认public.vector已存在，禁止安装扩展、ALTER既有表和DROP。运行原方法全部业务断言，唯一替换为抑制finally清理的DROP并保留schema及合成记录，SET search_path仍正常复位。既有表与用户资料不改动。测试业务本身的版本发布/回滚仅作用于新schema内的合成数据。
 
 已在忽略目录准备默认拒绝执行的qa_legacy_preserve_review.py，需显式审批参数及MVP_TEST_PG_DSN，并核验数据库名、QA隔离标记和既有vector扩展；仅对原test模块注入保留清理的Database子类，不修改原断言。当前未执行该入口或任何DDL，仍保持该方法BLOCKED。149是源码唯一方法的去重范围；辅助HTTP和匿名OCR不加入149重复计数。新语料配置仅适用于后续任务，本次历史OCR不得解释为新数据集已测。
+
+
+## v0.2.0最终独立验收：PASS（2026-11-07）
+
+用户明确批准仅在现有独立qa_round01中新建随机测试schema并保留后，QA补齐最后一项旧MVP PG方法。源码仍为 `8badb995592771ff099cf52570621ba29ad37533`，Fix传输仍为 `c7e56026b4669b4a8a0075369b873c393ed50efe`。本次只执行此前唯一未覆盖的方法，原业务断言保持，初始化所需vector已在public存在且不安装；唯一清理变更为抑制DROP，保留测试schema与数据，没有DROP/TRUNCATE/ALTER既有对象。测试库恢复原停止状态，未操作用户market_regulation库。
+
+本次1/1 PASS、0 FAIL、0 SKIP。第一次执行在DDL前被原测试文件字节校验阻断：Windows Git archive产生CRLF，与Git blob仅换行不同；QA验证归一化内容一致后，以精确Git blob生成该单文件执行快照并重试，未修改业务断言。该预检不算业务失败或额外测试方法。
+
+合并当前源码149个唯一方法：149 PASS、0 FAIL、0 SKIP、0 BLOCKED。该计数不把重复补测、辅助HTTP或历史OCR相加。A–J与旧功能回归已按既定范围满足；之前唯一legacy阻塞已解除。最终正式gate位于docs/qa/v0.2.0/version-gate.json，round01的v0.1历史gate不变。覆盖表和证据摘要在同目录qa-coverage.json。
+
+正式结论限定于本地开发/Mock/获准真实集成兼容验收，不包含真实官网识别质量、生产部署、全数据集识别准确率或真实BGE新增评测。历史两匿名OCR样本不解释为更新后数据集已测，不再新增模型/语料任务，不启动下一版未确认开发。
+
+QA保留schema辅助入口测试提交：`08cfbe9e84257bf878ccd85b8643007cf117097a`。固定镜像：`sha256:b4010953b65e06c2d1000fdcd129f6fcceeed9b9a5d48a12266d3365a610a2b1`。环境包清单指纹：`07bb674a2aef66f24e8387bdb0af04c2ce23841805d07770277385f0c098b9a4`。匿名保留标识：`mvp_test_2d7b53573e374735886414baa5a7817a`。
+
+最后一项原始结果摘要：`0a44ff4ef1a74e7615ba38e6151cd70285e00e744bcc7dea4fef84735311a2ad`；执行元数据摘要：`0c5ed4f40e30342c68cd968fbd7f36160731ca8198774a29048e2921ef77b273`。

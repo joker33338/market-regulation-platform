@@ -1,0 +1,55 @@
+{
+  "version": "v0.2.0",
+  "gate_status": "PASS",
+  "source_branch": "feat/ocr-dual-engine-v0.2",
+  "source_commit": "8badb995592771ff099cf52570621ba29ad37533",
+  "tested_commit_sha": "8badb995592771ff099cf52570621ba29ad37533",
+  "fix_transport_commit": "c7e56026b4669b4a8a0075369b873c393ed50efe",
+  "qa_test_commit": "08cfbe9e84257bf878ccd85b8643007cf117097a",
+  "original_scenario_test_commit": "d3c538643b4114c9e99acee002d1db77cd7ccbc1",
+  "total_tests": 149,
+  "passed_tests": 149,
+  "failed_tests": 0,
+  "skipped_tests": 0,
+  "blocked_tests": 0,
+  "critical_issues": [],
+  "report_paths": [
+    "docs/qa/round01/06-regression-report.md",
+    "docs/qa/round01/07-final-summary.md",
+    "docs/qa/v0.2.0/qa-coverage.json"
+  ],
+  "report_path": "docs/qa/round01/06-regression-report.md",
+  "report_sha256": {
+    "docs/qa/round01/06-regression-report.md": "833684124dde8fe3743f348a8a379b54d74021e36cfbe53f80bbfb22c5f51c0b",
+    "docs/qa/round01/07-final-summary.md": "257aeb0b1d6f41f29136090e377f567cf921a06bed74b7aaa76014cf48c14fda",
+    "docs/qa/v0.2.0/qa-coverage.json": "edafbc588ff88ea9ea338ea2a6138a5725d765cf3353cf2da69875cbef5471b5"
+  },
+  "report_hash_mode": "Exact Git blob bytes after repository text filters",
+  "checked_at": "2026-11-07T05:59:16.248220+00:00",
+  "tested_at": "2026-11-07T05:59:16.248220+00:00",
+  "mock_status": "PASS",
+  "integration_status": "PASS",
+  "qa_status": "PASS",
+  "required_tests": [
+    "independent-A-J",
+    "existing-source-149-unique-methods",
+    "real-local-http",
+    "approved-postgresql"
+  ],
+  "test_commands": [
+    "python -B -m unittest <six-existing-mock-suites> tests.test_dual_engine_policy",
+    "python -B <qa-harness> <mock/http/postgres/delta>",
+    "python -B tests/run_preserved_postgres_validation.py --source <frozen-readonly-snapshot> --approve-retained-test-schema"
+  ],
+  "result_summary": "Independent QA: 149 unique source methods PASS; retained-schema variant preserves original business assertions; auxiliary HTTP/anonymous historical OCR excluded from count",
+  "retained_schema": "mvp_test_2d7b53573e374735886414baa5a7817a",
+  "image": "sha256:b4010953b65e06c2d1000fdcd129f6fcceeed9b9a5d48a12266d3365a610a2b1",
+  "packages_fingerprint": "07bb674a2aef66f24e8387bdb0af04c2ce23841805d07770277385f0c098b9a4",
+  "limitations": [
+    "No production deployment acceptance",
+    "No real official cloud recognition quality acceptance",
+    "No full-corpus accuracy claim",
+    "No newly configured corpus retest",
+    "No next-version task authorized"
+  ]
+}
