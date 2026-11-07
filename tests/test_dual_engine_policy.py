@@ -117,6 +117,67 @@ class DualEnginePolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(task['status'], 'completed')
         self.assertEqual(result['parsing_status'], 'needs_review')
 
+    async def test_file_and_page_budgets_stop_before_unapproved_transfer(self):
+        source = make_source(self.root, 'png')
+        other = self.root / 'other.png'
+        other.write_bytes(source.read_bytes() + b'another synthetic hash')
+        self.authorize(source)
+        self.authorize(other)
+        service = self.service(max_cloud_files=1)
+        task, _ = await service.submit('alice', 'limited-files', [(source.name, source), (other.name, other)],
+                                       parse_options={'allow_cloud_fallback': True})
+        await service.run(task['id'])
+        self.assertEqual(self.fixture.submissions, 1)
+        self.assertEqual(service.repository.get(task['id'])['files'][1]['fallback_reason'], 'cloud_task_budget_exhausted')
+        self.fixture.calls.clear()
+        self.fixture.submissions = 0
+        import fitz
+        pdf_path = self.root / 'two-pages.pdf'
+        with fitz.open() as pdf:
+            pdf.new_page().insert_text((40, 50), 'Synthetic first page')
+            pdf.new_page().insert_text((40, 50), 'Synthetic second page')
+            pdf.save(pdf_path)
+        self.authorize(pdf_path)
+        limited = self.service(max_cloud_pages=1)
+        task, _ = await limited.submit('alice', 'limited-pages', [(pdf_path.name, pdf_path)],
+                                       parse_options={'strategy': 'remote', 'allow_cloud_fallback': True})
+        await limited.run(task['id'])
+        self.assertEqual(self.fixture.calls, [])
+        self.assertEqual(limited.repository.get(task['id'])['files'][0]['fallback_reason'], 'cloud_task_budget_exhausted')
+
+    async def test_ocr_failure_can_fallback_but_both_failures_remain_failed(self):
+        source = make_source(self.root, 'png')
+        self.runtime.fail = True
+        self.authorize(source)
+        service = self.service()
+        task, result = await self.run_source(service, source, allow_cloud_fallback=True)
+        self.assertEqual(task['status'], 'completed')
+        self.assertEqual(result['quality']['routing_trace']['raw_results']['local']['parsing_status'], 'failed')
+        self.assertEqual(result['source_location']['selected_engine'], ['mineru_official'])
+        self.grants.clear()
+        task, _ = await service.submit('alice', 'both-unavailable', [(source.name, source)],
+                                       parse_options={'allow_cloud_fallback': True})
+        await service.run(task['id'])
+        task = service.repository.get(task['id'])
+        self.assertEqual(task['status'], 'failed')
+        self.assertTrue(task['files'][0]['local_result_path'])
+        self.assertTrue(task['files'][0]['requires_review'])
+
+    async def test_revoked_authorization_prevents_source_upload(self):
+        source = make_source(self.root, 'png')
+        self.authorize(source)
+        original = self.fixture.handle
+        def handle(request):
+            response = original(request)
+            if request.method == 'POST':
+                self.grants.clear()
+            return response
+        self.fixture.handle = handle
+        _, result = await self.run_source(self.service(), source, allow_cloud_fallback=True)
+        self.assertFalse(self.fixture.uploaded)
+        self.assertEqual(self.fixture.submissions, 1)
+        self.assertIn('local', result['quality']['routing_trace']['raw_results'])
+
     async def test_unknown_create_outcome_does_not_repeat_on_retry(self):
         source = make_source(self.root, 'png')
         self.authorize(source)
