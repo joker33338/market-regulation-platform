@@ -1,46 +1,37 @@
 {
-  "handoff_id": "v0.1-qa-4e5f4a7-e7c62e2-bugfix",
+  "handoff_id": "v0.1-qa-d2a4c67-repairs-closed",
   "version": "v0.1",
-  "gate_status": "FAIL",
+  "gate_status": "PASS",
   "source_agent": "QA",
   "target_agent": "Fix",
+  "source_commit": "d2a4c673c596945be14fa4d91a995fd8086e2b31",
   "source_branch": "fix/round1",
-  "source_commit": "4e5f4a79ae5bd9d97316916c854ce6504e447dcc",
-  "qa_commit": "e7c62e25aeace99625b5f13c164129f44a7456bb",
-  "qa_commit_role": "committed QA test tooling; report transport SHA supplied separately",
+  "qa_commit": "4042a23c966c20f94eef17f3c3fc10d7d5f7702a",
+  "qa_commit_role": "已执行的QA测试提交；PASS报告传输提交由Git单独提供",
   "handoff_type": "bugfix",
   "task_type": "bugfix",
   "target_branch": "fix/round1",
-  "status": "ready",
-  "handoff_status": "READY_FOR_FIX",
-  "dispatch_status": "WAITING_COORDINATOR",
+  "status": "completed",
+  "handoff_status": "CLOSED",
   "bug_ids": [
-    "R01-005",
-    "R01-004"
+    "R01-004",
+    "R01-005"
   ],
   "feature_ids": [],
   "acceptance_criteria": [
-    "R01-005: both corrupt-first and valid-first local batches preserve valid output, record failed file and finish partial.",
-    "R01-004: Windows reserved-name case variants cannot replace original downloaded artifact bytes.",
-    "Run original R01 regression, production Mock/API/recovery/normalization/SQLite KB tests without lowering assertions.",
-    "Use only approved isolated PostgreSQL for live writes; report unresolved DB prerequisites explicitly.",
-    "Return exact repair commit and updated handoff-to-qa.md; do not start v0.2.0 from this FAIL gate."
+    "两个遗留问题及五个累计Bug均已实际复测通过。"
   ],
   "test_commands": [
-    "python -B -m unittest tests.test_round01_regressions tests.test_round01_integrity -v",
-    "python -B -m unittest tests.test_mineru_implementation tests.test_mineru_api tests.test_mineru_official -v",
-    "python -B tests/run_round01_validation.py --source <isolated-fix-checkout> --include-source-tests"
+    "python -B tests/run_round01_validation.py --source <isolated-checkout> --include-source-tests"
   ],
   "report_paths": [
     "docs/qa/round01/03-bug-list.md",
+    "docs/qa/round01/05-missing-features.md",
     "docs/qa/round01/06-regression-report.md",
     "docs/qa/round01/07-final-summary.md",
     "docs/qa/round01/handoff-to-fix.md"
   ],
-  "next_version_allowed": false,
+  "next_version_allowed": true,
   "automatic_dispatch_performed": false,
-  "coordinator_blockers": [
-    "Existing coordinator is a fail-closed preparation layer without completed restricted write dispatch.",
-    "Current receiver hardcodes a next-version handoff path; this repair handoff deliberately remains under round01."
-  ]
+  "note": "旧修复请求关闭；下一版使用单独的v0.2.0 READY交接，不能重复调度此任务。"
 }
