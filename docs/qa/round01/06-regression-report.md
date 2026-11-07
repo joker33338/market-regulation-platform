@@ -122,3 +122,10 @@ v0.1 本地集成 PASS，可按用户规定生成 v0.2.0 双引擎开发交接�
 - `output/delta.json`: `310fe455420b07b8b1e900a0195d9bd450be67979e6f3113c3706d57ac0f73de`
 - `output/windows-specific.json`: `d401e85f3c0665775c63c0756f4967be139f808f9d2d046d844a34d125ddacee`
 - `output/qa-isolated-pg.json`: `df38b7ee280f6a74fe939e77ffde6c176962f771a2ba78fa63ca963b0ea0e67e`
+
+
+### legacy缺口的最小待审批方案（仅准备，未执行）
+
+已只读审阅Database.initialize：除随机测试schema外，还会创建law_chunks表/索引与VERSION_SCHEMA中的mr_*表/索引，并含CREATE EXTENSION IF NOT EXISTS vector。建议仅在既有独立qa_round01库创建新的随机mvp_test_<hex> schema，所有测试表/索引限定在新schema，预先确认public.vector已存在，禁止安装扩展、ALTER既有表和DROP。运行原方法全部业务断言，唯一替换为抑制finally清理的DROP并保留schema及合成记录，SET search_path仍正常复位。既有表与用户资料不改动。测试业务本身的版本发布/回滚仅作用于新schema内的合成数据。
+
+已在忽略目录准备默认拒绝执行的qa_legacy_preserve_review.py，需显式审批参数及MVP_TEST_PG_DSN，并核验数据库名、QA隔离标记和既有vector扩展；仅对原test模块注入保留清理的Database子类，不修改原断言。当前未执行该入口或任何DDL，仍保持该方法BLOCKED。149是源码唯一方法的去重范围；辅助HTTP和匿名OCR不加入149重复计数。新语料配置仅适用于后续任务，本次历史OCR不得解释为新数据集已测。
