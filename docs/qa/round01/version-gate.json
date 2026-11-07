@@ -58,7 +58,8 @@
   "database_scope": "新建专用容器、内部网络、无主机端口；测试库已停止且保留数据；业务库仅查列定义。",
   "next_version": "v0.2.0",
   "next_version_allowed": true,
-  "next_version_handoff_status": "PENDING_GENERATION",
+  "next_version_handoff_status": "READY",
   "production_deployment_status": "NOT_TESTED",
-  "real_cloud_quality_status": "NOT_TESTED"
+  "real_cloud_quality_status": "NOT_TESTED",
+  "next_version_transport_commit": "a0c20a9e698d53ce06cd97dceaa1aa188dd042f3"
 }
