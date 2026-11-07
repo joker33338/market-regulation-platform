@@ -1,9 +1,10 @@
-"""Executable reference scenarios; unittest fallback because pytest is absent.
-
-These validate QA fixtures/driver only, not the absent application client.
-"""
+"""QA参考场景及独立生产适配器验收；所有HTTP流量使用Mock。"""
+import asyncio
+import importlib.util
 import io
 import json
+from pathlib import Path
+import tempfile
 import unittest
 import zipfile
 import httpx
@@ -167,6 +168,38 @@ class MinerUReferenceContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             ContractDriver(None)
 
-    @unittest.skip('MINERU-FEAT-001: production client/config/routes do not exist at baseline')
+    @unittest.skipUnless(importlib.util.find_spec('qa_core.document_parsing.mineru_service'),
+                         '当前源提交尚无生产适配器')
     def test_production_adapter_acceptance(self):
-        pass
+        from qa_core.document_parsing.mineru_config import MinerUConfig
+        from qa_core.document_parsing.mineru_client import MinerUClient
+        from qa_core.document_parsing.mineru_repository import TaskRepository
+        from qa_core.document_parsing.mineru_service import MinerUService
+        from qa_core.document_parsing.mineru_mock import mock_transport
+
+        async def verify(root):
+            config = MinerUConfig(enabled=True, result_dir=root, poll_interval=0, max_polls=3)
+            client = MinerUClient(config, transport=mock_transport())
+            try:
+                service = MinerUService(config, TaskRepository(root/'tasks.sqlite3'), client)
+                path = root/'synthetic.pdf'
+                path.write_bytes(b'%PDF-1.7 synthetic adapter contract')
+                task, _ = await service.submit('qa-owner', 'qa-contract', [('synthetic.pdf', path)])
+                await service.run(task['id'])
+                stored = service.repository.get(task['id'], 'qa-owner')
+                self.assertEqual(stored['status'], 'completed')
+                file = stored['files'][0]
+                self.assertTrue(stored['remote_id'])
+                normalized = json.loads((Path(file['result_path'])/'normalized.json').read_text(encoding='utf-8'))
+                self.assertEqual(normalized['document_id'], file['sha256'])
+                self.assertEqual(normalized['source_location']['mineru_task_id'], stored['remote_id'])
+                self.assertEqual(normalized['source_location']['mineru_file_id'], file['remote_id'])
+                self.assertTrue(normalized['quality']['mock'])
+                repeated, created = await service.submit('qa-owner', 'qa-contract', [('synthetic.pdf', path)])
+                self.assertFalse(created)
+                self.assertEqual(repeated['id'], task['id'])
+            finally:
+                await client.close()
+
+        with tempfile.TemporaryDirectory() as directory:
+            asyncio.run(verify(Path(directory)))
