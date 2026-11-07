@@ -1,0 +1,62 @@
+{
+  "version": "v0.1",
+  "gate_status": "FAIL",
+  "source_branch": "fix/round1",
+  "source_commit": "4e5f4a79ae5bd9d97316916c854ce6504e447dcc",
+  "remote_source_commit": "f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57",
+  "qa_test_commit": "e7c62e25aeace99625b5f13c164129f44a7456bb",
+  "checked_at": "2026-11-07T01:10:41.375125+00:00",
+  "critical_issues": [
+    "DOC-003/R01-005 (P1)"
+  ],
+  "open_bug_ids": [
+    "R01-004",
+    "R01-005"
+  ],
+  "report_paths": [
+    "docs/qa/round01/03-bug-list.md",
+    "docs/qa/round01/06-regression-report.md",
+    "docs/qa/round01/07-final-summary.md",
+    "docs/qa/round01/handoff-to-fix.md"
+  ],
+  "total_tests": 113,
+  "passed_tests": 107,
+  "failed_tests": 2,
+  "skipped_tests": 4,
+  "blocked_tests": 0,
+  "failure_records": 3,
+  "expected_failures": 0,
+  "count_unit": "test_method; failure_records counts failed assertions/subtests separately",
+  "skips": [
+    {
+      "test": "tests.test_mineru_contract.MinerUReferenceContracts.test_production_adapter_acceptance",
+      "reason": "MINERU-FEAT-001: production client/config/routes do not exist at baseline"
+    },
+    {
+      "test": "tests.test_parsing_postgres.ParsingPostgresTests.test_child_failure_rolls_back_parent_insert",
+      "reason": "Explicit existing test schema required"
+    },
+    {
+      "test": "tests.test_parsing_postgres.ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved",
+      "reason": "Explicit existing test schema required"
+    },
+    {
+      "test": "tests.test_postgres_integration.PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback",
+      "reason": "MVP_TEST_PG_DSN not supplied; production databases are not used"
+    }
+  ],
+  "environment_blocked_database_cases": 3,
+  "next_version": "v0.2.0",
+  "next_version_allowed": false,
+  "next_version_handoff_status": "NOT_CREATED",
+  "production_deployment_status": "NOT_TESTED",
+  "protocol_validation": "schema_only",
+  "execution_summary_sha256": "b423db6c2acc45e4cf3b82e94ff938ea80f08e70c2ac75e3e8c49e9985ea1c45",
+  "report_sha256": {
+    "docs/qa/round01/03-bug-list.md": "7930b0ae54f0392a33999218da0026202d26f2f2686271199b8fd1cd43173f4c",
+    "docs/qa/round01/06-regression-report.md": "9a10e90ae653b2a43a564337f33e0dc9d125c4ea7f2a7c895d64b75cf4be53ca",
+    "docs/qa/round01/07-final-summary.md": "6a2923f05a19ea0410d506c8dcce675966f0e43a6d46beafb3c8fd4c2398e567",
+    "docs/qa/round01/handoff-to-fix.md": "cf3fdb8c0970bbc49d9e0d1ecc4411328df8172553bb9629e24602577e823ee4"
+  },
+  "protocol_schema_sha256": "0cb74c453c818c017c403e234935a4afffaa272aecc55297965fd211c0c55037"
+}

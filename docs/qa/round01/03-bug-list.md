@@ -89,3 +89,7 @@ Tested Fix commit: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57` (business code thr
 `test_local_database_failure_remains_visible_on_error_api` PASS: a simulated DB failure is persisted and exposed by the shared status/errors serializer. `test_failed_database_result_can_resume_without_new_remote_task` PASS: simulated transient DB failure recovers without creating a new remote task. These tests use a fake sink, not a real PostgreSQL server.
 
 Current totals: 5 confirmed bugs, 3 fixed on the tested commit, 2 still FAIL; cumulative repair rate 60%. The initial source findings above remain historical baseline evidence. See `06-regression-report.md` for independent execution limits.
+
+## v0.1 latest-source gate — 2026-11-07
+
+Local Fix `4e5f4a79ae5bd9d97316916c854ce6504e447dcc` has now been tested in a fresh detached worktree. Remote fix/round1 was independently verified at `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`; local 4e5f4a7 only imports earlier QA changes, with no business-source diff. Both SEC-001/R01-004 and DOC-003/R01-005 still FAIL on this latest local source. Existing IDs, priorities, root causes, synthetic sample IDs and acceptance remain unchanged. Original R01-001/002/003 PASS. v0.1 gate FAIL; no v0.2.0 READY handoff.
