@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import stat
+import tempfile
 import zipfile
 
 from qa_core.utils import file_sha256
@@ -24,13 +25,13 @@ def unpack(payload: bytes, config) -> dict[str, bytes]:
                 # platforms; validate the original archive entry as well.
                 name = item.orig_filename
                 path = PurePosixPath(name)
+                canonical = path.as_posix().casefold()
                 if (not name or path.is_absolute() or ".." in path.parts or "\\" in name or ":" in name
                         or any(part.endswith((".", " ")) or any(ord(c) < 32 for c in part) for part in path.parts)
                         or any(part.split(".")[0].upper() in {"CON", "PRN", "AUX", "NUL", *("COM"+str(n) for n in range(1,10)), *("LPT"+str(n) for n in range(1,10))} for part in path.parts)
-                        or name in {"artifact.bin", "normalized.json"}
+                        or canonical.split("/")[0] in {"artifact.bin", "normalized.json"}
                         or stat.S_ISLNK(item.external_attr >> 16) or item.flag_bits & 1):
                     raise MinerUError("unsafe_archive_path")
-                canonical = path.as_posix().casefold()
                 if canonical in names:
                     raise MinerUError("duplicate_archive_path")
                 names.add(canonical)
@@ -75,10 +76,20 @@ def store_artifacts(payload, directory: Path, config):
         target.parent.mkdir(parents=True, exist_ok=True)
         if not target.resolve().is_relative_to(directory.resolve()) or target.is_symlink():
             raise MinerUError("unsafe_result_path")
-        temporary = target.with_name(target.name + ".part")
-        with temporary.open("wb") as stream:
-            stream.write(data)
-        os.replace(temporary, target)
+        # A ZIP member can itself be called e.g. markdown.md.part. An exclusive
+        # temporary file avoids clobbering it during another member's write.
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".mineru-", suffix=".part", delete=False) as stream:
+            temporary = Path(stream.name)
+            try:
+                stream.write(data)
+            except BaseException:
+                stream.close()
+                temporary.unlink(missing_ok=True)
+                raise
+        try:
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
     return result
 
 

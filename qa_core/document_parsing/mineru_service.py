@@ -147,9 +147,6 @@ class MinerUService:
                     or task["api_identity"] != stable_hash(self.config.api_url) or task["output_formats"] != list(self.config.output_formats)):
                 raise MinerUError("resume_configuration_mismatch", 409)
             task["error"] = None
-            for file in task["files"]:
-                if await asyncio.to_thread(file_sha256, file["source_path"]) != file["sha256"]:
-                    raise MinerUError("source_integrity_mismatch", 409)
             if task.get("cancel_requested") and not task["remote_id"]:
                 task["status"] = "canceled"
                 task["completed_at"] = now()
@@ -157,6 +154,9 @@ class MinerUService:
             if self.config.mode == "local":
                 await self._local(task)
                 return
+            for file in task["files"]:
+                if await asyncio.to_thread(file_sha256, file["source_path"]) != file["sha256"]:
+                    raise MinerUError("source_integrity_mismatch", 409)
             if not task["remote_id"]:
                 if task["submission_started"]:
                     raise MinerUError("submission_outcome_unknown", 409)
@@ -233,18 +233,47 @@ class MinerUService:
 
     async def _local(self, task):
         from .document_router import DocumentParser
+        from .schemas import DocumentResult
+        task["status"] = "running"
+        await self._save(task)
         for file in task["files"]:
-            def parse():
-                with DocumentParser() as parser:
-                    return parser.parse(file["source_path"])
-            result = await asyncio.to_thread(parse)
-            directory = self.root / task["id"] / file["id"]
-            directory.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread((directory / "normalized.json").write_text, result.to_json(), encoding="utf-8")
-            if self.result_sink:
-                file["database_parse_id"] = await asyncio.to_thread(self.result_sink.save, task, file, result)
-            file["result_path"] = str(directory)
-            file["status"] = "failed" if result.parsing_status in {"failed", "partial"} else "completed"
+            if file["status"] == "completed" and file.get("result_path"):
+                continue
+            file["status"] = "running"
+            await self._save(task)
+            try:
+                if await asyncio.to_thread(file_sha256, file["source_path"]) != file["sha256"]:
+                    raise MinerUError("source_integrity_mismatch", 409)
+                directory = self.root / task["id"] / file["id"]
+                result_path = directory / "normalized.json"
+                if file.get("local_result_path"):
+                    # Reuse the exact pre-DB result on retry: parsing timestamps
+                    # must not change an already committed result's digest.
+                    payload = await asyncio.to_thread(result_path.read_text, encoding="utf-8")
+                    result = DocumentResult.from_dict(json.loads(payload))
+                    if result.document_id != file["sha256"]:
+                        raise MinerUError("source_integrity_mismatch", 409)
+                else:
+                    def parse():
+                        with DocumentParser() as parser:
+                            return parser.parse(file["source_path"])
+                    result = await asyncio.to_thread(parse)
+                    if result.parsing_status in {"failed", "partial"}:
+                        raise MinerUError("local_parse_failed")
+                    directory.mkdir(parents=True, exist_ok=True)
+                    await asyncio.to_thread(result_path.write_text, result.to_json(), encoding="utf-8")
+                    file["local_result_path"] = str(directory)
+                    await self._save(task)
+                if self.result_sink:
+                    file["database_parse_id"] = await asyncio.to_thread(self.result_sink.save, task, file, result)
+                file["result_path"] = str(directory)
+                file["status"] = "completed"
+                file.pop("error", None)
+            except Exception as exc:
+                file["status"] = "failed"
+                file["error"] = {"code": exc.code if isinstance(exc, MinerUError) else type(exc).__name__}
+            # A bad parser/file/database result cannot discard sibling progress.
+            await self._save(task)
         success = sum(f["status"] == "completed" for f in task["files"])
         task["status"] = "completed" if success == len(task["files"]) else "partial" if success else "failed"
         task["completed_at"] = now()
@@ -254,7 +283,9 @@ class MinerUService:
         if task_id in self._locks:
             raise MinerUError("task_running", 409)
         can_retry_result = any(f.get("remote", {}).get("status") == "completed" and f.get("error") for f in task["files"])
-        if task["remote_id"] and (task["status"] == "timed_out" or task["status"] in {"partial", "failed"} and can_retry_result):
+        can_retry_local = task["mode"] == "local" and any(f["status"] == "failed" for f in task["files"])
+        if ((task["remote_id"] and (task["status"] == "timed_out" or task["status"] in {"partial", "failed"} and can_retry_result))
+                or task["status"] in {"partial", "failed"} and can_retry_local):
             task["status"] = "pending"
             await self._save(task)
         elif task["status"] not in {"created", "pending", "uploading", "running"}:
