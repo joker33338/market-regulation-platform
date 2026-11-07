@@ -1,4 +1,12 @@
-# Incremental QA → Fix handoff — 2026-11-07
+# v0.1 repair handoff — latest gate FAIL, 2026-11-07
+
+Latest independently tested local source: `4e5f4a79ae5bd9d97316916c854ce6504e447dcc`; remote fix/round1 verified separately at `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`. No business-source changes between them. QA test/helper commit: `e7c62e25aeace99625b5f13c164129f44a7456bb`.
+
+Current full run: 113 methods, 107 PASS, 2 failing methods, 4 skips; 3 failure records from ZIP plus both local-batch orders. The requested run_fix_regressions.ps1 also executed; its extra API environment skips were covered in the full rerun. The two repairs below are still outstanding on 4e5f4a7. **Do not start v0.2.0.** Current-version machine data is in version-gate.json and round01/handoff.json; no next-version READY data was generated.
+
+Coordinator source review shows a preparation layer without completed automatic write dispatch and with a reader tied to a next-version handoff path. Current bugfix JSON is schema-validated for coordinator receipt, not proof of automatic activation. **等待协调器接收。** No coordinator policy/state or Fix worktree was modified by QA.
+
+The historical handoff below remains applicable; use 4e5f4a7 as the latest source and e7c62e2 as committed QA tooling. Read 06/07 for authoritative latest results.
 
 Original baseline: `f2a5c925f0305a2e7df21f750b20bed63db40de3`.
 First QA handoff: `13db6f7b18e8661b3c462f105d1f55c1a153bcea`.

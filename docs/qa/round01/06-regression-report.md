@@ -1,4 +1,56 @@
-# Round 01 independent regression
+# v0.1 independent acceptance — FAIL
+
+## Latest authoritative version gate — 2026-11-07
+
+Unresolved P1 prevents current local integration PASS. Production deployment is not accepted; v0.2.0 is not authorized to start.
+
+| Reference | Exact identity |
+| --- | --- |
+| Remote fix/round1 | `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`, independently read from GitHub branches API |
+| Local fix/round1 tested | `4e5f4a79ae5bd9d97316916c854ce6504e447dcc` |
+| QA test/helper commit | `e7c62e25aeace99625b5f13c164129f44a7456bb` |
+
+Local and remote differ. Local 4e5f4a7 imported the preceding QA tests/reports; no qa_core, scripts, requirements-api.txt or Dockerfile changes exist against remote f7c4d75. Therefore Fix's 109-test report describes a historical suite. Read current handoff-to-qa.md, 05-fix-report.md and docs/mineru-integration/05-开发与测试记录.md from the exact local source; do not inherit their live service/DB PASS. Remote identity was checked through [the repository branches endpoint](https://api.github.com/repos/joker33338/market-regulation-platform/branches?per_page=100), without changing any remote ref.
+
+A fresh detached QA validation worktree was created at 4e5f4a7; prior validation and original/Fix worktrees were preserved. Existing Python and optional API libraries were reused read-only; no install/upgrade or business-source edit. Real DSNs/credentials were cleared for synthetic runs. Local asynchronous sockets were permitted, while remote fixtures remain MockTransport.
+
+| Current execution | Methods | PASS methods | Failing methods | Skips |
+| --- | ---: | ---: | ---: | ---: |
+| scripts/run_fix_regressions.ps1 -Python configured-interpreter | 113 | 101 | 2 | 10 |
+| Complete QA rerun with existing API libraries available | 113 | 107 | 2 | 4 |
+
+The supplied script resets PYTHONPATH to a source-local API environment absent in the fresh worktree. An attempted dependency junction was denied; no packages were installed or copied. Six FastAPI cases were additionally skipped by that script, then all six executed PASS in the complete rerun using the existing package path. The gate uses the latter run. Expected failures: zero. Console failures=3 represents two failing methods: both local-batch order subtests fail, plus the ZIP case. The helper deduplicates overlapping QA cases already imported by Fix and exports SHA-bound evidence.
+
+Reproduction from QA with configured interpreter/dependencies and writable TEMP/TMP:
+
+```text
+python -B tests/run_round01_validation.py --source <isolated-checkout> --include-source-tests --result-json <ignored-evidence-json>
+```
+
+Original R01-001/002/003 targeted assertions PASS. Reference Mock cases 13 PASS, production implementation cases 16 PASS, official-adapter cases 2 PASS, and FastAPI cases 6 PASS. These include authentication/ownership, uploads/results, uncertain creation, interrupted upload, idempotency, resume, normalization, reviewed legal bridge and SQLite retrieval. No real remote service or database is implied.
+
+**Current failures:** DOC-003/R01-005 P1 (corrupt-first stops valid sibling; valid-first task incorrectly failed instead of partial), and SEC-001/R01-004 P2 (ZIP ARTIFACT.BIN overwrites original artifact.bin on Windows). Both reproduced on 4e5f4a7; functions and synthetic reproducers remain in 03-bug-list.md. No duplicate bug IDs created.
+
+### Four current skips, explicitly reviewed
+
+| Test | Reason / disposition |
+| --- | --- |
+| MinerUReferenceContracts.test_production_adapter_acceptance | Historical unconditional baseline skip. Its absent-client message is stale; actual production client/config/API tests ran. Not evidence that the feature remains absent, and not product PASS. |
+| ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved | PARSING_TEST_PG_DSN not supplied; requires approved existing isolated document_review tables, intentionally retains a synthetic row. NOT RUN / environment BLOCKED. |
+| ParsingPostgresTests.test_child_failure_rolls_back_parent_insert | Same DB prerequisite absent. NOT RUN / environment BLOCKED; fake-sink retry is not PostgreSQL transaction evidence. |
+| PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback | MVP_TEST_PG_DSN not supplied. Creates/drops a generated schema and must never target the default business DB. NOT RUN / environment BLOCKED. |
+
+The three DB cases are counted once as skips, not as additional test methods. No skip allowlist waiving them was invented. Current original local/parser/legal/SQLite suites PASS; local multi-file orchestration remains FAIL. No P0 confirmed; the unresolved P1 alone blocks advancement.
+
+Actual DocumentParser, PaddleOCRService, PaddleStructureService, quality.py, OfficialMinerUClient, MinerUService, PostgresResultSink and reviewed legal adapter were inspected. Native routing, OCR confidence/provenance, Structure output and quality findings already exist and should be reused after approval. quality.py returns heuristic findings/review flags, not an implemented automatic local/cloud routing policy. No next-version feature development or planning handoff is started while the gate FAILS.
+
+Machine data: version-gate.json is FAIL; round01/handoff.json requests a **v0.1 bugfix**, not a v0.2.0 feature. Reports cannot embed their own future transport commit SHA; Git supplies that after commit. Fresh logs/statistics remain ignored as local/round01/v01-full-regression.log and v01-execution.json; supplied script log stays in the validation worktree's ignored reports.
+
+Coordinator source review found an independent preparation checkout: README/schema/tools describe fail-closed behavior, no completed write-dispatch adapter, and a reader hardcoded to the next-version handoff path. Current-version JSON is validated against its schema, but no --run/--resume, coordinator-state edit or automatic wakeup is performed. Current repair data stays under round01; no v0.2.0 READY file is created to bypass this gate. **等待协调器接收。**
+
+The remainder records the prior f7c4d75 regression as historical evidence. In particular, earlier real local OCR/BGE successes below are not newly executed real-model tests in this latest gate run; their business-source files are unchanged. Real cloud/Standard, full-corpus quality, live PostgreSQL, actual Docker build, browser visual and Aliyun GPU remain unverified by this QA gate.
+
+## Prior independent regression at f7c4d75 (retained history)
 
 Report updated: 2026-11-07 (Asia/Shanghai).
 

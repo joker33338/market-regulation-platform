@@ -1,4 +1,20 @@
-# Round 01 acceptance summary — current result: NOT ACCEPTED
+# v0.1 version gate — FAIL; v0.2.0 not released for development
+
+Latest independent check, 2026-11-07:
+
+- Local Fix tested: `4e5f4a79ae5bd9d97316916c854ce6504e447dcc`.
+- Remote fix/round1 verified separately: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`.
+- QA test/helper commit: `e7c62e25aeace99625b5f13c164129f44a7456bb`.
+- Full run: 113 methods, 107 PASS, 2 failing methods (3 failure records), 4 skips. All six FastAPI cases ran PASS in the full dependency-enabled rerun. The requested official regression script also ran, with six additional API environment skips explained in 06.
+- Original R01-001/002/003 PASS. **DOC-003/R01-005 P1 and SEC-001/R01-004 P2 remain FAIL.** Three live DB tests remain environment-blocked/skipped; the fourth skip is a historical placeholder, not an actual absent-client finding.
+
+Local 4e5f4a7 only imports QA changes; it does not repair the two issues. version-gate.json records FAIL and prohibits next-version advancement. round01/handoff.json is for current-version bug repair only. **No v0.2.0 requirements/plan/READY/development handoff is generated.** This decision is distinct from production deployment, which is NOT_TESTED.
+
+The existing Orchestrator is a preparation layer with automatic write dispatch blocked; its reader currently expects a next-version handoff path. QA does not change that policy/path or claim an agent was awakened. **等待协调器接收。** Fix must return a new exact repair SHA and updated handoff-to-qa.md before QA can reconsider advancement.
+
+The preceding bug/feature accounting remains: 5 bugs, 3 repaired, 2 unresolved (60%); 8 GAPs, 6 with at least partial code and 2 unsupplemented, under the scoped statuses in 05. Existing OCR/Structure/quality/client/DB/KB capabilities have been reviewed to avoid requesting their redevelopment after the gate passes.
+
+## Prior acceptance detail (historical f7c4d75 run)
 
 Updated 2026-11-07. This is the current acceptance decision, not a claim that all required work is complete.
 
