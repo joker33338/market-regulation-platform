@@ -16,9 +16,9 @@
     "docs/qa/v0.2.1/routing-quality-report.md",
     "docs/qa/v0.2.1/testset-inventory.md"
   ],
-  "checked_at": "2026-11-07T07:26:23.334075+00:00",
+  "checked_at": "2026-11-07T08:08:00.221233+00:00",
   "mock_status": "PASS",
-  "integration_status": "NOT_RERUN",
+  "integration_status": "NOT_REQUIRED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
     "9/53原标注路由差异未改写且尚待审定",
@@ -39,7 +39,7 @@
     "numerator": 25,
     "denominator": 25
   },
-  "business_code_changed": false,
+  "business_code_changed": true,
   "merge_main_allowed": false,
   "evidence_sha256": {
     "inventory.json": "f4720457abd2e00ba26082026c85ea8c32d2594f077fc46be0bff03d8c08bcef",
@@ -63,5 +63,7 @@
     "Q021-001",
     "Q021-002"
   ],
-  "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b"
+  "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
+  "business_code_changed_by_qa": false,
+  "integration_not_required_reason": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。"
 }

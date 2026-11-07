@@ -23,3 +23,7 @@
 原53页严格路由一致44页的统计仍绑定5ed1ba6339dc817f53747c0db7cbcbde3224dd3b，未为迎合实现改标签。9差异与真实质量标准答案仍待审定。前述真实OCR/Structure和合成3×3指标都是5ed基线的历史实测，不声称在新SHA重新推理。差异审查确认runtime、config、paddle_structure、模型与依赖未变，成功推理路径未变；本轮只修改异常Native候选保留和CLI配置继承，并由合成成功/异常控制复验适用边界。
 
 没有重跑149、真实模型或数据库，也没有安装依赖、上传语料、Push或合并main。
+
+## 门禁元数据更正
+
+本轮Fix实际修改三个业务/入口文件，因此business_code_changed为true；QA自身未修改业务代码，business_code_changed_by_qa为false。本轮真实集成状态采用NOT_REQUIRED而非非协议值：差异审查仅异常兜底及CLI配置变化，成功推理实现、模型和依赖未变，定向74项已覆盖这些边界；无需新增重模型或数据库测试。历史真实指标仍只适用于其原源码SHA，整体质量门禁保持BLOCKED。checked_at为本次验收记录时间，不代表重新执行测试。
