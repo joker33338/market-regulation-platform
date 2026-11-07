@@ -17,6 +17,9 @@
 当前结果库复用已有 schema，无迁移。任务管理另用本地 SQLite；不自动发布 public 法条知识库。
 批量大文件、复杂表格质量、多用户部署和分布式队列仍需后续验收。
 
-完整回归：`scripts/run_fix_regressions.ps1`，109 项中 105 通过、4 条件跳过。
-PostgreSQL 幂等与回滚另行 2/2 通过；真实 HTTP 上传至 PostgreSQL PASS。
+最新当前版本修复：`0cfb4f2`，解决本地批次隔离和 Windows 原始包覆盖问题。
+完整回归：`scripts/run_fix_regressions.ps1`，118 项中 114 通过、4 条件跳过。
+独立 QA 工作树可传入 `-Python` 与 `-ApiPackages` 复用已有依赖；不需要新建环境。
+此前 PostgreSQL 幂等与回滚另行 2/2 通过、真实 HTTP 上传至 PostgreSQL PASS，属于历史 Fix 实测，未作为本次 QA 独立 PASS。
+当前版本闸门仍为 FAIL，等待 Agent A 针对修复 SHA 重新验收；v0.2.0 和 requirements 整理尚未开始。
 详见 [Fix 交接](../qa/round01/handoff-to-qa.md) 和本目录设计/测试记录。

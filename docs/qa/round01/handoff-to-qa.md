@@ -1,4 +1,38 @@
-# Fix → QA: first usable upload-to-PostgreSQL version
+# Fix → Agent A: v0.1 blocker repairs ready for independent regression
+
+Updated 2026-11-07. Branch: `fix/round1`.
+Exact repair SHA: **`0cfb4f2f12d5fd87a57c0a2cacdc92a4cf54d2a4`**.
+QA transport: `bb257b1`, `e7c62e2`, `db977dd`; latest gate read as FAIL.
+The final report-only handoff SHA is obtained with `git log -1 --format=%H fix/round1`.
+
+R01-005/DOC-003: corrupt local files no longer prevent healthy siblings completing;
+per-file progress/errors are durable and partial aggregation is correct. Local DB retry
+uses the cached exact result; successful siblings and DB records are not processed again.
+R01-004/SEC-001: reserved names are canonicalized before extraction, including case and
+directory variants; exclusive temporary files cannot overwrite a similarly named ZIP member.
+
+Targeted QA + boundary tests: 9 PASS. One final full regression: **118 total,
+114 PASS, 4 skipped, 0 failures**. Every FastAPI case executed. The three live DB
+cases and old reference placeholder remain explicit skips; no new real DB/remote/model calls.
+
+Use the same separate validation checkout and existing environments. For the regression
+script, pass `-Python <configured-interpreter> -ApiPackages <existing-api-site-packages>`;
+it no longer silently hides API tests because the checkout lacks its own venv, and clears
+MVP_TEST_PG_DSN, PARSING_TEST_PG_DSN and PARSING_RESULT_PG_DSN.
+Alternatively reuse the committed QA runner against this exact repair SHA.
+Do not install dependencies or upload corpus content for these synthetic reproducers.
+
+Priority retest: both PDF input orders; bad-file error serialization; success/partial/all-failed
+aggregation; local cached-result DB retry and interruption recovery; ZIP reserved names/raw bytes;
+existing remote partial/DB retry cases; native/parser/legal/Mock/API regression.
+Detailed files/functions and actual commands are in 05-fix-report.md.
+
+No next-version work: Fix leaves the QA-owned FAIL gate unchanged. Agent A must issue
+valid PASS and the planned v0.2.0 handoff before dual-engine work starts. Requirements
+consolidation follows that implementation. Nothing was pushed or deployed in this batch.
+No functioning coordinator dispatch was available; the handoff is published locally in Git.
+
+## Prior first usable version handoff (historical)
 
 Branch: fix/round1.
 QA source: `13db6f7b18e8661b3c462f105d1f55c1a153bcea`.

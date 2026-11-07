@@ -1,4 +1,47 @@
-# Round 01 Fix report — usable upload-to-database version
+# v0.1 follow-up repair — 2026-11-07, awaiting QA acceptance
+
+QA transport: `bb257b1ab81019d82121932a71c773e858ec09b8`,
+`e7c62e25aeace99625b5f13c164129f44a7456bb`,
+`db977dded430161ccf9beefccfddb48df4ff416b`.
+Latest imported baseline: `83f4ea7`. Repair commit: `0cfb4f2f12d5fd87a57c0a2cacdc92a4cf54d2a4`.
+QA-owned version-gate.json remains FAIL; Fix does not grant itself PASS.
+
+Reused the existing red execution: 4 QA methods, 2 failing methods / 3 failure records,
+matching corrupt-first, valid-first and Windows reserved-artifact cases. No old assertion weakened.
+
+| Bug | Root cause / minimal repair | Verification |
+| --- | --- | --- |
+| DOC-003 / R01-005 P1 | MinerUService._local had only task-wide error handling. Isolate parser/integrity/DB failure per file; persist each outcome; aggregate partial accurately. Save the exact pre-DB normalized result so retry skips successful siblings and preserves DB digest/record identity. | Both QA file orders pass; failure visibility, exact-result DB retry and interrupted-worker recovery pass. |
+| SEC-001 / R01-004 P2 | Reserved ZIP names were compared case-sensitively on Windows. Canonicalize names before validating reserved roots; use exclusively created temporary files to avoid archive-member/temp-name collisions. | QA original-package assertion and case/path variants pass; malicious packages leave existing raw bytes unchanged; ordinary members and raw ZIP remain byte-exact. |
+
+Changed files/functions: mineru_service.py::run/_local/resume;
+mineru_artifacts.py::unpack/store_artifacts;
+scripts/run_fix_regressions.ps1 (reuse explicit or existing API packages; clear result-DB DSN);
+tests/test_round01_repair_edges.py (five focused boundary cases).
+
+Actual execution, using the existing interpreter/API packages and writable ignored TEMP/TMP:
+
+```text
+python -B -m unittest tests.test_round01_fix_acceptance tests.test_round01_repair_edges -v
+# 9 PASS
+./scripts/run_fix_regressions.ps1 -ApiPackages <existing-api-site-packages>
+# one complete regression after all code changes: 118 total, 114 PASS, 4 skipped, 0 failures
+git diff --check
+# PASS
+```
+
+The four skips remain the old QA reference placeholder and three opt-in database cases;
+all FastAPI cases executed. No new live DB, remote API, model/performance test, dependency
+installation, environment/worktree creation, service restart or Push in this repair batch.
+Tests were run before the repair commit; its code is the tested code without further business edits.
+
+Return this code SHA to Agent A through handoff-to-qa.md. Remaining risks/gates:
+QA must independently repeat the new reproducers and assess DB/real-provider prerequisites.
+v0.2.0 has no PASS/READY handoff, so no dual-engine development branch or code was started.
+The requested requirements consolidation stays after dual-engine implementation, not in this repair.
+No working coordinator dispatch was available; this is a Git handoff, not an automatic-wakeup claim.
+
+## Prior first usable version (historical)
 
 QA commit: `13db6f7b18e8661b3c462f105d1f55c1a153bcea`.
 Source baseline: `f2a5c925f0305a2e7df21f750b20bed63db40de3`.
