@@ -3,7 +3,7 @@
 本轮目标已跑通：文件上传 → 官网精准解析 → PostgreSQL 现有审阅表。
 真实验证只使用合成单页 PDF，未上传真实语料。服务器部署按用户要求暂停。
 
-1. 在独立 API 环境安装 requirements-api.txt，不升级原 OCR/BGE 环境。
+1. 复用已验证的现有环境；依赖统一维护在 requirements.txt，不升级原 OCR/BGE 环境。
 2. 使用忽略的 local/parsing-runtime.json 配置官网 Key、工作台访问码和显式测试库。
 3. 执行 `scripts/start_parsing_app.ps1 -Port 8180`，打开 http://127.0.0.1:8180。
 4. 从本地 local/workbench-access-code.txt 读取工作台访问码。不要把官网 Key 当作页面访问码。
@@ -21,5 +21,8 @@
 完整回归：`scripts/run_fix_regressions.ps1`，118 项中 114 通过、4 条件跳过。
 独立 QA 工作树可传入 `-Python` 与 `-ApiPackages` 复用已有依赖；不需要新建环境。
 此前 PostgreSQL 幂等与回滚另行 2/2 通过、真实 HTTP 上传至 PostgreSQL PASS，属于历史 Fix 实测，未作为本次 QA 独立 PASS。
-当前版本闸门仍为 FAIL，等待 Agent A 针对修复 SHA 重新验收；v0.2.0 和 requirements 整理尚未开始。
+v0.1 已由 QA 在 `75c9c1c` 提交验收 PASS（120 个唯一核心用例）。
+v0.2.0 双引擎实现见 [使用与验收说明](v0.2.0.md)，默认本地优先，云端回退需要逐文件授权。
+原 requirements-api/local/ocr/lock 清单已统一为 requirements.txt，保留现有已验证版本；没有重新安装环境或模型。
+双引擎及收尾变更等待 Agent A 对最终 Fix SHA 独立回归，不能把上一版 PASS 当作本版验收。
 详见 [Fix 交接](../qa/round01/handoff-to-qa.md) 和本目录设计/测试记录。

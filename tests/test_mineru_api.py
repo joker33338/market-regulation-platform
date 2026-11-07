@@ -7,7 +7,7 @@ import time
 import unittest
 
 
-@unittest.skipUnless(importlib.util.find_spec("fastapi"), "Install optional requirements-api.txt in an isolated environment")
+@unittest.skipUnless(importlib.util.find_spec("fastapi"), "Use an existing environment with requirements.txt API dependencies")
 class MinerUAPITests(unittest.TestCase):
     def setUp(self):
         from fastapi.testclient import TestClient

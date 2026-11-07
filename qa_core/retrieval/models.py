@@ -57,7 +57,7 @@ class LocalEmbeddings:
                 from sentence_transformers import SentenceTransformer
                 self._model = SentenceTransformer(str(self.path), device="cpu", local_files_only=True)
             except ImportError as exc:
-                raise IngestionError("本地向量化依赖未安装，请按 README 安装 requirements-local.txt。") from exc
+                raise IngestionError("本地向量化依赖未安装，请按文档安装 requirements.txt。") from exc
             self._model.max_seq_length = self.max_tokens
             actual = self._model.get_sentence_embedding_dimension()
             if actual != self.dimension:

@@ -1,4 +1,4 @@
-param([string]$Python = '', [string]$ApiPackages = '')
+param([string]$Python = '', [string]$ApiPackages = '', [switch]$DualEngine)
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $workspaceRoot
@@ -23,7 +23,9 @@ $env:PYTHONPATH = $apiPath
 $env:MVP_TEST_PG_DSN = ''
 $env:PARSING_TEST_PG_DSN = ''
 $env:PARSING_RESULT_PG_DSN = ''
-& $Python -B -m unittest discover -s tests -v *> reports/fix-regression.log
+$env:QA_ISOLATED_PG_DSN = ''
+if ($DualEngine) { $env:MARKET_REGULATION_DUAL_ENGINE_TEST_ADAPTER = 'tests.dual_engine_adapter:run_scenario' }
+& $Python -B tests/run_round01_validation.py --source . --include-source-tests --result-json reports/fix-regression.json *> reports/fix-regression.log
 $testExit = $LASTEXITCODE
 Get-Content reports/fix-regression.log -Tail 9
 exit $testExit

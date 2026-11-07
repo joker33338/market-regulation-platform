@@ -1,4 +1,50 @@
-# The core parser, SQLite demo and tests use only Python 3.12 standard library.
-psycopg2-binary>=2.9,<3
+# Unified Python 3.12 runtime: native parsing, API, OCR and local embeddings.
+# Existing validated versions retained; no model weights are installed here.
+psycopg2-binary==2.9.13
 PyMuPDF==1.26.7
+httpx==0.28.1
+fastapi==0.115.12
+uvicorn==0.34.2
+sentence-transformers==4.1.0
+transformers==4.57.6
+# Docker installs the CPU wheel from the official CPU index first.
+# An existing torch 2.7.1+cpu satisfies this version constraint.
+torch==2.7.1
+paddlepaddle==3.2.2
+paddleocr[doc-parser]==3.3.2
+paddlex==3.3.10
+PyYAML==6.0.2
+psutil==7.2.2
+pandas==2.2.3
 
+# Retained validated embedding environment pins (formerly requirements-lock.txt).
+# PyYAML follows the actual OCR runtime (6.0.2), resolving the stale 6.0.3 snapshot.
+certifi==2026.10.23
+charset-normalizer==3.5.2
+cloudpickle==3.1.2
+colorama==0.4.6
+filelock==4.2.4
+fsspec==2026.9.0
+huggingface-hub==0.36.2
+idna==3.20
+jinja2==3.1.6
+joblib==1.6.0
+markupsafe==3.0.3
+mpmath==1.3.0
+narwhals==2.28.0
+networkx==3.7
+numpy==2.5.4
+packaging==26.3
+pillow==13.0.0
+regex==2026.9.29
+requests==2.34.2
+safetensors==0.8.0
+scikit-learn==1.9.1
+scipy==1.18.1
+setuptools==78.1.0
+sympy==1.14.0
+threadpoolctl==3.8.0
+tokenizers==0.22.2
+tqdm==4.70.1
+typing-extensions==4.16.0
+urllib3==2.8.0

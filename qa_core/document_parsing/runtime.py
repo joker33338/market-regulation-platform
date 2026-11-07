@@ -53,7 +53,7 @@ def _build_engine(method: str, config: ParsingConfig):
         try:
             actual = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
-            raise IngestionError("缺少 " + name + "；请按 requirements-ocr.txt 安装。") from None
+            raise IngestionError("缺少 " + name + "；请按 requirements.txt 安装。") from None
         if actual != expected:
             raise IngestionError(name + " 版本不匹配：需要 " + expected + "，当前 " + actual)
     try:

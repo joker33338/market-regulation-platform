@@ -14,7 +14,7 @@
 访问码属于应用鉴权，与官网 Key 不同。页面不会获取官网 Key。
 启动脚本遇到端口占用会退出，不停止已有服务。
 
-已固定并在独立 API 环境验证 requirements-api.txt；原 OCR/BGE 环境未升级。
+API 固定版本已归并至 requirements.txt；现有独立 API 与 OCR/BGE 环境均未重新安装或升级。
 原 Docker COPY 缺失通过提供合成示例修复；尚未执行实际 Docker 镜像构建。
 
 未来恢复 ECS 部署时，以 [官方 Docker 方案](https://opendatalab.github.io/MinerU/zh/quick_start/docker_deployment/)
