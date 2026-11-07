@@ -1,0 +1,67 @@
+{
+  "handoff_id": "v0.2.0-qa-75c9c1c-d2a4c67-next",
+  "version": "v0.2.0",
+  "gate_status": "PASS",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_branch": "fix/round1",
+  "source_commit": "d2a4c673c596945be14fa4d91a995fd8086e2b31",
+  "qa_commit": "75c9c1c5e1c263ddc563e8d73ac09ab091789986",
+  "qa_commit_role": "已提交且通过的v0.1独立QA验收关卡",
+  "qa_test_commit": "4042a23c966c20f94eef17f3c3fc10d7d5f7702a",
+  "handoff_type": "next-version",
+  "task_type": "feature_development",
+  "target_branch": "fix/round1",
+  "status": "ready",
+  "handoff_status": "READY",
+  "bug_ids": [],
+  "feature_ids": [
+    "DUAL-001",
+    "DUAL-002",
+    "DUAL-003",
+    "DUAL-004",
+    "DUAL-005"
+  ],
+  "test_commands": [
+    "python -B tests/run_v02_acceptance.py --source <isolated-fix-checkout>",
+    "python -B tests/run_round01_validation.py --source <isolated-fix-checkout> --include-source-tests --result-json <ignored-result>",
+    "python -B tests/round01_isolated_postgres.py --source <isolated-fix-checkout> --output <qa-local-output>"
+  ],
+  "acceptance_criteria": [
+    "A原生Word/文字PDF不无故外传；B简单扫描优先本地PaddleOCR；C复杂布局保持结构并记录策略原因。",
+    "D空/低质量先告警；G默认及敏感文件未经适用授权不得云端提交。",
+    "E条号/金额/日期异常进入人工复核，不擅自改写法律原文。",
+    "F官网超时/429/失败有界处理，保留本地结果；创建结果不确定时不盲目重提。",
+    "H引擎/真实可得版本/原因/质量/原始数据/页码/来源关联完整，缺版本不编造。",
+    "I专用PostgreSQL重复执行不错误重复，失败不覆盖旧记录；J复核前零入库、复核后既有RAG可检索。",
+    "全部当前版本回归及绑定真实业务适配器后的A-J通过；没有未解决P0/P1，不能把新策略SKIP当成PASS。"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.0/01-requirements.md",
+    "docs/qa/v0.2.0/02-test-plan.md",
+    "docs/qa/v0.2.0/03-acceptance-tests.md",
+    "docs/qa/v0.2.0/handoff-to-fix.md",
+    "docs/qa/round01/06-regression-report.md",
+    "docs/qa/round01/07-final-summary.md"
+  ],
+  "report_sha256": {
+    "docs/qa/v0.2.0/01-requirements.md": "c80916f83fa124b7c3cd02e3c602b599a95f0d398be5b8e7b066a13ec6130bd5",
+    "docs/qa/v0.2.0/02-test-plan.md": "12157f01123e5098756c06ccb03c7cdb6e857578e575f528b8d423f8b4e4711e",
+    "docs/qa/v0.2.0/03-acceptance-tests.md": "4ccf4adfe1216e2dc214ec5517b96aca0cbda45f9023eaca5e28101951f951ab",
+    "docs/qa/v0.2.0/handoff-to-fix.md": "2a17a303729c794f868a2e7c284c37a323a204bd654d82ff6750bc2c1086eac2",
+    "docs/qa/round01/06-regression-report.md": "67fadeae4aa26e99943fe269b0f3c79dcf48cb64bc542c647ddd4b76b7b06d31",
+    "docs/qa/round01/07-final-summary.md": "48885d36517d97821afc18c14686008f2214f354632f61e8f853d5771527c5e3"
+  },
+  "baseline_new_version_tests": {
+    "total": 15,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 10,
+    "meaning": "5项现有能力真实通过；10项新策略等待Fix实现后绑定，不代表v0.2.0已验收"
+  },
+  "cloud_test_policy": "Mock及公开合成样本；真实语料禁止外传，不自动使用真实官方服务。",
+  "production_deployment_status": "NOT_TESTED",
+  "automatic_dispatch_performed": false,
+  "dispatch_status": "WAITING_COORDINATOR",
+  "transport_commit_note": "本交接传输SHA在提交后由Git/QA输出，避免自引用。"
+}
