@@ -1,0 +1,43 @@
+{
+  "handoff_id": "v021-fix-6216ae5-Q021-001-Q021-002",
+  "version": "v0.2.1",
+  "source_agent": "Fix",
+  "target_agent": "QA",
+  "source_branch": "codex/fix-v0.2.1",
+  "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
+  "baseline_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
+  "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
+  "qa_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
+  "status": "ready",
+  "handoff_type": "regression",
+  "qa_status": "PENDING",
+  "gate_status": "BLOCKED",
+  "bug_ids": [
+    "Q021-001",
+    "Q021-002"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.1/fix-plan.md",
+    "docs/qa/v0.2.1/fix-report.md",
+    "docs/qa/v0.2.1/handoff-to-qa.md"
+  ],
+  "report_sha256": {
+    "docs/qa/v0.2.1/fix-plan.md": "848857fa5c15d0541ada770ddd2dcb992290296ccacf58c1bc14b8c795c50f03",
+    "docs/qa/v0.2.1/fix-report.md": "990e985e548be5150f4dbde21cfa1ca556a8e7a7477608b44cda09486dbbf7fe",
+    "docs/qa/v0.2.1/handoff-to-qa.md": "d2fed2868647ff525380abc24b319fa4033897bcb72aef5edd16fb9fade84ad5"
+  },
+  "test_commands": [
+    "python -B -m unittest tests.test_v021_native_preservation tests.test_v021_table_cli tests.test_v021_fix_edges -v"
+  ],
+  "local_validation": {
+    "unique_focused_methods": 71,
+    "passed": 71,
+    "failed": 0,
+    "skipped": 0
+  },
+  "remaining_scope": [
+    "九处标签差异未修改",
+    "真实质量真值不足不伪装PASS",
+    "由QA独立验收，不自动合并main"
+  ]
+}
