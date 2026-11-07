@@ -1,44 +1,26 @@
-# v0.1 version gate — FAIL; v0.2.0 not released for development
+# v0.1 版本验收清单：本地集成 PASS
 
-Latest independent check, 2026-11-07:
+日期：2026-11-07。受测 Fix：`d2a4c673c596945be14fa4d91a995fd8086e2b31`；修复代码：`0cfb4f2f12d5fd87a57c0a2cacdc92a4cf54d2a4`；QA 测试提交：`4042a23c966c20f94eef17f3c3fc10d7d5f7702a`。
 
-- Local Fix tested: `4e5f4a79ae5bd9d97316916c854ce6504e447dcc`.
-- Remote fix/round1 verified separately: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`.
-- QA test/helper commit: `e7c62e25aeace99625b5f13c164129f44a7456bb`.
-- Full run: 113 methods, 107 PASS, 2 failing methods (3 failure records), 4 skips. All six FastAPI cases ran PASS in the full dependency-enabled rerun. The requested official regression script also ran, with six additional API environment skips explained in 06.
-- Original R01-001/002/003 PASS. **DOC-003/R01-005 P1 and SEC-001/R01-004 P2 remain FAIL.** Three live DB tests remain environment-blocked/skipped; the fourth skip is a historical placeholder, not an actual absent-client finding.
+| 关卡 | 结论 |
+| --- | --- |
+| 原有 R01-001/002/003 | PASS |
+| 后续 R01-004/005，包括两种批次顺序 | PASS |
+| Mock 契约、实际生产适配器、FastAPI 权限与幂等 | PASS |
+| 本地逐文件恢复、错误追踪及结果标准化 | PASS |
+| 专用 PostgreSQL 写入、冲突、映射及事务回滚 | PASS，五项真实数据库测试 |
+| 原有法律切分、去重、向量接口及检索 | PASS，在合成测试范围内 |
+| 关卡唯一用例覆盖 | 120 PASS，0 FAIL，0 SKIP，0 BLOCKED |
+| 未解决 P0/P1 | 无已确认的未解决项 |
+| v0.2.0 开发 | 可交接，需遵守下一版资料的授权与测试边界 |
+| 生产部署、真实云端/Standard/GPU 质量 | NOT_TESTED，不随本地 PASS 放行 |
 
-Local 4e5f4a7 only imports QA changes; it does not repair the two issues. version-gate.json records FAIL and prohibits next-version advancement. round01/handoff.json is for current-version bug repair only. **No v0.2.0 requirements/plan/READY/development handoff is generated.** This decision is distinct from production deployment, which is NOT_TESTED.
+Windows 阶段 120 项中 115 通过、5 条件跳过；独立数据库阶段五项全部通过，按相同用例 ID 补齐全部五项。不是把重复执行算成新用例。旧生产适配器跳过占位已改为真实 Mock 生命周期验收并实际通过，没有降低标准。
 
-The existing Orchestrator is a preparation layer with automatic write dispatch blocked; its reader currently expects a next-version handoff path. QA does not change that policy/path or claim an agent was awakened. **等待协调器接收。** Fix must return a new exact repair SHA and updated handoff-to-qa.md before QA can reconsider advancement.
+Bug 累计 5 个，修复并复测 5 个，修复率 100%。GAP 共 8 个，001–005 与 007 在已声明本地范围通过；006 部署与 008 泛文档范围仍不属于此次通过结论。任务 SQLite、结果 PostgreSQL 的现有分工保持，未声称交付分布式任务队列或全任务 PostgreSQL 化。
 
-The preceding bug/feature accounting remains: 5 bugs, 3 repaired, 2 unresolved (60%); 8 GAPs, 6 with at least partial code and 2 unsupplemented, under the scoped statuses in 05. Existing OCR/Structure/quality/client/DB/KB capabilities have been reviewed to avoid requesting their redevelopment after the gate passes.
+数据安全：原始测试集只读且未上传；业务库仅查询列定义；实际写入只发生在新建专用测试容器。测试容器已停止并保留测试数据。没有安装依赖、修改业务源码、删除原测试、Push 或合并主分支。
 
-## Prior acceptance detail (historical f7c4d75 run)
+下一步：先提交本次 PASS 关卡，再生成中文的 v0.2.0 需求、测试计划、验收测试和 READY 交接。下一版以本地 PaddleOCR 优先、经过明确授权的官方云端兜底为目标；已有能力必须复用。版本 READY 不等于会话已启动。现有协调器缺少完整自动写调度适配器，等待协调器接收。
 
-Updated 2026-11-07. This is the current acceptance decision, not a claim that all required work is complete.
-
-Tested Fix: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`.
-
-Independent combined tests: **113 test methods; 107 PASS, 2 failing methods, 4 skipped**. The two failing methods produce 3 failure records because both file orders fail the local-batch case. Existing Fix suite alone: 105 PASS, 4 skipped. Offline real OCR samples 2/2 successful; real local BGE output 1024 dimensions. No recognition-quality percentage or remote deployment success inferred.
-
-## Bug and feature accounting
-
-- Confirmed bugs: 5 cumulative. Original 3 pass targeted regression; 2 remain FAIL. Repair rate: 60% (3/5). Docker closure is limited to the reported missing-resource defect, not an unexecuted build.
-- Functional GAPs: 8. At least partial implementation added for 6; 2 not supplemented (deployment and pending generic-document scope).
-- Feature acceptance: 2 PASS, 2 FAIL, 2 BLOCKED, 2 NOT_TESTED, under the explicit scopes in `05-missing-features.md`. Partial implementation does not count as full acceptance.
-
-Open defects:
-
-1. **DOC-003 / R01-005, P1:** a corrupt PDF in local mode prevents later valid files in the batch from being parsed.
-2. **SEC-001 / R01-004, P2:** a case-variant ZIP member can replace the original artifact on Windows.
-
-Both have content-free synthetic reproducers and unweakened failing assertions in `tests/test_round01_fix_acceptance.py`. The QA runner targets the detached Fix source, keeping tests and production edits separate.
-
-## Remaining gates
-
-Fix both failures and rerun the combined suite. Then independently validate approved isolated PostgreSQL writes/rollback/idempotency, actual remote provider contract/version and the required deployment scope. Task identity currently persists in SQLite; whether this fully satisfies the originally proposed PostgreSQL task-metadata requirement remains open. Generic/Excel/table KB semantics are still pending requirements confirmation. Browser use, actual Docker build, full-corpus OCR quality and real self-hosted Standard/GPU are NOT_TESTED.
-
-No business source or Fix worktree edited, no schema migration, no production data write, no corpus upload, no dependency installation, no push or merge. Keep raw outputs and configuration ignored.
-
-Next action: Fix reads the new committed `handoff-to-fix.md`, repairs R01-004/R01-005 in its own worktree, and returns a new exact Fix SHA plus updated `handoff-to-qa.md`. QA will continue independent regression before granting final acceptance.
+完整执行条件、历史未验证范围和证据索引见 06-regression-report.md；机器结果见 version-gate.json。

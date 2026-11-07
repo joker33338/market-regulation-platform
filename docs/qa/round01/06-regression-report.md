@@ -1,120 +1,75 @@
-# v0.1 independent acceptance — FAIL
+# v0.1 独立回归报告：本地集成 PASS
 
-## Latest authoritative version gate — 2026-11-07
+日期：2026-11-07，Asia/Shanghai。本结论仅适用于下列精确提交及本地集成范围，不代表生产部署、真实云端识别质量或 GPU 验收通过。
 
-Unresolved P1 prevents current local integration PASS. Production deployment is not accepted; v0.2.0 is not authorized to start.
+## 版本与隔离
 
-| Reference | Exact identity |
-| --- | --- |
-| Remote fix/round1 | `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`, independently read from GitHub branches API |
-| Local fix/round1 tested | `4e5f4a79ae5bd9d97316916c854ce6504e447dcc` |
-| QA test/helper commit | `e7c62e25aeace99625b5f13c164129f44a7456bb` |
+- 受测 Fix 交接提交：`d2a4c673c596945be14fa4d91a995fd8086e2b31`。
+- 业务修复提交：`0cfb4f2f12d5fd87a57c0a2cacdc92a4cf54d2a4`；两提交间只有 Fix 报告变更。
+- QA 测试提交：`4042a23c966c20f94eef17f3c3fc10d7d5f7702a`。
+- 远程 fix/round1 只读核对仍为 `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`，与本地不同。本次没有 Push。
 
-Local and remote differ. Local 4e5f4a7 imported the preceding QA tests/reports; no qa_core, scripts, requirements-api.txt or Dockerfile changes exist against remote f7c4d75. Therefore Fix's 109-test report describes a historical suite. Read current handoff-to-qa.md, 05-fix-report.md and docs/mineru-integration/05-开发与测试记录.md from the exact local source; do not inherit their live service/DB PASS. Remote identity was checked through [the repository branches endpoint](https://api.github.com/repos/joker33338/market-regulation-platform/branches?per_page=100), without changing any remote ref.
+分别检出修复提交和最终交接提交到 QA 的独立工作树；最终关卡证据绑定 d2a4c67，未使用旧提交的成功结果替代。原工作树、Fix 工作树和业务源码均未修改。现有解释器、API 依赖和 Docker 镜像只读复用，没有安装或升级依赖。
 
-A fresh detached QA validation worktree was created at 4e5f4a7; prior validation and original/Fix worktrees were preserved. Existing Python and optional API libraries were reused read-only; no install/upgrade or business-source edit. Real DSNs/credentials were cleared for synthetic runs. Local asynchronous sockets were permitted, while remote fixtures remain MockTransport.
+## 执行结果与计数方法
 
-| Current execution | Methods | PASS methods | Failing methods | Skips |
+| 执行 | 用例数 | PASS | FAIL | SKIP |
 | --- | ---: | ---: | ---: | ---: |
-| scripts/run_fix_regressions.ps1 -Python configured-interpreter | 113 | 101 | 2 | 10 |
-| Complete QA rerun with existing API libraries available | 113 | 107 | 2 | 4 |
+| Fix 正式脚本，精确修复提交 | 118 | 114 | 0 | 4 |
+| 最终交接提交，Windows 全套及 QA 新测试 | 120 | 115 | 0 | 5 |
+| 同一交接提交，独立 PostgreSQL 专项 | 5 | 5 | 0 | 0 |
+| 按唯一用例 ID 合并后的关卡覆盖 | 120 | 120 | 0 | 0 |
 
-The supplied script resets PYTHONPATH to a source-local API environment absent in the fresh worktree. An attempted dependency junction was denied; no packages were installed or copied. Six FastAPI cases were additionally skipped by that script, then all six executed PASS in the complete rerun using the existing package path. The gate uses the latter run. Expected failures: zero. Console failures=3 represents two failing methods: both local-batch order subtests fail, plus the ZIP case. The helper deduplicates overlapping QA cases already imported by Fix and exports SHA-bound evidence.
+最后一行是去重覆盖，不是把两次执行简单相加。数据库专项的五个 ID 与 Windows 阶段的五个 SKIP 完全一致；两个阶段的 source_commit、qa_test_commit 相同。只有已实际执行 PASS 的专项结果替代对应 SKIP，未覆盖的跳过不会被改写为通过。每个方法的结果均保存在忽略的执行 JSON 中。
 
-Reproduction from QA with configured interpreter/dependencies and writable TEMP/TMP:
+正式脚本保留的四个跳过是历史占位及三个 PostgreSQL 条件测试。QA 没有删除旧用例：将自己的旧生产适配器占位改成真实 MinerUClient/MinerUService 的 Mock 生命周期、结果来源关联和请求幂等测试；该方法已实际 PASS。三个原数据库测试以及两个新增数据库用例均在专用实例实际 PASS，因此最终关卡没有遗留跳过或阻塞。
 
-```text
-python -B tests/run_round01_validation.py --source <isolated-checkout> --include-source-tests --result-json <ignored-evidence-json>
-```
+## 五个 Bug 的独立复测
 
-Original R01-001/002/003 targeted assertions PASS. Reference Mock cases 13 PASS, production implementation cases 16 PASS, official-adapter cases 2 PASS, and FastAPI cases 6 PASS. These include authentication/ownership, uploads/results, uncertain creation, interrupted upload, idempotency, resume, normalization, reviewed legal bridge and SQLite retrieval. No real remote service or database is implied.
-
-**Current failures:** DOC-003/R01-005 P1 (corrupt-first stops valid sibling; valid-first task incorrectly failed instead of partial), and SEC-001/R01-004 P2 (ZIP ARTIFACT.BIN overwrites original artifact.bin on Windows). Both reproduced on 4e5f4a7; functions and synthetic reproducers remain in 03-bug-list.md. No duplicate bug IDs created.
-
-### Four current skips, explicitly reviewed
-
-| Test | Reason / disposition |
-| --- | --- |
-| MinerUReferenceContracts.test_production_adapter_acceptance | Historical unconditional baseline skip. Its absent-client message is stale; actual production client/config/API tests ran. Not evidence that the feature remains absent, and not product PASS. |
-| ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved | PARSING_TEST_PG_DSN not supplied; requires approved existing isolated document_review tables, intentionally retains a synthetic row. NOT RUN / environment BLOCKED. |
-| ParsingPostgresTests.test_child_failure_rolls_back_parent_insert | Same DB prerequisite absent. NOT RUN / environment BLOCKED; fake-sink retry is not PostgreSQL transaction evidence. |
-| PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback | MVP_TEST_PG_DSN not supplied. Creates/drops a generated schema and must never target the default business DB. NOT RUN / environment BLOCKED. |
-
-The three DB cases are counted once as skips, not as additional test methods. No skip allowlist waiving them was invented. Current original local/parser/legal/SQLite suites PASS; local multi-file orchestration remains FAIL. No P0 confirmed; the unresolved P1 alone blocks advancement.
-
-Actual DocumentParser, PaddleOCRService, PaddleStructureService, quality.py, OfficialMinerUClient, MinerUService, PostgresResultSink and reviewed legal adapter were inspected. Native routing, OCR confidence/provenance, Structure output and quality findings already exist and should be reused after approval. quality.py returns heuristic findings/review flags, not an implemented automatic local/cloud routing policy. No next-version feature development or planning handoff is started while the gate FAILS.
-
-Machine data: version-gate.json is FAIL; round01/handoff.json requests a **v0.1 bugfix**, not a v0.2.0 feature. Reports cannot embed their own future transport commit SHA; Git supplies that after commit. Fresh logs/statistics remain ignored as local/round01/v01-full-regression.log and v01-execution.json; supplied script log stays in the validation worktree's ignored reports.
-
-Coordinator source review found an independent preparation checkout: README/schema/tools describe fail-closed behavior, no completed write-dispatch adapter, and a reader hardcoded to the next-version handoff path. Current-version JSON is validated against its schema, but no --run/--resume, coordinator-state edit or automatic wakeup is performed. Current repair data stays under round01; no v0.2.0 READY file is created to bypass this gate. **等待协调器接收。**
-
-The remainder records the prior f7c4d75 regression as historical evidence. In particular, earlier real local OCR/BGE successes below are not newly executed real-model tests in this latest gate run; their business-source files are unchanged. Real cloud/Standard, full-corpus quality, live PostgreSQL, actual Docker build, browser visual and Aliyun GPU remain unverified by this QA gate.
-
-## Prior independent regression at f7c4d75 (retained history)
-
-Report updated: 2026-11-07 (Asia/Shanghai).
-
-- Original source baseline: `f2a5c925f0305a2e7df21f750b20bed63db40de3`.
-- First QA handoff: `13db6f7b18e8661b3c462f105d1f55c1a153bcea`.
-- Tested Fix handoff: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57`.
-- Business code in that handoff: `6981ac8b78b2419c367e2c224979448a7010259e`, including `4767e71952a2cb8f2b4277e6f0694ddb515b67e9` and `7b1a173`.
-
-## Isolation and execution
-
-QA created a detached validation worktree at the exact Fix handoff under its ignored local area. Original and Fix worktrees were not edited. Validation worktree remains clean. QA additions are two test/helper files on `qa/round1`; no business implementation was modified. The original four test modules have no diff from the initial QA handoff.
-
-Used existing Python 3.12 interpreter and read-only access to Fix's already-installed optional API dependencies. QA did not install or upgrade dependencies. Synthetic tests cleared DB connection variables; HTTP fixtures use MockTransport. No real corpus bytes were sent to remote services. PostgreSQL writes and schema changes were not performed.
-
-The restricted environment initially stalled at Windows `socketpair` while creating the asynchronous event loop. A bounded 30-second diagnostic confirmed the wait occurs before application startup. The first attempt was interrupted, then tests were run with permission for local event-loop sockets. The controlled re-run completed; the environment stall is not counted as a product bug.
-
-Reproduction (configured interpreter; writable TEMP/TMP; optional API dependency path available):
-
-```text
-# In the detached Fix worktree; all real DB DSNs cleared:
-python -B -m unittest discover -s tests -v
-
-# From QA, targeting the detached Fix worktree:
-python -B tests/run_round01_validation.py --source <isolated-fix-checkout> --include-source-tests
-```
-
-The QA runner imports business code from the selected source and loads QA acceptance cases separately. Do not run the QA branch's old baseline source and call it Fix regression.
-
-## Results
-
-| Execution | Test methods | PASS methods | FAIL methods | Skipped methods |
-| --- | ---: | ---: | ---: | ---: |
-| Supplied Fix suite, independently rerun | 109 | 105 | 0 | 4 |
-| Four additional QA acceptance cases | 4 | 2 | 2 | 0 |
-| Combined single run | 113 | 107 | 2 | 4 |
-
-Four skips: original PostgreSQL integration, two opt-in parsing PostgreSQL tests, and the old QA reference-driver product placeholder. Actual production-client Mock tests ran successfully; the historical placeholder is not proof of missing production code and was not used to grant acceptance.
-
-The latest unittest console summary is `FAILED (failures=3, skipped=4)`: the two orders in the local-batch case each fail a subtest, plus the ZIP case fails once. There are two failing test methods and three failure records. The table counts test methods, not subtest failure records; it does not hide an additional bug.
-
-| Bug | Result | Independent evidence |
+| ID | 结果 | 验证范围 |
 | --- | --- | --- |
-| DOC-001 / R01-001 | PASS | Both empty/whitespace regression cases now return non-success. |
-| OCR-001 / R01-002 | PASS | Unicode grid detection and decoded-image positive control pass. |
-| DOC-002 / R01-003 | PASS | Docker COPY source preflight passes; actual build NOT_TESTED. |
-| SEC-001 / R01-004 | FAIL | ZIP member ARTIFACT.BIN overwrites original artifact.bin on Windows. |
-| DOC-003 / R01-005 | FAIL | Broken first local PDF stops processing; valid sibling stays created. |
+| DOC-001 / R01-001 | PASS | 空文本与纯空白返回非成功；原有效文本、空白 PDF 行为未退化 |
+| OCR-001 / R01-002 | PASS | 中文路径网格检测及相同像素正向对照 |
+| DOC-002 / R01-003 | PASS | Docker COPY 资源预检；实际 Docker 构建仍未执行 |
+| SEC-001 / R01-004 | PASS | Windows 大小写及路径变体不能覆盖原始 ZIP；保留文件与临时文件碰撞边界通过 |
+| DOC-003 / R01-005 | PASS | 两种文件顺序、逐文件错误、partial 聚合、数据库重试复用原结果、中断恢复及已成功文件不重复处理 |
 
-The two additional passing controls verify local DB-failure error serialization and successful retry with the original remote ID using a fake sink. They do not prove PostgreSQL transaction behavior.
+累计五个已确认 Bug 全部通过当前回归，修复率 100%；本次没有确认新的 P0/P1 问题。复现、根因及修复验收记录在 03-bug-list.md。
 
-Existing production-client fixtures cover self-hosted Tasks request contract, uncertain creation, source integrity, interrupted upload, bounded polling/resume, partial success, ZIP limits/traversal, real normalization and reviewed SQLite retrieval. Official public v4 has a separate adapter and separate Mock fixtures. These APIs are not treated as equivalent, and a fixture version string does not verify a deployed worker version.
+## PostgreSQL 真实执行
 
-## Real local models and corpus regression
+业务连接仅用于读取 document_review 五张表的列类型与主键，不读取正文、不写入业务库。使用本机已有 pgvector 镜像创建全新 QA 专用容器、独立内部网络和专用数据库，不映射主机端口、不连接现有 Compose 网络。
 
-Using the exact detached Fix source, repeated the two bounded, read-only local OCR samples: S00001 JPG success (174 normalized characters), S00002 PDF page 1 success (137 characters). Offline model files were reused with an explicit ASCII cache; original corpus unchanged. Result counts match the initial smoke, but no new accuracy or table-completeness claim is made.
+测试夹具按照已核对的列类型/主键建立 documents/pages/blocks/tables/cells；额外外键属于测试约束，不是对业务库的迁移。实际调用受测 PostgresResultSink、Database、检索与发布代码。覆盖：
 
-Real local BGE check: one synthetic input, one output vector, dimension 1024 — PASS. No local MinerU models were downloaded.
+1. 重复保存同一结果保持同一 parse_id、五级表各一条记录。
+2. 相同身份但正文发生变化时返回 database_result_conflict，并保留原记录。
+3. 页级失败、最深单元格失败使本次事务整体回滚，旧成功记录仍存在。
+4. 原有 pgvector 入库、检索、向量复用、发布及版本回滚。
+5. 本地任务/来源文件/远端文件 ID、正文、Markdown、表格和单元格映射。
 
-Ignored evidence: `local/round01/combined-regression.log`, `qa-fix-regression-unrestricted.log`, `additional-acceptance.log`, `fixed-ocr.log`, `fixed-bge.log`; local model summaries in the validation area's ignored outputs. Do not commit raw logs or machine paths.
+容器内以只读挂载运行精确 Fix 源码；现有应用镜像只提供依赖，不能据此声称已构建新镜像。测试后专用 PostgreSQL 容器已停止，数据库数据及资源清单保留；没有删除业务数据或启动默认 Compose。
 
-## Feature and environment gates
+## 其他核心验证
 
-GAP matrix is in `05-missing-features.md`: GAP-003 and GAP-007 PASS within stated scope; GAP-002 and GAP-005 FAIL; GAP-001 and GAP-004 BLOCKED; GAP-006 and GAP-008 NOT_TESTED.
+FastAPI 六项测试实际执行；认证、跨用户任务隔离、上传/结果、输入校验及幂等通过。参考和生产类 Mock、官方 API 独立适配、超时/断传/恢复、标准化、来源关联、法律人工复核闸门、SQLite RAG 和本地解析回归通过。模拟结果不会自动进入正式知识库。
 
-Fix reports earlier authorized live official API/PostgreSQL runs. QA has not independently reproduced those runs and does not inherit their PASS. The current user scope requires clearly isolated test DB writes, so no connection was used merely because it appeared in another worktree's local configuration. Self-hosted Standard, real official endpoint, DB idempotency/rollback, browser visual use, Docker build and Aliyun GPU remain unverified by this QA run.
+本轮未向官方 API 传送任何文档，没有上传真实语料，没有下载模型。此前真实离线 OCR 两个样例及 BGE 1024 维输出是历史证据；本轮没有重新统计全库识别质量。真实官网/自建 Standard、GPU、浏览器视觉、生产性能、实际 Docker 构建和业务库迁移兼容性均未作为 PASS 范围。
 
-Conclusion: original three reported defects pass targeted regression. Overall acceptance FAIL because two new defects remain, with separate environment and scope gates still open. Incremental handoff gives Fix their reproducible tests; no merge or push performed.
+## 复现与证据
+
+使用既有解释器和 API 依赖，设置可写 TEMP/TMP。合成阶段清空真实连接与云端凭据；数据库专项由助手创建专用连接。
+
+```text
+./scripts/run_fix_regressions.ps1 -Python <configured-python> -ApiPackages <existing-api-packages>
+python -B tests/run_round01_validation.py --source <isolated-checkout> --include-source-tests --result-json <ignored-windows-result>
+python -B tests/round01_isolated_postgres.py --source <isolated-checkout> --output <qa-local-output>
+```
+
+忽略证据位于 local/round01 下的 Windows 执行结果、独立库执行结果、资源清单和去重覆盖 JSON。凭据、容器实际名称、机器路径和原始日志不提交。version-gate.json 记录两个阶段的摘要哈希及精确源码/测试 SHA；报告提交 SHA 在提交后通过 Git 输出，避免自引用。
+
+## 结论与下一阶段
+
+v0.1 本地集成 PASS，可按用户规定生成 v0.2.0 双引擎开发交接。该放行不允许自动部署、上传语料、修改正式数据库或跳过法律复核。下一版应复用既有本地路由、OCR/Structure、质量发现、OfficialMinerUClient、生命周期、结果存储和法律入库链路；仅补充质量驱动的策略与授权回退。
+
+现有 Orchestrator 仍是准备层。QA 将发布可校验的 Git READY 数据并执行只读检查，不宣称已自动唤醒另一会话。

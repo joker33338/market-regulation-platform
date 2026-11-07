@@ -1,62 +1,64 @@
 {
   "version": "v0.1",
-  "gate_status": "FAIL",
+  "gate_status": "PASS",
   "source_branch": "fix/round1",
-  "source_commit": "4e5f4a79ae5bd9d97316916c854ce6504e447dcc",
+  "source_commit": "d2a4c673c596945be14fa4d91a995fd8086e2b31",
+  "repair_commit": "0cfb4f2f12d5fd87a57c0a2cacdc92a4cf54d2a4",
   "remote_source_commit": "f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57",
-  "qa_test_commit": "e7c62e25aeace99625b5f13c164129f44a7456bb",
-  "checked_at": "2026-11-07T01:10:41.375125+00:00",
-  "critical_issues": [
-    "DOC-003/R01-005 (P1)"
-  ],
-  "open_bug_ids": [
+  "qa_test_commit": "4042a23c966c20f94eef17f3c3fc10d7d5f7702a",
+  "checked_at": "2026-11-07T01:47:02.304318+00:00",
+  "critical_issues": [],
+  "closed_bug_ids": [
+    "R01-001",
+    "R01-002",
+    "R01-003",
     "R01-004",
     "R01-005"
   ],
   "report_paths": [
     "docs/qa/round01/03-bug-list.md",
+    "docs/qa/round01/05-missing-features.md",
     "docs/qa/round01/06-regression-report.md",
     "docs/qa/round01/07-final-summary.md",
     "docs/qa/round01/handoff-to-fix.md"
   ],
-  "total_tests": 113,
-  "passed_tests": 107,
-  "failed_tests": 2,
-  "skipped_tests": 4,
+  "total_tests": 120,
+  "passed_tests": 120,
+  "failed_tests": 0,
+  "skipped_tests": 0,
   "blocked_tests": 0,
-  "failure_records": 3,
-  "expected_failures": 0,
-  "count_unit": "test_method; failure_records counts failed assertions/subtests separately",
-  "skips": [
+  "count_unit": "unique_test_method",
+  "execution_stages": [
     {
-      "test": "tests.test_mineru_contract.MinerUReferenceContracts.test_production_adapter_acceptance",
-      "reason": "MINERU-FEAT-001: production client/config/routes do not exist at baseline"
+      "name": "Windows-Mock-API",
+      "total": 120,
+      "passed": 115,
+      "skipped": 5
     },
     {
-      "test": "tests.test_parsing_postgres.ParsingPostgresTests.test_child_failure_rolls_back_parent_insert",
-      "reason": "Explicit existing test schema required"
-    },
-    {
-      "test": "tests.test_parsing_postgres.ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved",
-      "reason": "Explicit existing test schema required"
-    },
-    {
-      "test": "tests.test_postgres_integration.PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback",
-      "reason": "MVP_TEST_PG_DSN not supplied; production databases are not used"
+      "name": "isolated-PostgreSQL",
+      "total": 5,
+      "passed": 5,
+      "skipped": 0
     }
   ],
-  "environment_blocked_database_cases": 3,
-  "next_version": "v0.2.0",
-  "next_version_allowed": false,
-  "next_version_handoff_status": "NOT_CREATED",
-  "production_deployment_status": "NOT_TESTED",
-  "protocol_validation": "schema_only",
-  "execution_summary_sha256": "b423db6c2acc45e4cf3b82e94ff938ea80f08e70c2ac75e3e8c49e9985ea1c45",
-  "report_sha256": {
-    "docs/qa/round01/03-bug-list.md": "7930b0ae54f0392a33999218da0026202d26f2f2686271199b8fd1cd43173f4c",
-    "docs/qa/round01/06-regression-report.md": "9a10e90ae653b2a43a564337f33e0dc9d125c4ea7f2a7c895d64b75cf4be53ca",
-    "docs/qa/round01/07-final-summary.md": "6a2923f05a19ea0410d506c8dcce675966f0e43a6d46beafb3c8fd4c2398e567",
-    "docs/qa/round01/handoff-to-fix.md": "cf3fdb8c0970bbc49d9e0d1ecc4411328df8172553bb9629e24602577e823ee4"
+  "count_explanation": "Windows阶段的五个跳过与独立库五个实际PASS按相同ID合并，两个阶段源码和QA提交一致。",
+  "evidence_sha256": {
+    "v01-d2a4c67-windows.json": "a90dd5166573bd4fcd90918fb03fa2ead3e1f2a636b9962814a1d2184717d151",
+    "pg-v01-d2a4c67-run1/database-execution.json": "ce784229b7610f46f82c879406516ff9d0cb5f565a8965162a8001a8596db763",
+    "v01-d2a4c67-coverage.json": "ccedbded740496b0e92ad0fad0f6dd29a1082939921184e6882e1f6e649596b0"
   },
-  "protocol_schema_sha256": "0cb74c453c818c017c403e234935a4afffaa272aecc55297965fd211c0c55037"
+  "report_sha256": {
+    "docs/qa/round01/03-bug-list.md": "53afa1bf1468d17ab66d5ef1e1c7002d0ddfbf8aa3dd2b07cc403f02b9a25373",
+    "docs/qa/round01/05-missing-features.md": "4fab8200dd1af22f569c0bec8ee425e0d75c28f62628a4772085d615f0171418",
+    "docs/qa/round01/06-regression-report.md": "67fadeae4aa26e99943fe269b0f3c79dcf48cb64bc542c647ddd4b76b7b06d31",
+    "docs/qa/round01/07-final-summary.md": "48885d36517d97821afc18c14686008f2214f354632f61e8f853d5771527c5e3",
+    "docs/qa/round01/handoff-to-fix.md": "3de9f4cec4e2f4ad7d473b4da85e8031f3fda2c54a52c0fe1d2e35e15067d8f9"
+  },
+  "database_scope": "新建专用容器、内部网络、无主机端口；测试库已停止且保留数据；业务库仅查列定义。",
+  "next_version": "v0.2.0",
+  "next_version_allowed": true,
+  "next_version_handoff_status": "PENDING_GENERATION",
+  "production_deployment_status": "NOT_TESTED",
+  "real_cloud_quality_status": "NOT_TESTED"
 }
