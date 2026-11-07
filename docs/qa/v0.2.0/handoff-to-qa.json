@@ -1,0 +1,56 @@
+{
+  "handoff_id": "v0.2.0-fix-8badb99-to-qa",
+  "version": "v0.2.0",
+  "source_agent": "Fix",
+  "target_agent": "QA",
+  "source_branch": "feat/ocr-dual-engine-v0.2",
+  "source_commit": "8badb995592771ff099cf52570621ba29ad37533",
+  "baseline_commit": "d2a4c673c596945be14fa4d91a995fd8086e2b31",
+  "qa_test_commit": "d3c538643b4114c9e99acee002d1db77cd7ccbc1",
+  "handoff_type": "regression",
+  "status": "ready",
+  "qa_status": "PENDING",
+  "gate_status": "BLOCKED",
+  "bug_ids": [],
+  "feature_ids": [
+    "DUAL-001",
+    "DUAL-002",
+    "DUAL-003",
+    "DUAL-004",
+    "DUAL-005"
+  ],
+  "acceptance_criteria": [
+    "对绑定源码SHA独立执行A-J与既有回归；必要测试有跳过或环境缺失必须标记BLOCKED。",
+    "许可、敏感标记、超时、预算、恢复和幂等边界全部通过；未授权真实资料禁止外传。",
+    "先Mock，再按变更范围进行真实HTTP和用户明确指定测试数据库的合成数据验证；不修改结构或清空数据。",
+    "真实样本仅通过MARKET_REGULATION_TEST_CORPUS和pathlib.Path只读访问，报告使用匿名编号。",
+    "由QA发布独立验收结果，不把Fix自测或先前SHA的通过结果当作本版验收。"
+  ],
+  "test_commands": [
+    "python -B tests/run_v02_acceptance.py --source <isolated-checkout>",
+    "python -B -m unittest tests.test_dual_engine_policy -v",
+    "python -B tests/run_round01_validation.py --source <isolated-checkout> --include-source-tests --result-json <ignored-result>"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.0/handoff-to-qa.md",
+    "docs/qa/v0.2.0/04-implementation-report.md"
+  ],
+  "report_sha256": {
+    "docs/qa/v0.2.0/handoff-to-qa.md": "f32327ad173124f8822527c493cf1c673cd809c0133c0fe3d150a261fab52105",
+    "docs/qa/v0.2.0/04-implementation-report.md": "0c31ecc1a2502da1b8c74bcd534eede139d08dd1bc1fa17cdb06287ae369b146"
+  },
+  "result_summary": "已完成开发并交回独立QA，当前冻结源码尚在复测；不声明本版验收PASS。",
+  "prior_validation": {
+    "source_commit": "943f942c55aad331a97bf8e6ce32c96c3692c73d",
+    "mock_passed": 97,
+    "http_passed": 1,
+    "isolated_postgres_passed": 5,
+    "reuse_policy": "仅历史参考，不替代当前冻结源码的独立验收。"
+  },
+  "constraints": [
+    "不Push、不合并主分支、不部署。",
+    "不安装依赖、不迁移结构、不操作生产数据库。",
+    "不上传真实语料；真实云端质量和生产部署未验收。"
+  ],
+  "identity_note": "source_commit是冻结受测源码，最终结构化交接传输SHA由Git外部提供，避免自引用。"
+}
