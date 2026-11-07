@@ -41,6 +41,9 @@ def assess_document(result: DocumentResult, low_confidence: float = 0.8, *, thre
             findings.append({"code": "invalid_character_ratio", **location, "severity": "review"})
         if page.source_location.get("complex_layout"):
             findings.append({"code": "complex_layout", **location, "severity": "info"})
+        if page.raw_result.get("enhancement_failure"):
+            findings.append({"code": "layout_enhancement_failed", **location, "severity": "review",
+                             "message": "版面增强失败后保留了原生候选，仍须人工复核。"})
         for year, month, day in re.findall(r"(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日", text):
             try:
                 date(int(year), int(month), int(day))
@@ -85,7 +88,7 @@ def assess_document(result: DocumentResult, low_confidence: float = 0.8, *, thre
                          "message": "可能是规范性文件、表格或条号漏识别；不能据此判断违法或解析必然错误。"})
     dates = re.findall(r"\d{4}年\s*\d{1,2}月\s*\d{1,2}日", raw)
     route_codes = {"page_failed", "empty_page", "short_page", "low_confidence", "invalid_character_ratio",
-                   "table_structure_missing", "table_alignment_review"}
+                   "table_structure_missing", "table_alignment_review", "layout_enhancement_failed"}
     reasons = sorted({item["code"] for item in findings if item["code"] in route_codes})
     if result.parsing_status in {"failed", "partial"}:
         reasons.append("engine_failed")
