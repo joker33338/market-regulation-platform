@@ -44,6 +44,8 @@ class NativePreservationTests(unittest.TestCase):
             self.assertIn('LEFTMARK',retained,'已有原生正文应作为可追溯候选保留，增强失败不能清空')
             self.assertIn('RIGHTMARK',retained)
             self.assertTrue(result.requires_review,'回退保留不等于免除人工复核')
+            diagnosis=str(result.pages[0].warnings)+' '+str(result.pages[0].raw_result)+' '+str(result.pages[0].error_message)
+            self.assertIn('合成结构增强失败',diagnosis,'增强失败原因必须可追溯')
 
 
 if __name__=='__main__':
