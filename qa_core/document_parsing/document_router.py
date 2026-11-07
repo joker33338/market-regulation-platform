@@ -195,6 +195,7 @@ class DocumentParser:
                                "page_size": [page.rect.width, page.rect.height]}
                 method = mode
                 replaced_text_layer = False
+                native_candidate = None
                 try:
                     raw = page.get_text("text")
                     image_rects = [item["bbox"] for item in page.get_image_info()]
@@ -214,6 +215,8 @@ class DocumentParser:
                             continue
                         if not scanned:
                             native = pdf_page(page, page_no, page_source)
+                            if native.raw_text.strip():
+                                native_candidate = native
                             native.source_location["complex_layout"] = bool(native.tables) or page_source["complex_layout"]
                             if native.tables or not looks_multicolumn(page):
                                 native.processing_time = time.perf_counter() - page_started
@@ -246,7 +249,20 @@ class DocumentParser:
                 except Exception as exc:
                     failed = self._error_page(page_no, method, page_source, exc)
                     failed.processing_time = time.perf_counter() - page_started
-                    result.pages.append(failed)
+                    if native_candidate is not None:
+                        # 增强失败不应清空本页已成功提取的原生候选，也不能取消人工复核。
+                        retained = replace(
+                            native_candidate, parsing_status="needs_review",
+                            warnings=[*native_candidate.warnings, "版面增强失败，已保留原生候选；阅读顺序和表格结构须人工复核。"],
+                            error_type=failed.error_type, error_message=failed.error_message,
+                            processing_time=failed.processing_time,
+                            raw_result={**native_candidate.raw_result, "enhancement_failure": {
+                                "attempted_method": method, "error_type": failed.error_type,
+                                "error_message": failed.error_message, "retained_method": "native_pdf"}},
+                        )
+                        result.pages.append(retained)
+                    else:
+                        result.pages.append(failed)
 
     @staticmethod
     def _error_page(number: int, method: str, source: dict, error: Exception) -> PageResult:
