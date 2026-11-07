@@ -1,0 +1,57 @@
+{
+  "version": "v0.2.1",
+  "gate_status": "BLOCKED",
+  "source_branch": "codex/fix-v0.2.1",
+  "source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
+  "qa_test_commit": "90598204852d3fdaf462007f7ccc370905f37808",
+  "total_tests": 18,
+  "passed_tests": 18,
+  "failed_tests": 0,
+  "skipped_tests": 0,
+  "blocked_tests": 0,
+  "critical_issues": [],
+  "report_paths": [
+    "docs/qa/v0.2.1/bug-list.md",
+    "docs/qa/v0.2.1/final-qa-report.md",
+    "docs/qa/v0.2.1/routing-quality-report.md",
+    "docs/qa/v0.2.1/testset-inventory.md"
+  ],
+  "checked_at": "2026-11-07T07:26:23.334075+00:00",
+  "mock_status": "PASS",
+  "integration_status": "PARTIAL",
+  "qa_status": "BLOCKED",
+  "blocked_reasons": [
+    "9/53原标签路由差异尚未审定",
+    "真实CER和人工表格结构真值NOT_LABELED",
+    "本轮仅完成限定Structure实测，未完成全面质量证据"
+  ],
+  "routing_exact_label_agreement": {
+    "numerator": 44,
+    "denominator": 53,
+    "percent": 83.02,
+    "mode": "DocumentParser + FakeRuntime，非端到端OCR"
+  },
+  "synthetic_structure_exact": {
+    "numerator": 1,
+    "denominator": 1
+  },
+  "unauthorized_cloud_submissions": 0,
+  "original_files_hash_unchanged": {
+    "numerator": 25,
+    "denominator": 25
+  },
+  "business_code_changed": false,
+  "merge_main_allowed": false,
+  "evidence_sha256": {
+    "inventory.json": "f4720457abd2e00ba26082026c85ea8c32d2594f077fc46be0bff03d8c08bcef",
+    "mock.json": "4fa6ec904d2a8017d083b4ec0f2d4fc6418f4c60b85a8d66c9e3d914cad9242b",
+    "routing.json": "8d753aeae0268f83ba22fd4c1f5e4def6c5496ac7b3a69a1b90bbd555dab67cb",
+    "S00003-real-off-summary.json": "8b3f9d7b1fd3fca3d63555f31a906b5d8a33775ceb1ca7c77a47d76340b75fa7",
+    "S00007-real-off-p4-summary.json": "c84b4f6c47f187087461fdf21a869a0c25fd5d7e9688963c56c52480254de612",
+    "S00007-real-off-summary.json": "746de762ea241df8c9e3c1e4537bca9e44ae55f9ffb703606d84d25c88c51e23",
+    "S00007-real-on-p4-summary.json": "93d8d013b6f7ef4cd0e9404329a50b2ae20bef9713522616d1bc8198c01fb91e",
+    "S00007-real-on-summary.json": "6b2f91b9df734992fbbadea8a4920935ba411081a54a4793567eb3708ab1b91b",
+    "S00008-real-on-p1-summary.json": "2f98efb6f05a46538f316eaecee7e51034609947583519e7ffc50d0d780fddde",
+    "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926"
+  }
+}
