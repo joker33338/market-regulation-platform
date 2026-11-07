@@ -1,15 +1,17 @@
 {
   "version": "v0.2.1",
-  "gate_status": "BLOCKED",
+  "gate_status": "FAIL",
   "source_branch": "codex/fix-v0.2.1",
   "source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
-  "qa_test_commit": "90598204852d3fdaf462007f7ccc370905f37808",
-  "total_tests": 18,
-  "passed_tests": 18,
-  "failed_tests": 0,
+  "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
+  "total_tests": 22,
+  "passed_tests": 20,
+  "failed_tests": 2,
   "skipped_tests": 0,
   "blocked_tests": 0,
-  "critical_issues": [],
+  "critical_issues": [
+    "Q021-001"
+  ],
   "report_paths": [
     "docs/qa/v0.2.1/bug-list.md",
     "docs/qa/v0.2.1/final-qa-report.md",
@@ -17,9 +19,9 @@
     "docs/qa/v0.2.1/testset-inventory.md"
   ],
   "checked_at": "2026-11-07T07:26:23.334075+00:00",
-  "mock_status": "PASS",
+  "mock_status": "FAIL",
   "integration_status": "PARTIAL",
-  "qa_status": "BLOCKED",
+  "qa_status": "FAIL",
   "blocked_reasons": [
     "9/53原标签路由差异尚未审定",
     "真实CER和人工表格结构真值NOT_LABELED",
@@ -53,5 +55,10 @@
     "S00007-real-on-summary.json": "6b2f91b9df734992fbbadea8a4920935ba411081a54a4793567eb3708ab1b91b",
     "S00008-real-on-p1-summary.json": "2f98efb6f05a46538f316eaecee7e51034609947583519e7ffc50d0d780fddde",
     "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926"
-  }
+  },
+  "confirmed_bug_ids": [
+    "Q021-001",
+    "Q021-002"
+  ],
+  "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437"
 }
