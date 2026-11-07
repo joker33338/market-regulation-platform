@@ -109,3 +109,20 @@
 - MySQL/Redis Compose 服务尚未接入 KB，部署文档已明确独立服务；无明确接入需求，列为不在本轮范围，不要求 Fix 增加使用。
 
 阶段统计：8 个 GAP，6 个明确新需求、1 个现有打包缺陷、1 个待确认范围；目前未补充 8 个、已补充 0 个。Bug 共 3 个，修复数 0，修复率 0%；无 Fix 提交，不做最终验收。各 GAP 当前验收均 BLOCKED 或 NOT_TESTED，任何参考 Mock PASS 不改变产品 GAP 状态。
+
+## Fix 独立回归增量（2026-11-07，替代上段的当前状态）
+
+Fix `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57` 已在 QA 的独立验证工作树检出并执行。下列状态限于注明的验收范围，不沿用 Fix 报告的实服/数据库 PASS。
+
+| GAP | 验收状态 | 已补充实现、执行证据及剩余事项 |
+| --- | --- | --- |
+| GAP-001 | BLOCKED | `mineru_client.MinerUClient` 和独立 `mineru_official.OfficialMinerUClient` 存在；真实生产类的 Mock 创建/上传/查询/下载测试 PASS。QA 没有独立调用实服；自建 4.1 Standard 与官网 v4 不能互相证明，未完成真实协议验收。 |
+| GAP-002 | FAIL | `mineru_config`、`mineru_service`、`mineru_repository` 实现模式、ID、幂等和恢复；远程 Mock 超时/重试/恢复测试 PASS，新增模拟 DB 失败恢复 PASS。本地 fallback 批处理隔离 FAIL，见 DOC-003/R01-005。 |
+| GAP-003 | PASS | 在独立测试依赖下实际执行 FastAPI 6 项测试：上传、提交、状态/结果、身份和任务归属、输入校验、幂等、服务信息、页面响应 PASS。范围为 TestClient + Mock；非浏览器视觉、远程官网或真实 DB 全链路验收。 |
+| GAP-004 | BLOCKED | TaskRepository 在本地 SQLite 持久化任务；`storage/parsing_results.PostgresResultSink` 实现向现有审阅表保存结果。任务元数据并未整体迁至 PostgreSQL；此架构与最初需求的范围仍需明确。未确认 QA 专用隔离 DB，3 项 DB 测试跳过；没有独立 DB 写入或迁移兼容性 PASS。 |
+| GAP-005 | FAIL | 结果标准化、保留未知结构、审核后 legal bridge、SQLite 入库/检索、表格审核闸门均有合成执行证据；ZIP 仍存在 Windows 保留文件覆盖问题 SEC-001/R01-004。 |
+| GAP-006 | NOT_TESTED | Fix 交接说明部署延后；未交付可独立验收的 ECS/GPU 部署证据。本轮不启动默认 Compose，不宣称真实 Standard 已验收。 |
+| GAP-007 | PASS | 安全合成 scenarios 资源已补，原 Docker COPY 预检 PASS；仅资源缺失问题关闭，实际 Docker 构建仍 NOT_TESTED。 |
+| GAP-008 | NOT_TESTED | 泛文档/Excel/表格 KB 语义仍待确认；没有要求 Fix 擅自扩展，也没有用 mock 产物自动发布知识库。 |
+
+统计口径：8 个 GAP 中 6 个已补充至少部分代码（001–005、007），2 个未补充（006、008）；这不等于 6 个全部验收。按本表验收状态为 2 PASS、2 FAIL、2 BLOCKED、2 NOT_TESTED。尚未充分验收的 GAP 共 6 个。Bug 累计 5 个，3 修复、2 未修复。下一批交接优先修 DOC-003 和 SEC-001；DB/真实服务阻塞仍保留。

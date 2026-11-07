@@ -53,3 +53,39 @@ Read-only source search found no MinerU client, FastAPI routes or parsing-task s
 - Current legal ingestion expects article structure (`service.py`, `legal_structure.py`); general-document Markdown adaptation requires explicit tests, not flattening tables or silently guessing parent structure.
 - No pytest/FastAPI installed; no dependency changes authorized during preparation. Reference contracts run with existing unittest/httpx. Isolated PostgreSQL DSN and deployed MinerU endpoint absent.
 - No live server/version-specific API assertions can be confirmed until Fix pins exact 4.1.x patch and records deployed OpenAPI/version.
+
+## Independent Fix regression — updated 2026-11-07
+
+Tested Fix commit: `f7c4d75e1ff11e2d06d75f44336bf4b89f96aa57` (business code through `6981ac8b78b2419c367e2c224979448a7010259e`). Separate validation worktree; no changes to Fix or original worktree. Original DOC-001/R01-001, OCR-001/R01-002 and DOC-002/R01-003 regression assertions now PASS. DOC-002 PASS covers the build-context preflight; an actual Docker build remains NOT_TESTED.
+
+### SEC-001 / R01-004 — P2 — ZIP case variant replaces the original artifact on Windows
+
+- Sample ID: synthetic Z001, four-entry ZIP. No corpus file or external service involved.
+- Failing module/functions: `qa_core/document_parsing/mineru_artifacts.py::unpack`, `store_artifacts`; downstream artifact download in `mineru_api.py::artifact`.
+- Reproduce from QA branch with the configured interpreter and optional API dependencies:
+
+  `python -B tests/run_round01_validation.py --source <isolated-fix-checkout>`
+
+  Failing case: `Round01FixAcceptance.test_R01_004_case_variant_archive_cannot_replace_original_artifact` in `tests/test_round01_fix_acceptance.py`.
+- Expected: reject case variants of reserved output names, or preserve the exact original download as `artifact.bin`.
+- Actual: archive entry `ARTIFACT.BIN` is accepted. Saved `artifact.bin` contains the entry's synthetic replacement bytes rather than the downloaded ZIP. The byte equality assertion FAILS on Windows.
+- Confirmed root cause: reserved-name comparison is case-sensitive, but extraction writes to a case-insensitive filesystem. `store_artifacts` first saves the ZIP as `artifact.bin`, then overwrites the same target via the archive member's case variant. Member-to-member casefold checks do not cover the reserved original-artifact file.
+- Suggested fix: apply a consistent canonical-name policy to reserved paths before any write; ensure temporary and generated filenames cannot collide with accepted entries. Preserve original bytes atomically.
+- Acceptance: this QA case PASS on Windows; existing traversal/duplicate/member-limit/CRC checks and ordinary download cases remain PASS. No claim of arbitrary path escape or production exploitation.
+
+### DOC-003 / R01-005 — P1 — corrupt local file stops later valid files in a batch
+
+- Sample IDs: synthetic L001 (broken PDF container with PDF header), L002 (valid single-page native PDF generated locally). No OCR, remote service or database required.
+- Failing module/function: `qa_core/document_parsing/mineru_service.py::MinerUService._local`, exception handling in `run`.
+- Reproduce using the same QA runner; failing case is `Round01FixAcceptance.test_R01_005_local_batch_bad_pdf_does_not_block_valid_sibling`.
+- Expected: corrupt input has a per-file failure; valid sibling is parsed and its result retained; task reports partial success.
+- Actual/log: corrupt-first order exits `_local`, leaving the valid sibling `created` with no result (`'created' != 'completed'`). Valid-first order preserves that sibling's result but incorrectly reports task `failed` instead of `partial`. Both subcases FAIL.
+- Confirmed root cause: `_local` lacks a per-file exception boundary and durable per-file progress; `run` handles the exception for the whole task. Existing `DocumentParser.parse_batch` isolation is not used here.
+- Suggested fix: isolate errors per file, persist sanitized error and progress, continue siblings, aggregate final status from actual per-file results. Review retry behavior so successful results/DB records are not duplicated.
+- Acceptance: both input orders preserve the valid sibling and return partial; the bad file has a visible sanitized error; successful local-only tasks still work. Existing remote partial-result and DB retry fixtures remain PASS.
+
+### Verified controls, not new bugs
+
+`test_local_database_failure_remains_visible_on_error_api` PASS: a simulated DB failure is persisted and exposed by the shared status/errors serializer. `test_failed_database_result_can_resume_without_new_remote_task` PASS: simulated transient DB failure recovers without creating a new remote task. These tests use a fake sink, not a real PostgreSQL server.
+
+Current totals: 5 confirmed bugs, 3 fixed on the tested commit, 2 still FAIL; cumulative repair rate 60%. The initial source findings above remain historical baseline evidence. See `06-regression-report.md` for independent execution limits.
