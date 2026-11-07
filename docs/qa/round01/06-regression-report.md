@@ -73,3 +73,52 @@ python -B tests/round01_isolated_postgres.py --source <isolated-checkout> --outp
 v0.1 本地集成 PASS，可按用户规定生成 v0.2.0 双引擎开发交接。该放行不允许自动部署、上传语料、修改正式数据库或跳过法律复核。下一版应复用既有本地路由、OCR/Structure、质量发现、OfficialMinerUClient、生命周期、结果存储和法律入库链路；仅补充质量驱动的策略与授权回退。
 
 现有 Orchestrator 仍是准备层。QA 将发布可校验的 Git READY 数据并执行只读检查，不宣称已自动唤醒另一会话。
+
+
+## QA增量独立执行：v0.2.0候选（2026-11-07）
+
+正式结论：**BLOCKED**。受测源码 `8badb995592771ff099cf52570621ba29ad37533`；QA测试基线 `d3c538643b4114c9e99acee002d1db77cd7ccbc1`；正式Fix交接传输 `c7e56026b4669b4a8a0075369b873c393ed50efe`。
+
+已独立核验真实提交、source是transport祖先、结构化Fix→QA ready身份、交接两份报告Git blob SHA256。transport只增加报告，因此不要求报告SHA与受测source相同；正式交接阻塞已解决。后续不重复执行同源码已有有效证据的测试。
+
+### 当前证据与A–J
+
+| 范围 | 当前完整源码结果 |
+| --- | --- |
+| A原生、B本地OCR、C复杂布局、D质量回退、E法律原文复核 | 独立QA业务适配器用例PASS |
+| F超时/限流/预算、G默认/敏感未授权拒绝、H双端来源追踪 | 独立QA用例及新增边界PASS |
+| I真实PostgreSQL重复/失败不覆盖 | 用户指定测试库实际执行PASS |
+| J复核前不入库/复核后可检索 | 原标准规定的演示向量既有pipeline兼容用例PASS |
+| 初始Mock与最新边界 | 100/100 PASS，0 FAIL、0 SKIP |
+| 未覆盖旧功能回归增量 | 46方法中42初次PASS、4初次SKIP；随后仅补测Windows专项1项、专用库2项，均PASS |
+| 当前源码149方法去重覆盖 | 148 PASS、0 FAIL、1必需方法BLOCKED |
+| 辅助真实HTTP | 1/1 PASS，实际Uvicorn本地TCP页面、认证拒绝、合成上传 |
+
+指定market_regulation是用户明确批准的测试库。本轮在其现有结构执行3项合成PG测试，另在既有QA专用库补齐2项独立映射/回滚，均未DDL或删除，成功记录保留；专用库恢复停止。只读快照、断网Mock、现有镜像、无依赖安装。source的Windows专项已在Windows实际执行。
+
+历史匿名真实样本S00001(JPG)与S00002(PDF首页)仅本地OCR：分别174与137字符、状态success、源哈希不变；结果仅证明解析可执行与非空，不冒充准确率评估。此历史结果不因后续语料配置变更而改写。后续语料位置只读取共享本地配置及MARKET_REGULATION_TEST_CORPUS，真实路径/文件名/正文不进入跟踪报告。
+
+### 唯一剩余必需回归缺口
+
+`test_postgres_integration.PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback` 尚无当前环境有效PASS。该旧方法会CREATE SCHEMA、初始化结构并最终DROP SCHEMA CASCADE，当前明确禁止结构修改/删除，因此未执行；这不是测试失败，也不能把SKIP改为PASS。旧v0.1成功证据存在，但缺少能够独立验证且匹配当前变更源码/依赖/配置/运行镜像的完整缓存指纹，不能按现有保守缓存策略直接复用。
+
+最小后续路径：由用户明确批准独立新建空测试环境中的该用例DDL生命周期，或由QA审查一条使用预先初始化独立schema、保留全部测试记录且不执行DDL/删除的等价验收入口。两种路径均不能触碰现有资料或擅自削弱断言；批准/环境未满足前保持该项BLOCKED。
+
+全语料质量无既定新准确率阈值，不是本轮新增门槛；真实BGE不属于J既定演示向量兼容标准，不作为额外阻塞；不把Fix附注的新安装/构建未测擅自提升为新增必需验收条件。旧round01 version-gate.json继续表示v0.1，未把本候选标成PASS。云端实际识别、生产部署不在本次结论内。
+
+### 可复现入口与消毒证据
+
+既有unittest用例经QA本地封装分阶段执行：六组Mock+独立v0.2.0+最新边界；真实HTTP；指定库两项持久化+DE-I；其余方法按case_id排除当前已PASS集合后增量执行；仅Windows专项与两项专用库再按完整方法ID补测。使用冻结源码和QA快照，不切换Fix工作树。机器路径、凭据、原始日志、执行封装保留在忽略目录。
+
+原始字节SHA256：
+
+- `summary.json`: `5d0ab09bd7d923895a69166da9831b71391c3d56d3d6872f66ff0c9aed5e408b`
+- `real-corpus.json`: `f92577a0c867b02b985f57d414645bef20ff54027303d93744a7c272a6500e80`
+- `handoff-verified.json`: `d6497ac14513ae7be834102e7c875d249335545a631adc4b708901a53cb95e47`
+- `coverage-final.json`: `aea8cbf752f424ba7c12814aba159a7aa48c8be7da7aec14f6d85841d08a4025`
+- `output/mock.json`: `b2c49e3dbbd6a71a180bffa5410126e405f167ce1056c6ab85260db6e96df3e3`
+- `output/http.json`: `9461685fdc12b8fcabcc698cbba1145182a4dcaaaddd56d9d47230494da910c1`
+- `output/postgres.json`: `59617129996f1c468fe365ce98ffa72ae1865813206249eab0012320b2c99639`
+- `output/delta.json`: `310fe455420b07b8b1e900a0195d9bd450be67979e6f3113c3706d57ac0f73de`
+- `output/windows-specific.json`: `d401e85f3c0665775c63c0756f4967be139f808f9d2d046d844a34d125ddacee`
+- `output/qa-isolated-pg.json`: `df38b7ee280f6a74fe939e77ffde6c176962f771a2ba78fa63ca963b0ea0e67e`
