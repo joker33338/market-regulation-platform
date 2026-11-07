@@ -1,17 +1,15 @@
 {
   "version": "v0.2.1",
-  "gate_status": "FAIL",
+  "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
+  "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
   "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
-  "total_tests": 22,
-  "passed_tests": 20,
-  "failed_tests": 2,
+  "total_tests": 74,
+  "passed_tests": 74,
+  "failed_tests": 0,
   "skipped_tests": 0,
   "blocked_tests": 0,
-  "critical_issues": [
-    "Q021-001"
-  ],
+  "critical_issues": [],
   "report_paths": [
     "docs/qa/v0.2.1/bug-list.md",
     "docs/qa/v0.2.1/final-qa-report.md",
@@ -19,13 +17,12 @@
     "docs/qa/v0.2.1/testset-inventory.md"
   ],
   "checked_at": "2026-11-07T07:26:23.334075+00:00",
-  "mock_status": "FAIL",
-  "integration_status": "PARTIAL",
-  "qa_status": "FAIL",
+  "mock_status": "PASS",
+  "integration_status": "NOT_RERUN",
+  "qa_status": "BLOCKED",
   "blocked_reasons": [
-    "9/53原标签路由差异尚未审定",
-    "真实CER和人工表格结构真值NOT_LABELED",
-    "本轮仅完成限定Structure实测，未完成全面质量证据"
+    "9/53原标注路由差异未改写且尚待审定",
+    "真实CER和人工结构标准答案NOT_LABELED；专项质量不能由修复回归PASS替代"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -54,11 +51,17 @@
     "S00007-real-on-p4-summary.json": "93d8d013b6f7ef4cd0e9404329a50b2ae20bef9713522616d1bc8198c01fb91e",
     "S00007-real-on-summary.json": "6b2f91b9df734992fbbadea8a4920935ba411081a54a4793567eb3708ab1b91b",
     "S00008-real-on-p1-summary.json": "2f98efb6f05a46538f316eaecee7e51034609947583519e7ffc50d0d780fddde",
-    "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926"
+    "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926",
+    "fixed-source-focused-result.json": "25a217415795efda9708cd8cdc78459b5a66f0b649b3a5bebc749b5a0d7efa70"
   },
-  "confirmed_bug_ids": [
+  "confirmed_bug_ids": [],
+  "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
+  "functional_status": "PASS",
+  "tested_commit_sha": "6216ae5f40727871b369dfc8c54868ac748c4648",
+  "fix_transport_commit": "a4863c463a0e8f6082c33d125965e4a1ec5c79fd",
+  "closed_bug_ids": [
     "Q021-001",
     "Q021-002"
   ],
-  "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437"
+  "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b"
 }
