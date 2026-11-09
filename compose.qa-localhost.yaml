@@ -1,0 +1,89 @@
+name: market-regulation-qa-localhost
+x-sandbox: &sandbox
+  image: market-regulation-qa-gateway:v0.2.1-nft1
+  pull_policy: never
+  user: "0:0"
+  read_only: true
+  cap_drop: [ALL]
+  cap_add: [NET_ADMIN, SETUID, SETGID, SETPCAP]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  mem_limit: 1g
+  cpus: 1
+  sysctls:
+    net.ipv4.ip_forward: "0"
+    net.ipv6.conf.all.forwarding: "0"
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    - /policy:rw,noexec,nosuid,size=4m,mode=0755
+services:
+  app:
+    <<: *sandbox
+    profiles: [local]
+    command: [app]
+    restart: unless-stopped
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      OCR_MODEL_ROOT: /no-models
+    volumes:
+      - ${QA_LOCAL_ROOT:?请使用启动脚本}/source:/source:ro
+      - type: bind
+        source: ${QA_LOCAL_ROOT}/runtime.json
+        target: /private/runtime.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - ${QA_LOCAL_ROOT}/state:/state:rw
+    networks:
+      backend:
+        ipv4_address: 172.30.250.10
+  ingress:
+    <<: *sandbox
+    profiles: [local]
+    command: [local-ingress]
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["127.0.0.1:8180:8180"]
+    networks:
+      backend:
+        ipv4_address: 172.30.250.12
+      frontend:
+        ipv4_address: 172.30.251.12
+  tls-gateway:
+    <<: *sandbox
+    profiles: [cloud]
+    command: [tls-egress]
+    # 地址授权窗口到期后必须显式重新初始化，不自动无限刷新。
+    restart: "no"
+    networks:
+      backend:
+        ipv4_address: 172.30.250.11
+      egress:
+        ipv4_address: 172.30.252.11
+  client:
+    <<: *sandbox
+    profiles: [cloud]
+    command: [client]
+    restart: "no"
+    stdin_open: true
+    volumes:
+      - ${QA_LOCAL_ROOT}/source:/source:ro
+      - ${QA_LOCAL_ROOT}/output:/output:rw
+      - ./tests:/qa:ro
+    networks:
+      backend:
+        ipv4_address: 172.30.250.10
+networks:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.250.0/28
+  frontend:
+    ipam:
+      config:
+        - subnet: 172.30.251.0/28
+  egress:
+    ipam:
+      config:
+        - subnet: 172.30.252.0/28
