@@ -117,3 +117,10 @@ class BatchHTTPFlow(unittest.IsolatedAsyncioTestCase):
         task = dict(owner='alice', parse_options=dict(sensitive=False))
         self.authority.bind_task(task)
         self.assertFalse(self.authority.authorize(task, dict(source_path=str(self.source), sha256=self.sha))[0])
+
+    async def test_factory_accepts_properly_bound_batch_service(self):
+        from qa_core.document_parsing.mineru_api import create_app
+        service = self.service()
+        app = create_app(service.config, tokens={'a'*32:'alice'}, service=service,
+                         dual_config=service.dual_router.config)
+        self.assertIsNotNone(app)
