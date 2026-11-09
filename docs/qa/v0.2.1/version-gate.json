@@ -1,15 +1,17 @@
 {
   "version": "v0.2.1",
-  "gate_status": "BLOCKED",
+  "gate_status": "FAIL",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
-  "qa_test_commit": "5f4417ef905f3feacf3f266bfbbb81a6047116c5",
-  "total_tests": 156,
-  "passed_tests": 149,
+  "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+  "qa_test_commit": "4f4b744665bce7afcb89246c5e891c1c67b6f081",
+  "total_tests": 185,
+  "passed_tests": 178,
   "failed_tests": 0,
   "skipped_tests": 7,
   "blocked_tests": 0,
-  "critical_issues": [],
+  "critical_issues": [
+    "QTB-001"
+  ],
   "report_paths": [
     "docs/qa/v0.2.1/01-测试集盘点.md",
     "docs/qa/v0.2.1/02-标准答案完整性.md",
@@ -20,15 +22,14 @@
     "docs/qa/v0.2.1/07-缺陷与待裁决.md",
     "docs/qa/v0.2.1/09-完整回归结果.md"
   ],
-  "checked_at": "2026-11-09T01:38:45.113273+00:00",
-  "mock_status": "BLOCKED",
+  "checked_at": "2026-11-09T01:50:28.754688+00:00",
+  "mock_status": "FAIL",
   "integration_status": "BLOCKED",
-  "qa_status": "BLOCKED",
+  "qa_status": "FAIL",
   "blocked_reasons": [
-    "当前完整基线7项环境条件SKIP未覆盖",
-    "TEST_BATCH新增边界实现与独立Mock尚待完成",
-    "真实API资格敏感性结论尚待可信确认",
-    "人工大图路由期望与既有资源策略尚待工程裁决"
+    "QTB-001工厂配置守卫缺陷待修复",
+    "完整suite7个条件环境项未覆盖",
+    "真实批次资格/敏感性未确认并且root尚未放行真实请求"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -62,12 +63,13 @@
     "current-truth-metrics.json": "952291482df83db0c0b09172916caada371207d26501b22811668cf8946a5eb7",
     "current-table-formats.json": "c20b3b056c12556f3625190591b584ad840cf646bd006ecef369a5379569bd86",
     "source621-full-baseline-summary.json": "0598e702008d8531d75a39ed4e0cdd50ae0daf7464075d7cd9040a3b6c595ef3",
-    "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118"
+    "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118",
+    "source215-full-result.json": "4e00ab1b73004f85348c3d442d5d84f6408d3eb98e11e4709af2e5319e998d69"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
   "functional_status": "BLOCKED",
-  "tested_commit_sha": "6216ae5f40727871b369dfc8c54868ac748c4648",
+  "tested_commit_sha": "215807769feb2fbfedf8d91d275dec156cc038bb",
   "fix_transport_commit": "a4863c463a0e8f6082c33d125965e4a1ec5c79fd",
   "closed_bug_ids": [
     "Q021-001",
@@ -114,5 +116,13 @@
   "test_commands": [
     "python -B -m unittest discover -s tests -v",
     "python -B -m unittest tests.test_v021_test_batch_authorization -v"
-  ]
+  ],
+  "independent_security_tests": {
+    "total": 37,
+    "passed": 34,
+    "failed": 3,
+    "errors": 0,
+    "skipped": 0,
+    "overlap_with_source_suite": 29
+  }
 }
