@@ -2,13 +2,13 @@
   "version": "v0.2.1",
   "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
-  "qa_test_commit": "4f4b744665bce7afcb89246c5e891c1c67b6f081",
-  "total_tests": 191,
-  "passed_tests": 190,
+  "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+  "qa_test_commit": "38837ea464717d943a46cb4e1917c12b5688d1df",
+  "total_tests": 111,
+  "passed_tests": 111,
   "failed_tests": 0,
-  "skipped_tests": 1,
-  "blocked_tests": 1,
+  "skipped_tests": 0,
+  "blocked_tests": 0,
   "critical_issues": [],
   "report_paths": [
     "docs/qa/v0.2.1/01-测试集盘点.md",
@@ -21,15 +21,16 @@
     "docs/qa/v0.2.1/09-完整回归结果.md",
     "docs/qa/v0.2.1/10-Windows执行策略诊断.md"
   ],
-  "checked_at": "2026-11-09T03:24:23.011027+00:00",
+  "checked_at": "2026-11-09T03:57:06.056970+00:00",
   "mock_status": "PASS",
   "integration_status": "BLOCKED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
-    "旧MVP数据库生命周期方法包含未经批准DDL/合成投影DELETE，尚未执行",
-    "宿主端口8180不可达，容器内部HTTP和重启已通过",
-    "系统CodeIntegrity事件确认本地sklearn扩展及独立官方客户端libssl各自WINDOWS_POLICY_BLOCKED",
-    "真实官方HTTP为0，未获得MinerU技术对照；局部历史页指标不能覆盖完整集或所有引擎"
+    "Smart App Control执行阻止本地sklearn扩展及独立HTTPS依赖libssl，尚未解除",
+    "真实MinerU HTTP为0，API仍NOT_TESTED/BLOCKED，Dual仍BLOCKED",
+    "旧ee7完整191中MVP生命周期方法仍缺DDL/合成投影DELETE许可",
+    "宿主入口仅限时中继验证通过且已停止，Docker NAT未修复、无持续入口",
+    "全测试集各引擎质量覆盖尚不完整，业务验收阈值未制定"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -75,17 +76,23 @@
     "official-import-audit.json": "ad9c8985f1616f27991ed1f72fe169b7ee14e14c55fe439731d5e75fad29820b",
     "policy-matches.json": "d14a13eeb5230bdbe7d31c5b8d73e6a8e15d35a297a8d6ff4c3825f725da1dab",
     "policy-file-inventory.json": "52ff12911df0ba60d72058714271d9a156f2a0b54c71941de85cf9a12ea4db62",
-    "diagnostics-contract-red-corrected.json": "65934df699e031ef40aa37555b775c53696989ed2ce8d9873ee595bb0f5bf800"
+    "diagnostics-contract-red-corrected.json": "65934df699e031ef40aa37555b775c53696989ed2ce8d9873ee595bb0f5bf800",
+    "source67709-independent.json": "7988194e6170aa67db6bd0f4fdb59d768596cdeb9bfc35b1e2ad66e2dc5c08dc",
+    "source0770-independent.json": "584be41de8e09e79f82933faeaa079d62686657570a04a8fd35be0811d5bf5e1",
+    "windows-policy-kind.json": "1eae3a85f017deabdbbd4e36caa5a0c55a2f716b45340b8e4146cbe0557e58ec",
+    "sourceee7-host-relay-summary.json": "fd663581a4b5668a245d0286b75d581c8efec6847cf101eec078b3c26477586b"
   },
   "confirmed_bug_ids": [],
-  "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
-  "functional_status": "BLOCKED",
-  "tested_commit_sha": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
-  "fix_transport_commit": "e16b4e241651a0641bdccac8420a64290e40869f",
+  "fix_handoff_commit": "16b397cc79bd0c3a7710ba4722959cb3eae73c26",
+  "functional_status": "PASS",
+  "tested_commit_sha": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+  "fix_transport_commit": "949bc4b109e98ddd6f8b939971b1ac2dbf9955ae",
   "closed_bug_ids": [
     "Q021-001",
     "Q021-002",
-    "QTB-001"
+    "QTB-001",
+    "Q021-003",
+    "Q021-004"
   ],
   "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
   "business_code_changed_by_qa": false,
@@ -124,27 +131,32 @@
   },
   "previous_bugfix_functional_status": "PASS",
   "prior_fix_only_integration_waiver": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
-  "integration_blocked_reason": "批次安全与19固定SHA资格/ACL/dry-run已通过且协调器放行；真实首样本安全停止，尚无官方HTTP结果。",
+  "integration_blocked_reason": "诊断代码111项定向通过不解除系统SAC，不代表真实API或整版质量通过。",
   "test_commands": [
-    "python -B -m unittest discover -s tests -v",
-    "python -B -m unittest tests.test_v021_test_batch_authorization -v"
+    "python -B -m unittest tests.test_v021_document_io_diagnostics tests.test_v021_engine_diagnostics -v",
+    "受影响DocumentParsing/DualEnginePolicy/TEST_BATCH/API及QA HTTP边界；完整模块与唯一方法ID见本地111项证据"
   ],
   "independent_security_tests": {
-    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
     "total": 38,
     "passed": 38,
     "failed": 0,
     "errors": 0,
     "skipped": 0,
-    "deduplication_note": "与191源码方法存在重叠，不相加"
+    "overlap_with_targeted": 38,
+    "deduplication_note": "38包含于111，不相加"
   },
   "real_service_checks": {
     "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
     "internal_http": "PASS",
     "docker_restart": "PASS",
-    "host_port_8180": "BLOCKED",
+    "host_port_8180": "PASS_TEMPORARY_RELAY",
+    "relay_stopped": true,
+    "continuous_host_entry": "NOT_CONFIGURED",
+    "docker_nat": "NOT_REPAIRED",
     "provider": "synthetic-mock",
-    "counted_in_unit_methods": false
+    "counted_in_unit_methods": false,
+    "report_commit": "1602cdac5edd6b9c418bffbdcbe362aa7795257b"
   },
   "real_cloud_uploads": 0,
   "test_batch_preflight": {
@@ -175,19 +187,36 @@
   "mineru_api_observation": "NOT_TESTED",
   "mineru_api_status": "BLOCKED",
   "dual_engine_status": "BLOCKED",
-  "pending_diagnostics_contract": {
-    "qa_test_commit": "5e752376d8c8855a974be5add9f0902c324fc22d",
-    "total": 8,
-    "passed": 0,
-    "failed": 2,
-    "errors": 6,
-    "skipped": 0,
-    "feature_ids": [
-      "OBS021-001"
-    ],
-    "bug_ids": [
-      "Q021-003"
-    ],
-    "note": "新增合成诊断合同与构造兜底；独立于最终源码191方法，不混为历史功能结果"
+  "diagnostics_validation": {
+    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+    "contract_tests": 11,
+    "contract_passed": 11,
+    "targeted_unique_methods": 111,
+    "passed": 111,
+    "includes_contracts": true,
+    "fix_rounds": 2,
+    "max_rounds": 3,
+    "prior_source": "0770e65578b6cf128cb497afbd521901b59e6719",
+    "prior_total": 110,
+    "prior_passed": 107,
+    "prior_failed": 3
+  },
+  "full_regression_history": {
+    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+    "total": 191,
+    "passed": 190,
+    "failed": 0,
+    "blocked": 1,
+    "new_source_full_suite_rerun": false,
+    "reuse_basis": "本轮仅诊断/helper、runtime异常包装、页附件及构造兜底；受影响模块定向复验。依赖/模型/官方客户端/授权/预算/API/数据库代码未改；历史191不冒充新SHA全量实跑。"
+  },
+  "windows_policy": {
+    "status": "BLOCKED",
+    "kind": "Smart App Control",
+    "policy_name": "VerifiedAndReputableDesktop",
+    "event_id": 3077,
+    "citool_list": "FAILED_NONZERO",
+    "individual_app_exception_supported": false,
+    "policy_changed": false
   }
 }

@@ -43,3 +43,8 @@
 ## 最新无网络诊断
 
 官方客户端独立构造已确认httpx→ssl的libssl被Windows执行策略拒绝，与Paddle的sklearn扩展拒绝分别有CodeIntegrity 3033/3077佐证。导入审计未加载Paddle，网络尝试为零。LOCAL_DEPENDENCY_ERROR未证实；MinerU为NOT_TESTED/BLOCKED，Dual为BLOCKED，不是API_FAIL。见[Windows执行策略诊断](10-Windows执行策略诊断.md)。新增8项合成诊断合同（0通过、2失败、6错误）和构造异常Q021-003已正式交接，不能通过代码修改解除系统策略，也不能把合同转绿当真实API成功。
+
+
+## 最终诊断修复独立复验
+
+源码67709c4989781594dd6c4723666fdb2c21caaa7b，报告运输949bc4b109e98ddd6f8b939971b1ac2dbf9955ae，111/111定向PASS（包含11正式诊断/IO合同与38授权安全方法，不与历史191或Fix108相加）。Q021-003/004关闭；普通文件缺失/EACCES及已就绪引擎输入I/O不再误报依赖。安全附件和真实加载错误控制保持通过。未运行模型/真实HTTP，Windows SAC仍BLOCKED、MinerU为NOT_TESTED。网络仅ee7限时中继PASS且已停止，NAT未修复。
