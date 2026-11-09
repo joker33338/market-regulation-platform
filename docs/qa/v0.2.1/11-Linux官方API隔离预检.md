@@ -37,10 +37,12 @@ python /qa/qa_mineru_egress_proxy.py --pins /policy/pins.json --attestation /pol
 独立云端 runner 为 `tests/qa_mineru_linux_runner.py`。源代码49个Python文件的SHA256索引已从冻结Git提交生成；不改业务代码。准确的容器内dry-run入口如下，不带 `--execute`，不读取Key、不发官方请求：
 
 ```text
-python /qa/qa_mineru_linux_runner.py --attestation /policy/client-kernel-attestation.json --integrity /policy/linux-source-integrity.json --plan /policy/preflight-plan.json --manifest /policy/manifest.json --ledger /ledger/manifest.json.usage.json --output /output --gateway-ip 172.30.250.11
+python /qa/qa_mineru_linux_runner.py --attestation /policy/client-kernel-attestation.json --integrity /policy/linux-source-integrity.json --plan /policy/preflight-plan.json --manifest /policy/manifest.json --registration /policy/canonical-ledger-registration.json --ledger /ledger/manifest.json.usage.json --output /output --gateway-ip 172.30.250.11
 ```
 
 只有协调器收到独立内核读回、实际负向探针和dry-run证据后才追加 `--execute`；Token仅经stdin输入内存，不写命令行或Docker环境元数据。该runner保持原真实DocumentParser和正式授权/预算链，额外禁止本次纯云环境导入模型包，429或不确定POST后阻止新发送。原始失败候选和官方结果只保留在私有output；代理仅见匿名来源，不打印签名URL。runner目前仅语法检查通过，未宣称真实执行已通过。
+
+最小权限账本布局经协调器确认：只在证明旧账本不存在、真实请求为0后首次登记专用batch-ledger目录下唯一账本，批次/owner/32调用3内容上限不变，不重置已有账本。仅该专用目录RW挂载，其余私有文件逐一只读；active记录canonical路径，runner要求登记信息一致并禁止默认旧路径另开账本。
 
 实际上传前仍须验证：客户端 IPv4/IPv6 直连和通用 DNS均失败；网关任意外域/端口和伪造 CONNECT 均失败；允许官方域仅443且标准TLS证书校验通过；网关自身cap0且内核规则确实限制新出站；无主机端口或业务网络暴露；HTTP重定向到新域拒绝。由协调器审核这些证据后再启动同清单的真实云端。
 

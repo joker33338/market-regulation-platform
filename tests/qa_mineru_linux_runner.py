@@ -67,6 +67,12 @@ async def run(args, control):
         if hashlib.sha256(path.read_bytes().replace(b'\r\n',b'\n')).hexdigest() != expected:
             raise ValueError('业务源码完整性不符')
     plan = json.loads(args.plan.read_text('utf-8'))
+    registration = json.loads(args.registration.read_text('utf-8'))
+    if (registration.get('batch_id') != plan['batch_id'] or registration.get('owner') != plan['owner'] or
+            registration.get('canonical_ledger_container_path') != str(args.ledger.resolve()) or
+            registration.get('old_default_ledger_forbidden') is not True or
+            registration.get('selected_sha256') != [row['sha256'] for row in plan['selected']]):
+        raise ValueError('必须沿用已登记的唯一账本与批准范围')
     if len(plan['selected']) != 3 or sum(row['pages'] for row in plan['selected']) != 13:
         raise ValueError('首批范围不符')
     authority = TrustedTestBatch(args.manifest,owner=plan['owner'],batch_id=plan['batch_id'],
@@ -154,7 +160,7 @@ async def run(args, control):
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    for name in ('attestation','integrity','plan','manifest','ledger','output'):
+    for name in ('attestation','integrity','plan','manifest','ledger','output','registration'):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--gateway-ip',required=True)
     parser.add_argument('--execute',action='store_true')
