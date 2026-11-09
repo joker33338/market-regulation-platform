@@ -1,6 +1,8 @@
-param([ValidateSet('start','stop','status','restart','rebuild','cloud-client')][string]$Action = 'status',
+﻿param([ValidateSet('start','stop','status','restart','rebuild','cloud-client')][string]$Action = 'status',
       [string]$Python = '')
 $ErrorActionPreference = 'Stop'
+$previousPythonEncoding = $env:PYTHONIOENCODING
+$env:PYTHONIOENCODING = 'utf-8'
 $workspace = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $workspace
 try {
@@ -50,5 +52,6 @@ try {
         Invoke-Compose -Arguments @('--profile','local','--profile','cloud','ps','-a')
     }
 } finally {
+    $env:PYTHONIOENCODING = $previousPythonEncoding
     Pop-Location
 }
