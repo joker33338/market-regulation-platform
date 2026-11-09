@@ -1,17 +1,15 @@
 {
   "version": "v0.2.1",
-  "gate_status": "FAIL",
+  "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+  "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
   "qa_test_commit": "4f4b744665bce7afcb89246c5e891c1c67b6f081",
-  "total_tests": 185,
-  "passed_tests": 178,
+  "total_tests": 191,
+  "passed_tests": 190,
   "failed_tests": 0,
-  "skipped_tests": 7,
-  "blocked_tests": 0,
-  "critical_issues": [
-    "QTB-001"
-  ],
+  "skipped_tests": 1,
+  "blocked_tests": 1,
+  "critical_issues": [],
   "report_paths": [
     "docs/qa/v0.2.1/01-测试集盘点.md",
     "docs/qa/v0.2.1/02-标准答案完整性.md",
@@ -22,14 +20,15 @@
     "docs/qa/v0.2.1/07-缺陷与待裁决.md",
     "docs/qa/v0.2.1/09-完整回归结果.md"
   ],
-  "checked_at": "2026-11-09T01:50:28.754688+00:00",
-  "mock_status": "FAIL",
+  "checked_at": "2026-11-09T03:07:04.115885+00:00",
+  "mock_status": "PASS",
   "integration_status": "BLOCKED",
-  "qa_status": "FAIL",
+  "qa_status": "BLOCKED",
   "blocked_reasons": [
-    "QTB-001工厂配置守卫缺陷待修复",
-    "完整suite7个条件环境项未覆盖",
-    "真实批次资格/敏感性未确认并且root尚未放行真实请求"
+    "旧MVP数据库生命周期方法包含未经批准DDL/合成投影DELETE，尚未执行",
+    "宿主端口8180不可达，容器内部HTTP和重启已通过",
+    "首批本地Paddle组件受应用程序控制阻止；云链路另捕获ImportError待独立诊断",
+    "真实官方HTTP为0，未获得MinerU技术对照；局部历史页指标不能覆盖完整集或所有引擎"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -65,16 +64,22 @@
     "source621-full-baseline-summary.json": "0598e702008d8531d75a39ed4e0cdd50ae0daf7464075d7cd9040a3b6c595ef3",
     "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118",
     "source215-full-result.json": "4e00ab1b73004f85348c3d442d5d84f6408d3eb98e11e4709af2e5319e998d69",
-    "source215-real-http-restart.json": "15196579a62916d9f120c37a2a055e71eb42bcea985a2138e9534aa479b538a2"
+    "source215-real-http-restart.json": "15196579a62916d9f120c37a2a055e71eb42bcea985a2138e9534aa479b538a2",
+    "sourceee7-security-result.json": "658d5c056bd0ce58a5d484b4a7ce46efde4ba31f9c43a3f562d9950683863519",
+    "sourceee7-coverage-after-pg-five.json": "ab91ab04a60e18bbad9ed76e8f7b1edaea61593eb35ed12c32d27523f222bbe8",
+    "sourceee7-pg-five-result.json": "1d68d100fb22fde16b584204803ba84ea71e342a52df6baae80378feb0a3aea0",
+    "sourceee7-batch-preflight.json": "ac4f17be1d825773d5e64804b1a2ce42ee739ad5e94d24da6eb11109ae70d077",
+    "sourceee7-cloud-execution.json": "f34c190eb7ee805f3dfc5e4987bef291acc21193f33150ff8fe69e76c48da39b"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
   "functional_status": "BLOCKED",
-  "tested_commit_sha": "215807769feb2fbfedf8d91d275dec156cc038bb",
-  "fix_transport_commit": "a4863c463a0e8f6082c33d125965e4a1ec5c79fd",
+  "tested_commit_sha": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+  "fix_transport_commit": "e16b4e241651a0641bdccac8420a64290e40869f",
   "closed_bug_ids": [
     "Q021-001",
-    "Q021-002"
+    "Q021-002",
+    "QTB-001"
   ],
   "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
   "business_code_changed_by_qa": false,
@@ -113,25 +118,49 @@
   },
   "previous_bugfix_functional_status": "PASS",
   "prior_fix_only_integration_waiver": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
-  "integration_blocked_reason": "本次用户新增官方API TEST_BATCH范围，必须完成新边界实现/Mock及资格审查后再真实HTTP；先前异常兜底/CLI修复无需新推理的豁免不适用于此新增范围。",
+  "integration_blocked_reason": "批次安全与19固定SHA资格/ACL/dry-run已通过且协调器放行；真实首样本安全停止，尚无官方HTTP结果。",
   "test_commands": [
     "python -B -m unittest discover -s tests -v",
     "python -B -m unittest tests.test_v021_test_batch_authorization -v"
   ],
   "independent_security_tests": {
-    "total": 37,
-    "passed": 34,
-    "failed": 3,
+    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+    "total": 38,
+    "passed": 38,
+    "failed": 0,
     "errors": 0,
     "skipped": 0,
-    "overlap_with_source_suite": 29
+    "deduplication_note": "与191源码方法存在重叠，不相加"
   },
   "real_service_checks": {
-    "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
     "internal_http": "PASS",
     "docker_restart": "PASS",
     "host_port_8180": "BLOCKED",
     "provider": "synthetic-mock",
     "counted_in_unit_methods": false
-  }
+  },
+  "real_cloud_uploads": 0,
+  "test_batch_preflight": {
+    "qualified_files": 19,
+    "source_sha_verified": 19,
+    "acl": "PASS",
+    "dry_run": "READY",
+    "coordinator_released": true,
+    "selected_samples": [
+      "S00014",
+      "S00007",
+      "S00010"
+    ],
+    "selected_pages": 13,
+    "max_calls": 32,
+    "max_unique_sha": 3,
+    "max_calls_per_task": 8,
+    "poll_seconds": 10,
+    "started_tasks": 1,
+    "completed_cloud_tasks": 0,
+    "usage_ledger_created": false
+  },
+  "current_real_quality_status": "BLOCKED",
+  "business_threshold_status": "NOT_DEFINED_BY_USER"
 }
