@@ -19,18 +19,20 @@
     "docs/qa/v0.2.1/06-真实MinerU测试.md",
     "docs/qa/v0.2.1/07-缺陷与待裁决.md",
     "docs/qa/v0.2.1/09-完整回归结果.md",
-    "docs/qa/v0.2.1/10-Windows执行策略诊断.md"
+    "docs/qa/v0.2.1/10-Windows执行策略诊断.md",
+    "docs/qa/v0.2.1/11-Linux官方API隔离预检.md",
+    "docs/qa/v0.2.1/11-persistent-localhost-validation.md",
+    "docs/qa/v0.2.1/final-qa-report.md"
   ],
-  "checked_at": "2026-11-09T03:57:06.056970+00:00",
+  "checked_at": "2026-11-09T08:55:39.196619+00:00",
   "mock_status": "PASS",
   "integration_status": "BLOCKED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
-    "Smart App Control执行阻止本地sklearn扩展及独立HTTPS依赖libssl，尚未解除",
-    "真实MinerU HTTP为0，API仍NOT_TESTED/BLOCKED，Dual仍BLOCKED",
-    "旧ee7完整191中MVP生命周期方法仍缺DDL/合成投影DELETE许可",
-    "宿主入口仅限时中继验证通过且已停止，Docker NAT未修复、无持续入口",
-    "全测试集各引擎质量覆盖尚不完整，业务验收阈值未制定"
+    "Windows Smart App Control仍阻止本地sklearn扩展及独立HTTPS依赖libssl；独立Linux获准并已执行，不等于Windows解除",
+    "首批真实官方流程PARTIAL：S7完整链PASS但表格质量告警；S10上传后轮询超时，结果未下载；S14代理拒绝占位保留",
+    "旧ee7完整191中MVP生命周期仍缺独立DDL及合成投影DELETE许可",
+    "完整测试集各引擎质量覆盖及业务验收阈值未完成；Dual仍BLOCKED"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -80,7 +82,14 @@
     "source67709-independent.json": "7988194e6170aa67db6bd0f4fdb59d768596cdeb9bfc35b1e2ad66e2dc5c08dc",
     "source0770-independent.json": "584be41de8e09e79f82933faeaa079d62686657570a04a8fd35be0811d5bf5e1",
     "windows-policy-kind.json": "1eae3a85f017deabdbbd4e36caa5a0c55a2f716b45340b8e4146cbe0557e58ec",
-    "sourceee7-host-relay-summary.json": "fd663581a4b5668a245d0286b75d581c8efec6847cf101eec078b3c26477586b"
+    "sourceee7-host-relay-summary.json": "fd663581a4b5668a245d0286b75d581c8efec6847cf101eec078b3c26477586b",
+    "linux-final-cloud-evidence.json": "a276b30aa508969d6ee684ca8715a3d500976d9992fd8abfaa3145f909f95cee",
+    "S00007-html-offline-analysis-with-cell-counts.json": "3e5563a8af29fb79132805c726c1912ec1f17da4edf2d7c9ac92c6fb3d4e384d",
+    "post-cloud-source-integrity.json": "ee9b3a858adc5539833d8bce04cce709dcab4012a64a58095d624dd90d249a64",
+    "S00014-failed-no-origin-http-proof.json": "4d11d099d244e0c19ea9450fce2ca94ce0b66b5ef22efed2f20f8bae17bce6c0",
+    "nft3-independent-result.json": "aaa7bf1105ba8a7088ffa96746af4227b5e7a0667b1f1c83c21b2d6d5b5c3f5e",
+    "proxy-independent-10-result.json": "f77252fac5d72538e21b284b52fcac4ac985da930cdda74c147db5ebed967675",
+    "post-cloud-localhost-verification.json": "848484d2ee0f8539e0bc97cda825c8f452de751d34d4328e4aa3b7655b4ebe41"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "16b397cc79bd0c3a7710ba4722959cb3eae73c26",
@@ -92,11 +101,12 @@
     "Q021-002",
     "QTB-001",
     "Q021-003",
-    "Q021-004"
+    "Q021-004",
+    "Q021-005"
   ],
   "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
   "business_code_changed_by_qa": false,
-  "report_path": "docs/qa/v0.2.1/09-完整回归结果.md",
+  "report_path": "docs/qa/v0.2.1/final-qa-report.md",
   "manual_truth_status": "LABELED",
   "manual_truth_tasks": 4,
   "routing_original_label_rate": {
@@ -122,7 +132,7 @@
     "numerator": 2,
     "denominator": 2
   },
-  "real_cloud_requests": 0,
+  "real_cloud_requests": 11,
   "test_batch_contract_baseline": {
     "total": 23,
     "passed": 4,
@@ -131,7 +141,7 @@
   },
   "previous_bugfix_functional_status": "PASS",
   "prior_fix_only_integration_waiver": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
-  "integration_blocked_reason": "诊断代码111项定向通过不解除系统SAC，不代表真实API或整版质量通过。",
+  "integration_blocked_reason": "Linux官方完整链仅S7通过，首批PARTIAL；Windows本地OCR策略和完整质量覆盖仍受限，不能据单链或工具Mock放行整版。",
   "test_commands": [
     "python -B -m unittest tests.test_v021_document_io_diagnostics tests.test_v021_engine_diagnostics -v",
     "受影响DocumentParsing/DualEnginePolicy/TEST_BATCH/API及QA HTTP边界；完整模块与唯一方法ID见本地111项证据"
@@ -147,18 +157,29 @@
     "deduplication_note": "38包含于111，不相加"
   },
   "real_service_checks": {
-    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
-    "internal_http": "PASS",
-    "docker_restart": "PASS",
-    "host_port_8180": "PASS_TEMPORARY_RELAY",
-    "relay_stopped": true,
-    "continuous_host_entry": "NOT_CONFIGURED",
-    "docker_nat": "NOT_REPAIRED",
+    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+    "infrastructure_commit": "04ea352cb60a43f429f09415fad455be74067787",
+    "network_status": "PARTIAL",
+    "continuous_host_entry": "PASS",
+    "host_port_8180": "PASS",
+    "host_binding": "127.0.0.1_ONLY",
+    "listener_process": "com.docker.backend",
+    "temporary_relay_used": false,
+    "container_restart": "PASS",
+    "container_recreate": "PASS",
+    "self_loopback": "PASS",
+    "kernel_negative": "PASS",
+    "windows_host_reboot": "NOT_TESTED",
+    "docker_original_nat": "NOT_REPAIRED",
+    "post_cloud_restore": "PASS",
+    "root_http_status": 200,
+    "cloud_client_stopped": true,
+    "cloud_gateway_stopped": true,
+    "report_commit": "4a6d669053b5670393b0147df24b13127485cafb",
     "provider": "synthetic-mock",
-    "counted_in_unit_methods": false,
-    "report_commit": "1602cdac5edd6b9c418bffbdcbe362aa7795257b"
+    "counted_in_unit_methods": false
   },
-  "real_cloud_uploads": 0,
+  "real_cloud_uploads": 2,
   "test_batch_preflight": {
     "qualified_files": 19,
     "source_sha_verified": 19,
@@ -175,17 +196,21 @@
     "max_unique_sha": 3,
     "max_calls_per_task": 8,
     "poll_seconds": 10,
-    "started_tasks": 1,
-    "completed_cloud_tasks": 0,
-    "usage_ledger_created": false
+    "started_tasks": 3,
+    "completed_cloud_tasks": 1,
+    "usage_ledger_created": true,
+    "actual_budget_reservations": 12,
+    "actual_unique_sha": 3,
+    "original_batch_reused": true,
+    "expiry_extended": false
   },
   "current_real_quality_status": "BLOCKED",
   "business_threshold_status": "NOT_DEFINED_BY_USER",
   "local_engine_status": "LOCAL_ENGINE_UNAVAILABLE",
   "local_engine_reason": "WINDOWS_POLICY_BLOCKED",
   "local_dependency_error_confirmed": false,
-  "mineru_api_observation": "NOT_TESTED",
-  "mineru_api_status": "BLOCKED",
+  "mineru_api_observation": "PARTIAL_FIRST_BATCH",
+  "mineru_api_status": "PASS",
   "dual_engine_status": "BLOCKED",
   "diagnostics_validation": {
     "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
@@ -218,5 +243,108 @@
     "citool_list": "FAILED_NONZERO",
     "individual_app_exception_supported": false,
     "policy_changed": false
+  },
+  "real_cloud_requests_definition": "正式官方调用尝试11；HTTP200响应10，连接超时1到源站未知；另有代理拒绝且源站确证0的预算预留1。",
+  "mineru_api_pass_scope": "仅S00007完整POST→GET→PUT→poll→CDN下载链5次HTTP200；不是首批/质量/双引擎PASS",
+  "local_engine_status_scope": "Windows Paddle/Structure仍LOCAL_ENGINE_UNAVAILABLE；Linux无OCR模型，Native S7成功及S10保留候选另列，未冒充真实OCR。",
+  "real_service_checks_history": {
+    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+    "internal_http": "PASS",
+    "docker_restart": "PASS",
+    "host_port_8180": "PASS_TEMPORARY_RELAY",
+    "relay_stopped": true,
+    "continuous_host_entry": "NOT_CONFIGURED",
+    "docker_nat": "NOT_REPAIRED",
+    "provider": "synthetic-mock",
+    "counted_in_unit_methods": false,
+    "report_commit": "1602cdac5edd6b9c418bffbdcbe362aa7795257b"
+  },
+  "linux_official_batch": {
+    "status": "PARTIAL",
+    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+    "proxy_fix_commit": "6ae4e19aa67853e0e54ce85faf105a6822706c12",
+    "runner_commit": "396c7cf",
+    "infrastructure_commit": "04ea352cb60a43f429f09415fad455be74067787",
+    "image": "sha256:b18606a0402b488fd31e277c5d15fed51ac7453637deeda06c4c42e1f366db9e",
+    "reservations": 12,
+    "max_calls": 32,
+    "unique_sha": 3,
+    "max_unique_sha": 3,
+    "formal_http_attempts": 11,
+    "http_200_responses": 10,
+    "connection_timeouts_origin_delivery_unknown": 1,
+    "proxy_rejected_no_origin_reservations": 1,
+    "successful_uploads": 2,
+    "complete_official_chains": 1,
+    "selected_files": 3,
+    "selected_pages": 13,
+    "remote_mode_only": true,
+    "auto_fallback_covered": false,
+    "unknown_post_replayed": false,
+    "budget_reset": false,
+    "results": [
+      {
+        "sample_id": "S00014",
+        "status": "FAILED_NO_ORIGIN_HTTP",
+        "post_reservation_preserved": true
+      },
+      {
+        "sample_id": "S00007",
+        "api_chain": "PASS",
+        "quality": "BLOCKED",
+        "local_native": "PASS",
+        "remote_review_reason": "table_alignment_review",
+        "final_candidate": "native"
+      },
+      {
+        "sample_id": "S00010",
+        "status": "BLOCKED",
+        "reason": "ConnectTimeout",
+        "remote_result_downloaded": false,
+        "local_native": "NEEDS_REVIEW",
+        "local_reason": "layout_enhancement_failed"
+      }
+    ]
+  },
+  "linux_official_table_comparison": {
+    "sample_id": "S00007",
+    "page": 4,
+    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+    "html_structure": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "html_structure_and_all_text": {
+      "numerator": 0,
+      "denominator": 1
+    },
+    "exact_text_cells": {
+      "numerator": 25,
+      "denominator": 30
+    },
+    "rows": 14,
+    "columns": 4,
+    "normalized_cells": "NOT_AVAILABLE",
+    "html_preserved": true,
+    "markdown_semantics": "NOT_EVALUATED",
+    "full_page_cer": "NOT_EVALUATED",
+    "scope": "单页同SHA已审真实标准，不能外推完整集"
+  },
+  "qa_helper_checks": {
+    "proxy": {
+      "source_commit": "6ae4e19aa67853e0e54ce85faf105a6822706c12",
+      "tests": 10,
+      "passed": 10
+    },
+    "runner": {
+      "qa_commit": "396c7cf",
+      "tests": 4,
+      "passed": 4
+    },
+    "not_added_to_business_111": true
+  },
+  "post_cloud_original_files_hash_unchanged": {
+    "numerator": 3,
+    "denominator": 3
   }
 }

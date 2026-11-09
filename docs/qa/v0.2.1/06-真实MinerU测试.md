@@ -1,4 +1,48 @@
-# TEST_BATCH 官方 API 真实验证
+# TEST_BATCH 官方 API 最新真实验证
+
+截至2026-11-09 08:52 UTC。业务源码 `67709c4989781594dd6c4723666fdb2c21caaa7b`，业务交接 `949bc4b109e98ddd6f8b939971b1ac2dbf9955ae`；Linux部署配置 `04ea352cb60a43f429f09415fad455be74067787`，代理修复 `6ae4e19aa67853e0e54ce85faf105a6822706c12`，QA续跑入口 `396c7cf`。
+
+**S00007完整官方链路PASS，首批整体PARTIAL，质量及Dual仍BLOCKED。** 本节取代后文历史Windows阶段“真实HTTP为零”的现状描述。
+
+## 隔离与独立验收
+
+沿用用户固定19SHA的“均为自有都可以上传”“已经检查，没有敏感内容”声明、原期限、owner及批次ID；私有清单ACL已核，未扩大未来范围。经明确批准新增独立Linux环境，未改Windows SAC。固定镜像为`sha256:b18606a0402b488fd31e277c5d15fed51ac7453637deeda06c4c42e1f366db9e`。
+
+网关及客户端实际nft inet qa_guard三链双栈DROP、优先级-150，在Docker DNS DNAT前拦截通用DNS。网关仅允许三个原官方域审核公网IP:443；客户端只到固定代理。PID1 UID65534，五组capabilities为0、NoNewPrivs=1，DNS和直连外网负向实测拒绝。Token仅stdin传给已降权进程内存；网关无Token/语料挂载。纯云环境不挂模型、禁止Paddle/sklearn导入，不伪造本地OCR成功。
+
+标准httpcore固定Accept:*/*被辅助代理错误拒绝，Q021-005红测10方法9PASS/1ERROR。最小固定值兼容修复在独立Git快照10/10PASS；非固定值、重复头和原安全边界仍拒绝。精确httpx transport无Key探针TLS成功并在源站HTTP写入前终止。续跑入口子集、防重发边界4/4PASS，两组工具检查不与原业务111项相加。
+
+## 首批三份真实结果
+
+| 样本 | 页数 | 实际结果 | 处理 |
+|---|---:|---|---|
+| S00014 | 1 | 早期代理CONNECT403，源站HTTP确证0 | FAILED_NO_ORIGIN_HTTP，保留POST占位1、不重发 |
+| S00007 | 7 | API POST、上传信息GET、OSS PUT、轮询GET、CDN下载GET共5次HTTP200 | 完整官方链路PASS，云质量告警，保留两候选 |
+| S00010 | 5 | POST、上传信息GET、OSS PUT及两次轮询GET均200；下一轮询ConnectTimeout | 结果未下载，保留本地候选，不再POST |
+
+原canonical账本累计**12/32预留、3/3唯一SHA**；每任务仍8次、轮询至少10秒。12包含早期代理拒绝预留1和正式官方调用尝试11；HTTP200响应10、连接超时1。超时请求是否到达源站未知，不能写源站实发11。成功上传PUT为2，不等于两份解析均已完成。无未知POST重发、第二账本或换批次清零。
+
+## 已保存产物及实际质量
+
+S00007保存Markdown11359字节及两个JSON200377/283458字节，摘要仅留匿名本地证据；归一化为document-parsing-v1，输入SHA绑定正确，页1～7完整。Native和云端、原始和规范化产物均保留，真实产物不进Git。
+
+Native7页成功、3595字符/4表，路由reasons为空；云端7页、1971字符/4表，needs_review且reasons=[table_alignment_review]。现有云候选原因数不多于本地的条件未满足，因此remote_quality_insufficient并保留Native，未改阈值或强选云。这是质量选择而非API失败。runner粗略local_engine_status=BLOCKED指无OCR模型，不覆盖Native成功事实。
+
+S00007第4页同SHA已审标准为1表14行4列30单元格。对已存943字节HTML作有界离线解析：行列、位置和rowspan/colspan严格一致**1/1**；结构及全部文本同时一致**0/1**；按相同位置和跨度，文本严格匹配**25/30**单元格。规范化cells未展开记**NOT_AVAILABLE**：源码明确保留远端HTML、避免不可信跨度展开并要求复核，HTML未丢失，不把空cells算官方识别率0%，不为此制造Bug。本次未完成云Markdown结构语义或同页全文CER，不把单元格文本匹配率当全文CER。
+
+S00010保留Native5页、10017字符，needs_review原因为layout_enhancement_failed，无模型条件的版面增强失败可见，不冒充OCR成功。远端结果未下载，不能算该文件云质量。S00014无真实云预测，未完成整个测试集各引擎覆盖。
+
+## 停止与恢复
+
+未重跑模型、完整回归或数据库。事后源SHA重新检查**3/3不变**。确认无活动任务后正常停止client/gateway，使用现有脚本恢复app/ingress，实际127.0.0.1:8180根页HTTP200、HTML；没有Push/生产操作/部署。
+
+后续仅经协调器复核原期限、SHA、账本及远端任务状态后恢复S00010已有任务轮询，不得新POST；本轮未恢复。S00014保留失败不重发。Dual仍BLOCKED、业务阈值未定义、整版继续BLOCKED。
+
+---
+
+## 以下为历史阶段记录，不代表最新状态
+
+# TEST_BATCH 官方 API 真实验证（历史）
 
 受测源码：`ee7dd7e6c8243e98c9f1bf995a4c57c555611786`。Fix 交接：`e16b4e241651a0641bdccac8420a64290e40869f`。
 
