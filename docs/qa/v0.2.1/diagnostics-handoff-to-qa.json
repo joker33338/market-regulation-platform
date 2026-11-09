@@ -1,0 +1,46 @@
+{
+  "version": "v0.2.1",
+  "source_commit_sha": "0770e65578b6cf128cb497afbd521901b59e6719",
+  "baseline_source_sha": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+  "baseline_transport_sha": "e16b4e241651a0641bdccac8420a64290e40869f",
+  "qa_handoff_commit_sha": "9bdb4685a081fa412eea88b4c15fe2913d96e8f3",
+  "qa_test_commit_sha": "5e752376d8c8855a974be5add9f0902c324fc22d",
+  "items": [
+    "OBS021-001",
+    "Q021-003"
+  ],
+  "gate_status": "BLOCKED",
+  "qa_status": "PENDING",
+  "local_validation": {
+    "total_tests": 104,
+    "passed_tests": 104,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "errors": 0,
+    "includes_contract_tests": 8
+  },
+  "real_validation": {
+    "local_engine": "BLOCKED",
+    "mineru_api": "NOT_TESTED",
+    "dual_engine": "BLOCKED",
+    "real_http_requests": 0
+  },
+  "reports": [
+    "docs/qa/v0.2.1/08-??????.md",
+    "docs/qa/v0.2.1/diagnostics-handoff-to-qa.md"
+  ],
+  "remaining": [
+    "??QA??????SHA",
+    "Windows???????????",
+    "???????API?????????????"
+  ],
+  "test_commands": [
+    "python -B -m unittest tests.test_v021_engine_diagnostics -v",
+    "python -B -m unittest tests.test_v021_engine_diagnostics tests.test_v021_diagnostic_edges tests.test_v021_native_preservation tests.test_v021_fix_edges tests.test_document_parsing tests.test_dual_engine_policy tests.test_v021_test_batch_authorization tests.test_v021_test_batch_flow tests.test_v021_test_batch_startup_guard tests.test_mineru_api -v"
+  ],
+  "report_sha256": {
+    "docs/qa/v0.2.1/08-??????.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/qa/v0.2.1/diagnostics-handoff-to-qa.md": "2291d65e4c0e24b54d53249fc23a1d8580cdd4ef020527b033961520b8aa37cc"
+  },
+  "tested_at": "2026-11-09T03:34:27.906096+00:00"
+}
