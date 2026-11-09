@@ -23,3 +23,9 @@ python -B -m unittest tests.test_v021_engine_diagnostics tests.test_v021_diagnos
 请QA独立复验这8项合同、6项新增边界及必要权限/预算控制；本次没有重新执行完整历史套件或真实模型。
 Windows系统策略阻塞尚未解决，本地真实引擎BLOCKED、官方真实API NOT_TESTED，双引擎真实验证BLOCKED。
 没有外传、修改系统策略、替换解释器、安装依赖、修改Docker/网络、Push或合并；版本闸门保持BLOCKED，等待独立验收与环境处理。
+
+## 运输记录更正
+
+初次报告运输 `d627fa3bc6360f27dede6dfaf0e6be0755b533ba` 的 JSON 中文路径和剩余事项受管道编码影响，
+其中空对象哈希不能作为有效证据。本次只更正报告，不改历史或源码；重新验证每个精确 Git 对象存在且内容非空后计算哈希。
+QA 另在验证文件 I/O 异常分类边界，当前源码不抢先修改，不以本轮报告更正替代独立验收。
