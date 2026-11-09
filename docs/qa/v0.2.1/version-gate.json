@@ -3,26 +3,32 @@
   "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
   "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
-  "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
-  "total_tests": 74,
-  "passed_tests": 74,
+  "qa_test_commit": "5f4417ef905f3feacf3f266bfbbb81a6047116c5",
+  "total_tests": 156,
+  "passed_tests": 149,
   "failed_tests": 0,
-  "skipped_tests": 0,
+  "skipped_tests": 7,
   "blocked_tests": 0,
   "critical_issues": [],
   "report_paths": [
-    "docs/qa/v0.2.1/bug-list.md",
-    "docs/qa/v0.2.1/final-qa-report.md",
-    "docs/qa/v0.2.1/routing-quality-report.md",
-    "docs/qa/v0.2.1/testset-inventory.md"
+    "docs/qa/v0.2.1/01-测试集盘点.md",
+    "docs/qa/v0.2.1/02-标准答案完整性.md",
+    "docs/qa/v0.2.1/03-路由准确率.md",
+    "docs/qa/v0.2.1/04-OCR准确率.md",
+    "docs/qa/v0.2.1/05-表格准确率.md",
+    "docs/qa/v0.2.1/06-真实MinerU测试.md",
+    "docs/qa/v0.2.1/07-缺陷与待裁决.md",
+    "docs/qa/v0.2.1/09-完整回归结果.md"
   ],
-  "checked_at": "2026-11-07T08:08:00.221233+00:00",
-  "mock_status": "PASS",
+  "checked_at": "2026-11-09T01:38:45.113273+00:00",
+  "mock_status": "BLOCKED",
   "integration_status": "NOT_REQUIRED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
-    "9/53原标注路由差异未改写且尚待审定",
-    "真实CER和人工结构标准答案NOT_LABELED；专项质量不能由修复回归PASS替代"
+    "当前完整基线7项环境条件SKIP未覆盖",
+    "TEST_BATCH新增边界实现与独立Mock尚待完成",
+    "真实API资格敏感性结论尚待可信确认",
+    "人工大图路由期望与既有资源策略尚待工程裁决"
   ],
   "routing_exact_label_agreement": {
     "numerator": 44,
@@ -65,5 +71,38 @@
   ],
   "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
   "business_code_changed_by_qa": false,
-  "integration_not_required_reason": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。"
+  "integration_not_required_reason": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
+  "report_path": "docs/qa/v0.2.1/09-完整回归结果.md",
+  "manual_truth_status": "LABELED",
+  "manual_truth_tasks": 4,
+  "routing_original_label_rate": {
+    "numerator": 44,
+    "denominator": 53
+  },
+  "routing_manual_accepted_rate": {
+    "numerator": 52,
+    "denominator": 53
+  },
+  "cer_raw": {
+    "edits": 53,
+    "reference_characters": 736,
+    "pages": 2,
+    "prediction_source": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b"
+  },
+  "cer_normalized": {
+    "edits": 53,
+    "reference_characters": 736,
+    "normalization": "NFC/newline_only"
+  },
+  "real_table_structure_exact": {
+    "numerator": 2,
+    "denominator": 2
+  },
+  "real_cloud_requests": 0,
+  "test_batch_contract_baseline": {
+    "total": 23,
+    "passed": 4,
+    "feature_missing_failures": 18,
+    "config_parameter_missing_errors": 1
+  }
 }
