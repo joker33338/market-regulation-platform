@@ -184,7 +184,9 @@ async def run(args, control):
         print('QA_TASK '+json.dumps(result),flush=True)
         if task['status']!='completed' or trace.get('failure_reason') or stop['blocked']:
             return dict(status='BLOCKED',outcomes=outcomes)
-    return dict(status='COMPLETED_REMOTE_ONLY',outcomes=outcomes,dual_engine_status='BLOCKED')
+    return dict(status='COMPLETED_REMOTE_SUBSET' if args.only is not None else 'COMPLETED_REMOTE_ONLY',
+        execution_subset=[row['sample_id'] for row in selected],outcomes=outcomes,dual_engine_status='BLOCKED',
+        previous_task_failures_preserved=sum(row.get('task_status')!='completed' for row in outcomes))
 
 
 def main(argv=None):
@@ -201,7 +203,7 @@ def main(argv=None):
         control=json.loads(sys.stdin.read()) if args.execute else {}
         result=asyncio.run(run(args,control))
         print(json.dumps(result),flush=True)
-        return 0 if result['status'] in {'READY','COMPLETED_REMOTE_ONLY'} else 2
+        return 0 if result['status'] in {'READY','COMPLETED_REMOTE_ONLY','COMPLETED_REMOTE_SUBSET'} else 2
     except Exception as exc:
         print(json.dumps(dict(status='BLOCKED',exception_type=type(exc).__name__)),flush=True)
         return 2
