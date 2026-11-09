@@ -111,3 +111,32 @@ Get-NetTCPConnection -LocalPort 8180 -State Listen -ErrorAction SilentlyContinue
 ```
 
 脚本会观察停止文件、结束转发并关闭监听；也有10分钟总上限。即使用户手动验证成功，也只是限时本机定目标通路，不代表 Docker NAT 已恢复、容器可任意出站、OpenAPI已开放或数据库阶段通过。
+
+## 用户手动启用后的实际限时网络回归
+
+2026-11-09，用户在原生 Windows PowerShell 手动启动同一已审脚本，提供 Test-NetConnection=True、Invoke-WebRequest GET / 返回200的截图。主协调器随后独立确认 PowerShell GET / 为200，监听地址仅127.0.0.1。此前工具启动拒绝事实保留，不因手动成功而改写；手动前台成功说明该脚本本机执行路径可用，尚不证明工具托管隐藏启动路径可用。
+
+QA没有再次创建或启动中继，只使用该窗口执行真实回归。受测服务仍固定源码 `ee7dd7e6c8243e98c9f1bf995a4c57c555611786`；较新诊断代码没有部署到此服务，不得混称新源码实测。
+
+| 层级或功能 | 实际结果 |
+| --- | --- |
+| A 容器内部真实 TCP GET / | 200 |
+| B 同内部网络非root临时peer，经容器服务名 GET / | 200 |
+| C Windows 宿主经127.0.0.1:8180 GET / | 200 |
+| 宿主未认证 info / 带私有Token info | 401 / 200 |
+| 合成PDF上传、Mock解析任务、完成轮询、结果读取 | PASS |
+| 相同幂等键重提 | PASS，同一任务 |
+| OpenAPI | NOT_EXPOSED，现有/openapi.json为404，不是功能失败或假通过 |
+| restart固定QA容器后原CMD自动恢复，宿主再次GET / | PASS，200 |
+| 重启后任务、结果及幂等键保留 | PASS |
+| 服务日志 ERROR / Traceback | 未发现 |
+
+认证信息仅从既有忽略runtime.env读取，不输出或写入请求日志；全部请求显式关闭连接，避免串行短期中继积压。此处的peer使用既有固定镜像，不拉取或安装；容器内docker exec仅运行HTTP客户端，服务仍由原PID1命令启动。
+
+隔离复核：应用仍唯一internal网络、无默认网关；读取路由确认无default route，对保留文档测试地址192.0.2.1:443进行一次无敏感TCP连接探测未连通。该探测与路由/网络配置共同支持本轮未引入出站通路，不能把一次探测扩大为所有协议的渗透测试结论。没有更改防火墙、添加普通bridge、挂Docker socket或启动第二Uvicorn；没有真实云、模型或数据库访问，已完成的五项PG不重复运行。
+
+回归结束后QA创建约定StopFile主动结束本轮用户已授权中继，没有kill其他进程。五秒后只读确认Windows8180监听数为0、容器内固定base64 socket执行进程数为0，临时通路已结束；原QA应用内部服务保留。后续再次测试需要用户明确处理已存在停止文件并重新启用，不会自动常驻。
+
+结果为 **PASS_TEMPORARY_RELAY**，Docker NAT 状态为 **NOT_REPAIRED**。这解决了本次限时宿主访问验证需求，不是持久Docker发布配置修复或生产网络方案；不得自动恢复原应用、开启出站或把临时成功视为版本最终PASS。
+
+本地证据 `host-network-verified-444292f855/summary.json` 原始字节SHA256：`fd663581a4b5668a245d0286b75d581c8efec6847cf101eec078b3c26477586b`。原日志与私有配置继续只在忽略目录。
