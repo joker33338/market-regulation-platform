@@ -53,6 +53,7 @@ services:
         ipv4_address: 172.30.251.12
   tls-gateway:
     <<: *sandbox
+    image: market-regulation-qa-gateway:v0.2.1-nft3
     profiles: [cloud]
     command: [tls-egress]
     # 地址授权窗口到期后必须显式重新初始化，不自动无限刷新。
@@ -64,6 +65,7 @@ services:
         ipv4_address: 172.30.252.11
   client:
     <<: *sandbox
+    image: market-regulation-qa-gateway:v0.2.1-nft3
     profiles: [cloud]
     command: [client]
     restart: "no"

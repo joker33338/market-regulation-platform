@@ -8,6 +8,15 @@ def request(target, method='CONNECT', extra=''):
 
 
 class EgressPolicyContract(unittest.TestCase):
+    def test_standard_httpcore_accept_header_is_accepted(self):
+        self.assertEqual(connect_host(request('mineru.net:443', extra='Accept: */*\r\n')), 'mineru.net')
+
+    def test_other_accept_values_and_duplicate_accept_are_rejected(self):
+        for extra in ('Accept: text/html\r\n', 'Accept: */*, text/html\r\n',
+                      'Accept: */*\r\nAccept: */*\r\n'):
+            with self.assertRaises(ValueError):
+                connect_host(request('mineru.net:443', extra=extra))
+
     def test_three_exact_hosts_are_accepted(self):
         for host in OFFICIAL_HOSTS:
             self.assertEqual(connect_host(request(host+':443')), host)

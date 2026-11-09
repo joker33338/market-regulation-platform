@@ -33,11 +33,13 @@ def connect_host(header):
             raise ValueError('请求头格式无效')
         key, value = line.split(':', 1)
         key = key.lower()
-        if key in seen or key not in {'host', 'proxy-connection'}:
+        if key in seen or key not in {'host', 'proxy-connection', 'accept'}:
             raise ValueError('请求头不允许')
         seen.add(key)
         if key == 'host' and value.strip() != target:
             raise ValueError('Host不匹配')
+        if key == 'accept' and value.strip() != '*/*':
+            raise ValueError('仅允许标准客户端固定Accept')
     return host
 
 

@@ -2,7 +2,8 @@
 
 固定Docker Desktop分组：`market-regulation-qa-localhost`。
 本地应用与入口镜像：`market-regulation-qa-gateway:v0.2.1-nft2`。
-云测试网关与客户端继续固定 `market-regulation-qa-gateway:v0.2.1-nft1`，不因本地自检更新被重建。
+云测试网关与客户端固定 `market-regulation-qa-gateway:v0.2.1-nft3`，与本地自检镜像分开。
+历史nft1/nft2标签保留不覆盖；nft3仅补标准CONNECT固定Accept兼容，不扩大授权或目的地范围。
 原有 `market-regulation` 分组、镜像、数据库、模型和Windows策略不受本配置修改。
 这是独立测试服务，不是生产部署；两个profile均默认关闭。
 
