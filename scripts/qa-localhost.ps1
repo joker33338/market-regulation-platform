@@ -34,13 +34,14 @@ try {
     } elseif ($Action -eq 'start') {
         $cloud = & docker @composeArgs --profile cloud ps --status running --services
         if ($cloud -match 'client') { throw '独立云测试客户端正在运行；先安全完成任务并停止。' }
-        $running = @(& docker @composeArgs --profile local ps --status running --services)
-        if ($running.Count -gt 0) {
+        $running = @(& docker @composeArgs --profile local ps --status running --services | Where-Object { $_ -in @('app','ingress') })
+        if ($running.Count -eq 2) {
             Write-Output '已有本地QA服务运行；本次只显示状态，不重建或中断任务。'
             Invoke-Compose -Arguments @('--profile','local','ps')
             return
         }
-        Invoke-Compose -Arguments @('--profile','local','up','-d','--no-build','--pull','never','app','ingress')
+        $missing = @('app','ingress') | Where-Object { $_ -notin $running }
+        Invoke-Compose -Arguments (@('--profile','local','up','-d','--no-deps','--no-recreate','--no-build','--pull','never') + $missing)
         Write-Output '独立本地QA入口：http://127.0.0.1:8180；默认仅匿名Mock。'
     } elseif ($Action -eq 'cloud-client') {
         throw '真实云客户端须由QA确认无运行任务后显式启动cloud profile；普通入口脚本不会自动开启外传。'
