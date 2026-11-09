@@ -179,7 +179,7 @@ class HTTPOptionBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def reject_option(self,key,value):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);p=root/'synthetic.pdf';p.write_bytes(b'%PDF synthetic')
-            cfg=MinerUConfig(enabled=True,result_dir=root)
+            cfg=MinerUConfig(enabled=True,mode='local',result_dir=root)
             router=SimpleNamespace(config=SimpleNamespace(enabled=True))
             service=MinerUService(cfg,TaskRepository(root/'tasks.sqlite3'),dual_router=router)
             with self.assertRaises(MinerUError) as raised:
