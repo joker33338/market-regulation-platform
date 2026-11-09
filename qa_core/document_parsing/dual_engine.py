@@ -14,6 +14,7 @@ import time
 
 from qa_core.utils import file_sha256
 from .document_router import DocumentParser
+from .diagnostics import attached_diagnostic, safe_diagnostic
 from .mineru_client import MinerUError
 from .mineru_official import OfficialMinerUClient
 from .mineru_repository import TaskRepository
@@ -134,14 +135,18 @@ class DualEngineRouter:
             local = DocumentResult.from_dict(json.loads(checkpoint.read_text(encoding='utf-8')))
         else:
             def parse_local():
-                with self.parser_factory() as parser:
-                    try:
+                try:
+                    with self.parser_factory() as parser:
                         return parser.parse(file['source_path'])
-                    except Exception as exc:
-                        # Preserve the failure type, never confidential exception text.
-                        return DocumentResult(file['sha256'], file['file_name'], Path(file['file_name']).suffix,
-                                              {'file_path': file['source_path'], 'file_sha256': file['sha256']},
-                                              parsing_status='failed', error_message=type(exc).__name__, requires_review=True)
+                except Exception as exc:
+                    # 构造和上下文进入失败也保存候选，不输出私密异常正文。
+                    failed = DocumentResult(file['sha256'], file['file_name'], Path(file['file_name']).suffix,
+                                            {'file_path': file['source_path'], 'file_sha256': file['sha256']},
+                                            parsing_status='failed', error_message=type(exc).__name__, requires_review=True)
+                    diagnostic = attached_diagnostic(exc, component='paddle')
+                    if diagnostic:
+                        failed.quality['engine_availability'] = diagnostic
+                    return failed
             local = await asyncio.to_thread(parse_local)
             local.file_name = file['file_name']
             await asyncio.to_thread(persist_result, checkpoint, local)
@@ -164,6 +169,12 @@ class DualEngineRouter:
                  'version_unavailable_reason': 'Candidates without parser_version did not report a verified version; model_version is not parser_version.',
                  'page_numbers': [page.page_number for page in local.pages],
                  'requires_review': local_quality['review_required']}
+        local_availability = safe_diagnostic(local.quality.get('engine_availability'))
+        if not local_availability:
+            local_availability = next((value for page in local.pages
+                                       if (value := safe_diagnostic(page.raw_result.get('engine_availability')))), None)
+        if local_availability:
+            route['local_availability'] = local_availability
         for engine in self.engines(local):
             route['parser_versions'][engine] = None
         selected = local
@@ -195,6 +206,9 @@ class DualEngineRouter:
                 except Exception as exc:
                     route['failure_reason'] = exc.code if isinstance(exc, MinerUError) else type(exc).__name__
                     route['route_reason'] = 'cloud_failed_local_preserved'
+                    diagnostic = safe_diagnostic(getattr(exc, 'diagnostic', None))
+                    if diagnostic and state['calls'] == 0:
+                        route['remote_availability'] = {**diagnostic, 'status': 'BLOCKED', 'api_status': 'NOT_TESTED'}
         route['remote_task_id'] = state.get('remote_task_id')
         route['usage'] = {**state, 'estimated_cost': None, 'cost_unavailable_reason': 'Provider billing is not returned by the API.'}
         # Do not mutate either candidate when adding the final routing decision.
@@ -233,7 +247,12 @@ class DualEngineRouter:
             await save(task)
         config = replace(self.remote_config, result_dir=Path(task['result_root']) / 'cloud',
                          max_polls=min(self.remote_config.max_polls, self.config.max_cloud_calls))
-        client = self.client_factory(config)
+        try:
+            client = self.client_factory(config)
+        except (ImportError, OSError) as exc:
+            # 只在传输客户端加载边界分类，文件或算法异常不能冒充依赖问题。
+            exc.diagnostic = attached_diagnostic(exc, component='mineru_transport')
+            raise
         async def before_request(method, url):
             allowed, _ = self.authorization(task, file)
             if not allowed:

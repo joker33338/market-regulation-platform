@@ -11,6 +11,7 @@ from pathlib import Path
 from qa_core.config.settings import ROOT
 from qa_core.utils import IngestionError, file_sha256
 from .config import ParsingConfig
+from .diagnostics import attached_diagnostic
 from .native import docx_document, pdf_page
 from .normalizer import normalize_text
 from .paddle_ocr import PaddleOCRService
@@ -256,7 +257,7 @@ class DocumentParser:
                             warnings=[*native_candidate.warnings, "版面增强失败，已保留原生候选；阅读顺序和表格结构须人工复核。"],
                             error_type=failed.error_type, error_message=failed.error_message,
                             processing_time=failed.processing_time,
-                            raw_result={**native_candidate.raw_result, "enhancement_failure": {
+                            raw_result={**native_candidate.raw_result, **failed.raw_result, "enhancement_failure": {
                                 "attempted_method": method, "error_type": failed.error_type,
                                 "error_message": failed.error_message, "retained_method": "native_pdf"}},
                         )
@@ -268,8 +269,12 @@ class DocumentParser:
     def _error_page(number: int, method: str, source: dict, error: Exception) -> PageResult:
         logger.warning("Parsing page %s failed: %s", number, type(error).__name__)
         message = str(error) if isinstance(error, IngestionError) else "解析失败：" + type(error).__name__
+        diagnostic = attached_diagnostic(error, component='paddle') if method in {'ocr', 'structure'} else None
+        if diagnostic:
+            message = "本地解析引擎无法加载，请查看安全诊断与本地运行日志。"
         return PageResult(number, method, source_location=source, parsing_status="failed",
-                          error_message=message, error_type=type(error).__name__)
+                          error_message=message, error_type=type(error).__name__,
+                          raw_result={'engine_availability': diagnostic} if diagnostic else {})
 
     def parse_batch(self, paths: list[Path], mode: str = "auto", *,
                     page_numbers: list[int] | None = None) -> list[DocumentResult]:
