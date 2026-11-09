@@ -76,6 +76,16 @@ class MinerUService:
             task['fingerprint'] = stable_hash(task['fingerprint'], task['parse_options'])
             task['result_root'] = str(self.root)
             task['routing_protocol'] = 'dual-engine-v1'
+            if getattr(self.dual_router.config, 'authorization_mode', 'FILE_SHA') == 'TEST_BATCH':
+                from .test_batch_authorization import TrustedTestBatch
+                authority = self.dual_router.batch_authorizer
+                if not isinstance(authority, TrustedTestBatch):
+                    raise MinerUError('test_batch_unconfigured', 503)
+                try:
+                    authority.bind_task(task)
+                except ValueError as exc:
+                    raise MinerUError('test_batch_binding_mismatch', 403) from exc
+                task['fingerprint'] = stable_hash(task['fingerprint'], task['authorization_context'])
         return await asyncio.to_thread(self.repository.create, task, self.config.queue_size)
 
     def _snapshot(self, task, snapshot):
