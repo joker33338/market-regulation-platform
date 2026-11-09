@@ -1,0 +1,11 @@
+# QTB-001：TEST_BATCH工厂配置可退回直接官方服务
+
+受测源码：`215807769feb2fbfedf8d91d275dec156cc038bb`。
+
+优先级P0配置路径候选已被无网络Mock确认：create_app接收environment=test、authorization_mode=TEST_BATCH，但dual_config.enabled=false；若任务配置是official/remote，工厂跳过双引擎分支，成功创建未绑定批次授权器的直接官方服务。没有实际请求或文件上传；证据不是已发生外传。
+
+预期：显式选择TEST_BATCH时必须failclosed，不能因双引擎关闭降级到不含批次授权的服务。production默认FILE_SHA历史工厂仍可创建。
+
+实际独立QA：固定源只读、断网、非root容器，2方法=1FAIL、1PASS、0ERROR/SKIP；红测test_QTB001_disabled_dual_must_not_fall_into_direct_official_service，正向生产控制通过。测试只构造app，不发送HTTP。
+
+修复范围：最小工厂启动配置校验，拒绝TEST_BATCH与dual disabled不一致；保留生产FILE_SHA和原功能，不顺带调整预算或敏感规则。修复后新SHA重新独立边界验收，冻结所有真实云上传。
