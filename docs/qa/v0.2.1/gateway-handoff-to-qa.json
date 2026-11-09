@@ -1,0 +1,42 @@
+{
+  "version": "v0.2.1",
+  "business_source_sha": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+  "deployment_config_sha": "04ea352cb60a43f429f09415fad455be74067787",
+  "launcher_config_sha": "adcd4e633e19ce5898865a7310f7b027555aeb5c",
+  "qa_configuration_handoff_sha": "7844c2b5e037e230b2f9e2021e37f9990b2a61ad",
+  "qa_proxy_handoff_sha": "d85cbec43988cfea6154a3f4e55961642445d9fc",
+  "project_name": "market-regulation-qa-localhost",
+  "gate_status": "BLOCKED",
+  "real_api_status": "PENDING_QA",
+  "local_real_model_status": "BLOCKED",
+  "dual_engine_status": "BLOCKED",
+  "windows_reboot_status": "NOT_TESTED",
+  "fix_real_http_requests": 0,
+  "protocol_mock_tests": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "images": {
+    "local_nft2": "sha256:5ee2e281796686b781e585593c0d8552c92efe25f1782545eacc2fe05368199c",
+    "cloud_nft3": "sha256:b18606a0402b488fd31e277c5d15fed51ac7453637deeda06c4c42e1f366db9e",
+    "historical_nft1": "sha256:659fde72ae49637504598da25fac118340f9eddeb4bed2bf9538a5ed0ee94996"
+  },
+  "reports": [
+    "docs/qa/v0.2.1/08-缺陷修复报告.md",
+    "docs/qa/v0.2.1/gateway-handoff-to-qa.md"
+  ],
+  "remaining": [
+    "独立QA验证最终nft3内核与标准客户端TLS握手",
+    "同批次剩余两个未占位SHA真实调用验收",
+    "云结束后恢复nft2本地入口并验证HTTP200",
+    "Windows整机重启及本地真实模型尚未验证"
+  ],
+  "report_sha256": {
+    "docs/qa/v0.2.1/08-缺陷修复报告.md": "dd205884f2d808fd7d67e66f88b7a5ffb5dfa2f3f86ea3ad20a7b5cc9fac2b0e",
+    "docs/qa/v0.2.1/gateway-handoff-to-qa.md": "423aa3e984d92fc7d46fad7e8fc674d0abdba5de300296d89fcff79e02d011a2"
+  },
+  "reported_at": "2026-11-09T08:42:13.749901+00:00"
+}
