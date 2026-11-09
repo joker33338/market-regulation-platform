@@ -28,7 +28,7 @@ try {
     if ($Action -eq 'rebuild') {
         & docker tag sha256:b4010953b65e06c2d1000fdcd129f6fcceeed9b9a5d48a12266d3365a610a2b1 market-regulation-qa-base:b4010953
         if ($LASTEXITCODE -ne 0) { throw '基础镜像不存在或不匹配。' }
-        & docker build --pull=false -f deploy/qa-gateway/Dockerfile -t market-regulation-qa-gateway:v0.2.1-nft1 .
+        & docker build --pull=false -f deploy/qa-gateway/Dockerfile -t market-regulation-qa-gateway:v0.2.1-nft2 .
         if ($LASTEXITCODE -ne 0) { throw '新独立镜像构建失败。' }
         Write-Output '新镜像已构建；未自动重建正在运行的任务。'
     } elseif ($Action -eq 'start') {

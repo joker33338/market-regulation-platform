@@ -19,6 +19,7 @@ x-sandbox: &sandbox
 services:
   app:
     <<: *sandbox
+    image: market-regulation-qa-gateway:v0.2.1-nft2
     profiles: [local]
     command: [app]
     restart: unless-stopped
@@ -39,6 +40,7 @@ services:
         ipv4_address: 172.30.250.10
   ingress:
     <<: *sandbox
+    image: market-regulation-qa-gateway:v0.2.1-nft2
     profiles: [local]
     command: [local-ingress]
     restart: unless-stopped

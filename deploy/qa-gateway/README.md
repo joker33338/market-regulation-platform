@@ -1,7 +1,8 @@
 # 独立本地QA入口与Linux官方测试环境
 
 固定Docker Desktop分组：`market-regulation-qa-localhost`。
-独立镜像：`market-regulation-qa-gateway:v0.2.1-nft1`。
+本地应用与入口镜像：`market-regulation-qa-gateway:v0.2.1-nft2`。
+云测试网关与客户端继续固定 `market-regulation-qa-gateway:v0.2.1-nft1`，不因本地自检更新被重建。
 原有 `market-regulation` 分组、镜像、数据库、模型和Windows策略不受本配置修改。
 这是独立测试服务，不是生产部署；两个profile均默认关闭。
 
@@ -48,6 +49,8 @@
 不保留root父进程。没有docker.sock、host network、privileged或原数据卷。
 OUTPUT优先级-150处于连接跟踪之后、Docker DNS目的地址转换之前，运行期DNS和任意直连均拒绝。
 入口仅允许固定应用8180，客户端仅允许固定TLS网关8080；回包只准ct方向reply。
+仅app角色额外允许lo接口上源/目标都为127.0.0.1、目的端口8180的自检连接；
+不允许127.0.0.11、其他回环地址或其他端口，网关和云客户端没有此例外。
 独立QA仍须读回实际规则、核对进程权限及拒绝计数，证明文件不能代替验收。
 
 ## 独立云验证
