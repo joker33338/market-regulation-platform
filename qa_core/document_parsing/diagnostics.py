@@ -1,7 +1,4 @@
 """引擎加载失败的最小安全诊断，不传播异常原文或本机路径。"""
-from qa_core.utils import IngestionError
-
-
 _COMPONENTS = {'paddle', 'mineru_transport'}
 _REASONS = {'WINDOWS_POLICY_BLOCKED', 'LOCAL_DEPENDENCY_ERROR'}
 _EXCEPTIONS = {'ImportError', 'ModuleNotFoundError', 'OSError', 'PermissionError',
@@ -40,11 +37,11 @@ def safe_diagnostic(value):
                 exception_type=name if isinstance(name, str) and name in _EXCEPTIONS else 'Exception')
 
 
-def attached_diagnostic(exc, *, component):
-    """通用算法异常不标记为依赖不可用；已附诊断仍需正规化。"""
+def attached_diagnostic(exc, *, component, loading=False):
+    """普通文件I/O不代表引擎失效，仅明确加载边界可推断OSError。"""
     value = safe_diagnostic(getattr(exc, 'diagnostic', None))
     if value and value['component'] == component:
         return value
-    if isinstance(exc, (ImportError, OSError)):
+    if isinstance(exc, ImportError) or loading and isinstance(exc, OSError):
         return engine_unavailable(exc, component=component)
     return None

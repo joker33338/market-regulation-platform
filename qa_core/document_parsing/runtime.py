@@ -62,7 +62,7 @@ def _build_engine(method: str, config: ParsingConfig):
     except Exception as exc:
         logger.exception("Paddle import failed in isolated worker")
         failure = IngestionError("Paddle 运行时加载失败；请查看安装诊断报告。")
-        diagnostic = attached_diagnostic(exc, component='paddle')
+        diagnostic = attached_diagnostic(exc, component='paddle', loading=True)
         if diagnostic:
             failure.diagnostic = diagnostic
         raise failure from None
@@ -109,11 +109,13 @@ def _worker_predict(method: str, image_path: str, config: ParsingConfig) -> dict
     started = time.perf_counter()
     key = (method, config)
     load_time = 0.0
+    loading = key not in _ENGINES
     try:
-        if key not in _ENGINES:
+        if loading:
             load_started = time.perf_counter()
             _ENGINES[key] = _build_engine(method, config)
             load_time = time.perf_counter() - load_started
+        loading = False
         engine = _ENGINES[key]
         options = {"use_table_orientation_classify": False} if method == "structure" else {}
         result = next(iter(engine.predict(image_path, **options)), None)
@@ -141,7 +143,7 @@ def _worker_predict(method: str, image_path: str, config: ParsingConfig) -> dict
     except Exception as exc:
         logger.exception("Local Paddle %s failure", method)
         failure = IngestionError("Paddle " + method + " 推理失败；详细异常见本地 worker 日志。")
-        diagnostic = attached_diagnostic(exc, component='paddle')
+        diagnostic = attached_diagnostic(exc, component='paddle', loading=loading)
         if diagnostic:
             failure.diagnostic = diagnostic
         raise failure from None

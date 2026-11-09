@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from qa_core.document_parsing.diagnostics import engine_unavailable, safe_diagnostic
+from qa_core.document_parsing.diagnostics import attached_diagnostic, engine_unavailable, safe_diagnostic
 from qa_core.document_parsing.document_router import DocumentParser
 from qa_core.document_parsing.dual_engine import DualEngineConfig, DualEngineRouter
 from qa_core.document_parsing.mineru_config import MinerUConfig
@@ -15,6 +15,12 @@ from qa_core.utils import IngestionError
 
 
 class DiagnosticSafetyEdges(unittest.TestCase):
+    def test_oserror_is_dependency_only_in_explicit_loading_boundary(self):
+        error = FileNotFoundError('合成依赖文件缺失')
+        self.assertIsNone(attached_diagnostic(error, component='paddle'))
+        diagnostic = attached_diagnostic(error, component='paddle', loading=True)
+        self.assertEqual(diagnostic['reason'], 'LOCAL_DEPENDENCY_ERROR')
+
     def test_context_policy_cycle_is_bounded(self):
         outer = ImportError('合成失败')
         inner = OSError('合成拒绝')

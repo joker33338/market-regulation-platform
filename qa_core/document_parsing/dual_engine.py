@@ -135,15 +135,17 @@ class DualEngineRouter:
             local = DocumentResult.from_dict(json.loads(checkpoint.read_text(encoding='utf-8')))
         else:
             def parse_local():
+                loading = True
                 try:
                     with self.parser_factory() as parser:
+                        loading = False
                         return parser.parse(file['source_path'])
                 except Exception as exc:
                     # 构造和上下文进入失败也保存候选，不输出私密异常正文。
                     failed = DocumentResult(file['sha256'], file['file_name'], Path(file['file_name']).suffix,
                                             {'file_path': file['source_path'], 'file_sha256': file['sha256']},
                                             parsing_status='failed', error_message=type(exc).__name__, requires_review=True)
-                    diagnostic = attached_diagnostic(exc, component='paddle')
+                    diagnostic = attached_diagnostic(exc, component='paddle', loading=loading)
                     if diagnostic:
                         failed.quality['engine_availability'] = diagnostic
                     return failed
@@ -251,7 +253,7 @@ class DualEngineRouter:
             client = self.client_factory(config)
         except (ImportError, OSError) as exc:
             # 只在传输客户端加载边界分类，文件或算法异常不能冒充依赖问题。
-            exc.diagnostic = attached_diagnostic(exc, component='mineru_transport')
+            exc.diagnostic = attached_diagnostic(exc, component='mineru_transport', loading=True)
             raise
         async def before_request(method, url):
             allowed, _ = self.authorization(task, file)
