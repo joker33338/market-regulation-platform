@@ -15,12 +15,33 @@ from urllib.parse import urlsplit
 sys.path.insert(0, '/source')
 
 
+def select_unreserved_rows(plan, only, usage):
+    """仅选择批准计划的显式子集；已预留POST的任务永久拒绝再次提交。"""
+    rows = plan['selected']
+    ids = [row['sample_id'] for row in rows]
+    chosen = ids if only is None else list(only)
+    if not chosen or len(set(chosen)) != len(chosen) or not set(chosen) <= set(ids):
+        raise ValueError('执行子集不在批准计划内或重复')
+    if usage:
+        if usage.get('owner') != plan['owner'] or usage.get('batch_id') != plan['batch_id']:
+            raise ValueError('原账本身份不匹配')
+        if type(usage.get('calls')) is not int or not 0 <= usage['calls'] <= 32:
+            raise ValueError('原账本调用数无效')
+        if not set(usage.get('files', [])) <= {row['sha256'] for row in rows}:
+            raise ValueError('原账本文件超出批准范围')
+    submissions = usage.get('submissions', {})
+    selected = [row for row in rows if row['sample_id'] in chosen]
+    if any(submissions.get(row['sha256']+':remote') for row in selected):
+        raise ValueError('已有POST预留，禁止重新提交')
+    return selected
+
+
 def kernel_guard(path, gateway):
     if os.name != 'posix' or os.geteuid() == 0:
         raise ValueError('必须Linux非root')
     status = Path('/proc/self/status').read_text()
-    value = next(line.split(':',1)[1].strip() for line in status.splitlines() if line.startswith('CapEff:'))
-    if int(value,16):
+    fields = dict(line.split(':',1) for line in status.splitlines() if ':' in line)
+    if fields['NoNewPrivs'].strip() != '1' or any(int(fields[name].strip(),16) for name in ('CapInh','CapPrm','CapEff','CapBnd','CapAmb')):
         raise ValueError('运行期capabilities必须为零')
     stat = path.stat()
     if stat.st_uid != 0 or stat.st_mode & 0o022:
@@ -75,6 +96,8 @@ async def run(args, control):
         raise ValueError('必须沿用已登记的唯一账本与批准范围')
     if len(plan['selected']) != 3 or sum(row['pages'] for row in plan['selected']) != 13:
         raise ValueError('首批范围不符')
+    usage=json.loads(args.ledger.read_text('utf-8')) if args.ledger.exists() else {}
+    selected=select_unreserved_rows(plan,args.only,usage)
     authority = TrustedTestBatch(args.manifest,owner=plan['owner'],batch_id=plan['batch_id'],
         usage_path=args.ledger,max_calls=32,max_files=3)
     checks=[]
@@ -89,7 +112,8 @@ async def run(args, control):
     if not all(row['eligible'] for row in checks):
         return dict(status='BLOCKED',checks=checks)
     if not args.execute:
-        return dict(status='READY',execute=False,checks=checks,real_http_requests=0,
+        return dict(status='READY',execute=False,checks=checks,execution_subset=[row['sample_id'] for row in selected],
+            preserved_call_reservations=usage.get('calls',0),real_http_requests=0,
             environment=dict(source_commit=metadata['source_commit'],python=sys.version,openssl=ssl.OPENSSL_VERSION,
                 httpx=httpx.__version__,model_modules=[name for name in sys.modules if name.split('.')[0] in {'paddle','paddleocr','paddlex','sklearn'}]))
     token=control.get('api_key')
@@ -133,8 +157,13 @@ async def run(args, control):
     router=DualEngineRouter(policy,remote,batch_authorizer=authority,client_factory=client_factory)
     service=MinerUService(replace(remote,mode='local',provider='self_hosted',api_url=''),
         TaskRepository(args.output/'tasks.sqlite3'),dual_router=router)
-    outcomes=[]
+    previous_path=args.output/'execution.json'
+    outcomes=json.loads(previous_path.read_text('utf-8')).get('outcomes',[]) if previous_path.exists() else []
     for row in plan['selected']:
+        if row not in selected:
+            print('QA_SKIP '+json.dumps(dict(sample_id=row['sample_id'],status='SKIPPED_RESERVED_NO_REPLAY',
+                previous_post_reserved=bool(usage.get('submissions',{}).get(row['sha256']+':remote')))),flush=True)
+    for row in selected:
         path=Path('/inputs')/(row['sample_id']+'.pdf')
         key=stable_hash('TEST_BATCH',plan['owner'],plan['batch_id'],row['sha256'],'remote')
         task,created=await service.submit(plan['owner'],key,[(authority.remote_name(dict(source_path=str(path),sha256=row['sha256'])),path)],
@@ -164,10 +193,12 @@ def main(argv=None):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--gateway-ip',required=True)
     parser.add_argument('--execute',action='store_true')
+    parser.add_argument('--only',nargs='+',help='仅执行已批准计划内且未有POST预留的样本ID')
     args=parser.parse_args(argv)
-    # 机密配置通过stdin进入内存，不放入命令行或Docker环境元数据。
-    control=json.loads(sys.stdin.read()) if args.execute else {}
     try:
+        # 权限与当前命名空间证明核验之后才读取stdin机密，不放入Docker环境。
+        kernel_guard(args.attestation,args.gateway_ip)
+        control=json.loads(sys.stdin.read()) if args.execute else {}
         result=asyncio.run(run(args,control))
         print(json.dumps(result),flush=True)
         return 0 if result['status'] in {'READY','COMPLETED_REMOTE_ONLY'} else 2
