@@ -1,0 +1,21 @@
+{
+  "version": "v0.2.1",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_commit": "0770e65578b6cf128cb497afbd521901b59e6719",
+  "qa_test_commit": "38837ea464717d943a46cb4e1917c12b5688d1df",
+  "fix_report_transport": "fd9fd3e1234438f2556ebbebb57ef29fa5ead229",
+  "bug_id": "Q021-004",
+  "severity": "P2",
+  "status": "ready",
+  "fix_round": 2,
+  "max_rounds": 3,
+  "expected": "文档缺失或普通访问权限错误保留解析失败，不误报引擎依赖或Windows策略",
+  "actual": "三个普通文档I/O控制均附LOCAL_ENGINE_UNAVAILABLE/LOCAL_DEPENDENCY_ERROR",
+  "baseline_result": {"total": 110, "passed": 107, "failed": 3, "errors": 0, "skipped": 0, "model_calls": 0, "real_http_requests": 0},
+  "accepted_scope": ["收窄错误分类边界", "保留真实加载诊断和既有脱敏", "最小回归"],
+  "forbidden_scope": ["系统策略", "授权或预算", "业务阈值", "依赖和新环境", "数据库", "真实模型或API重跑"],
+  "test_commands": ["python -B -m unittest tests.test_v021_document_io_diagnostics -v", "python -B -m unittest tests.test_v021_engine_diagnostics tests.test_v021_diagnostic_edges -v"],
+  "report_path": "docs/qa/v0.2.1/Q021-004-handoff-to-fix.md",
+  "gate_status": "BLOCKED"
+}

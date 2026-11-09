@@ -15,6 +15,7 @@ from pathlib import Path
 from qa_core.config.settings import ROOT
 from qa_core.utils import IngestionError
 from .config import LAYOUT_MODEL, OCR_MODELS, ParsingConfig
+from .diagnostics import attached_diagnostic
 from .paddle_compat import share_table_ocr_pipeline, skip_disabled_chart_model
 from .schemas import json_safe
 from .windows_paths import ascii_runtime_root, paddle_model_path
@@ -53,14 +54,18 @@ def _build_engine(method: str, config: ParsingConfig):
         try:
             actual = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
-            raise IngestionError("缺少 " + name + "；请按 requirements-ocr.txt 安装。") from None
+            raise IngestionError("缺少 " + name + "；请按 requirements.txt 安装。") from None
         if actual != expected:
             raise IngestionError(name + " 版本不匹配：需要 " + expected + "，当前 " + actual)
     try:
         from paddleocr import PaddleOCR, PPStructureV3
     except Exception as exc:
         logger.exception("Paddle import failed in isolated worker")
-        raise IngestionError("Paddle 运行时加载失败：" + type(exc).__name__ + "；请查看安装诊断报告。") from None
+        failure = IngestionError("Paddle 运行时加载失败；请查看安装诊断报告。")
+        diagnostic = attached_diagnostic(exc, component='paddle', loading=True)
+        if diagnostic:
+            failure.diagnostic = diagnostic
+        raise failure from None
     options = {
         "device": config.device, "cpu_threads": config.cpu_threads, "enable_mkldnn": False,
         "text_detection_model_name": OCR_MODELS[0], "text_detection_model_dir": str(paths[OCR_MODELS[0]]),
@@ -104,11 +109,13 @@ def _worker_predict(method: str, image_path: str, config: ParsingConfig) -> dict
     started = time.perf_counter()
     key = (method, config)
     load_time = 0.0
+    loading = key not in _ENGINES
     try:
-        if key not in _ENGINES:
+        if loading:
             load_started = time.perf_counter()
             _ENGINES[key] = _build_engine(method, config)
             load_time = time.perf_counter() - load_started
+        loading = False
         engine = _ENGINES[key]
         options = {"use_table_orientation_classify": False} if method == "structure" else {}
         result = next(iter(engine.predict(image_path, **options)), None)
@@ -135,8 +142,11 @@ def _worker_predict(method: str, image_path: str, config: ParsingConfig) -> dict
         raise
     except Exception as exc:
         logger.exception("Local Paddle %s failure", method)
-        raise IngestionError("Paddle " + method + " 推理失败：" + type(exc).__name__ +
-                             "；详细异常见 reports/parsing_worker.log。") from None
+        failure = IngestionError("Paddle " + method + " 推理失败；详细异常见本地 worker 日志。")
+        diagnostic = attached_diagnostic(exc, component='paddle', loading=loading)
+        if diagnostic:
+            failure.diagnostic = diagnostic
+        raise failure from None
 
 
 class PaddleRuntime:

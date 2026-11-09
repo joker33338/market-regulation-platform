@@ -1,4 +1,4 @@
-"""Local parsing/benchmark CLI. No upload API, embeddings or database writes."""
+"""本地解析与性能记录入口，不调用上传接口、向量模型或数据库写入。"""
 from __future__ import annotations
 
 import argparse
@@ -54,7 +54,7 @@ def main(argv=None):
     parser.add_argument("--mode", choices=["auto", "ocr", "structure"], default="auto")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--model-root", type=Path)
-    parser.add_argument("--tables", action="store_true")
+    parser.add_argument("--tables", action="store_true", help="仅本次启用表格；未指定时继承进程配置。")
     parser.add_argument("--dpi", type=int, default=160)
     parser.add_argument("--cpu-threads", type=int, default=4)
     parser.add_argument("--max-pages", type=int, default=200)
@@ -62,7 +62,8 @@ def main(argv=None):
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO")
     args = parser.parse_args(argv)
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s %(name)s: %(message)s")
-    config = replace(ParsingConfig.from_env(), enable_tables=args.tables, dpi=args.dpi,
+    config = ParsingConfig.from_env()
+    config = replace(config, enable_tables=config.enable_tables or args.tables, dpi=args.dpi,
                      cpu_threads=args.cpu_threads, max_pages=args.max_pages)
     if args.model_root:
         config = replace(config, model_root=args.model_root.resolve())
@@ -85,7 +86,7 @@ def main(argv=None):
             except importlib.metadata.PackageNotFoundError:
                 versions[name] = None
         report = {
-            "mode": args.mode, "tables": args.tables, "offline_guard": True, "device": config.device,
+            "mode": args.mode, "tables": config.enable_tables, "offline_guard": True, "device": config.device,
             "selected_pages": args.pages, "dpi": config.dpi, "cpu_threads": config.cpu_threads,
             "elapsed_seconds": time.perf_counter() - started, "sampled_peak_total_rss_bytes": sampler.peak,
             "files": len(results), "failed_files": sum(result.parsing_status in {"failed", "partial"} for result in results),

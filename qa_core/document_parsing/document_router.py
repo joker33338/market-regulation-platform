@@ -11,6 +11,7 @@ from pathlib import Path
 from qa_core.config.settings import ROOT
 from qa_core.utils import IngestionError, file_sha256
 from .config import ParsingConfig
+from .diagnostics import attached_diagnostic
 from .native import docx_document, pdf_page
 from .normalizer import normalize_text
 from .paddle_ocr import PaddleOCRService
@@ -35,6 +36,19 @@ def looks_multicolumn(page) -> bool:
     return False
 
 
+def has_vector_grid(page) -> bool:
+    """Detect ruled PDF layouts even when cells are empty and no table is extracted."""
+    horizontal = vertical = 0
+    for drawing in page.get_drawings():
+        for item in drawing.get('items', []):
+            if item[0] != 'l':
+                continue
+            start, end = item[1:3]
+            horizontal += abs(start.y - end.y) < 1 and abs(start.x - end.x) > 30
+            vertical += abs(start.x - end.x) < 1 and abs(start.y - end.y) > 30
+    return horizontal >= 2 and vertical >= 2
+
+
 def has_hidden_text_layer(page) -> bool:
     """Detect an existing invisible OCR layer, rather than visible PDF text."""
     traces = page.get_texttrace()
@@ -47,7 +61,10 @@ def has_grid(image_path: Path) -> bool:
     """A routing hint, not a claim that all table layouts can be detected."""
     try:
         import cv2
-        image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+        import numpy as np
+        # OpenCV's Windows file reader does not reliably accept Unicode paths.
+        payload = image_path.read_bytes()
+        image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_GRAYSCALE) if payload else None
         if image is None:
             return False
         mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
@@ -56,7 +73,7 @@ def has_grid(image_path: Path) -> bool:
         vertical = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(30, height // 5))))
         return int((horizontal.sum(axis=1) > width * 255 * 0.3).sum()) > 5 and int(
             (vertical.sum(axis=0) > height * 255 * 0.3).sum()) > 5
-    except ImportError:
+    except (ImportError, OSError):
         return False
 
 
@@ -117,7 +134,10 @@ class DocumentParser:
             blocks = [LayoutBlock(str(index), "text", text, reading_order=index,
                                   source_location={**source, "line": index + 1})
                       for index, text in enumerate(raw.splitlines())]
-            result.pages = [PageResult(1, "native_text", raw, normalize_text(raw), raw, blocks, source_location=source)]
+            normalized = normalize_text(raw)
+            result.pages = [PageResult(1, "native_text", raw, normalized, raw, blocks, source_location=source,
+                                      parsing_status="success" if normalized.strip() else "needs_review",
+                                      warnings=[] if normalized.strip() else ["文本没有可提取的正文，请核对原始文件。"])]
         elif path.suffix.lower() == ".pdf":
             self._parse_pdf(path, mode, result, source, page_numbers)
         else:
@@ -176,12 +196,14 @@ class DocumentParser:
                                "page_size": [page.rect.width, page.rect.height]}
                 method = mode
                 replaced_text_layer = False
+                native_candidate = None
                 try:
                     raw = page.get_text("text")
                     image_rects = [item["bbox"] for item in page.get_image_info()]
                     area = max(page.rect.width * page.rect.height, 1)
                     image_fraction = max(((box[2] - box[0]) * (box[3] - box[1]) / area for box in image_rects), default=0)
                     if mode == "auto":
+                        page_source["complex_layout"] = looks_multicolumn(page) or has_vector_grid(page)
                         # A header on a scanned page must not suppress OCR of its image body.
                         text_length = len("".join(raw.split()))
                         scanned = text_length == 0 or (bool(image_rects) and (
@@ -194,6 +216,9 @@ class DocumentParser:
                             continue
                         if not scanned:
                             native = pdf_page(page, page_no, page_source)
+                            if native.raw_text.strip():
+                                native_candidate = native
+                            native.source_location["complex_layout"] = bool(native.tables) or page_source["complex_layout"]
                             if native.tables or not looks_multicolumn(page):
                                 native.processing_time = time.perf_counter() - page_started
                                 result.pages.append(native)
@@ -225,14 +250,31 @@ class DocumentParser:
                 except Exception as exc:
                     failed = self._error_page(page_no, method, page_source, exc)
                     failed.processing_time = time.perf_counter() - page_started
-                    result.pages.append(failed)
+                    if native_candidate is not None:
+                        # 增强失败不应清空本页已成功提取的原生候选，也不能取消人工复核。
+                        retained = replace(
+                            native_candidate, parsing_status="needs_review",
+                            warnings=[*native_candidate.warnings, "版面增强失败，已保留原生候选；阅读顺序和表格结构须人工复核。"],
+                            error_type=failed.error_type, error_message=failed.error_message,
+                            processing_time=failed.processing_time,
+                            raw_result={**native_candidate.raw_result, **failed.raw_result, "enhancement_failure": {
+                                "attempted_method": method, "error_type": failed.error_type,
+                                "error_message": failed.error_message, "retained_method": "native_pdf"}},
+                        )
+                        result.pages.append(retained)
+                    else:
+                        result.pages.append(failed)
 
     @staticmethod
     def _error_page(number: int, method: str, source: dict, error: Exception) -> PageResult:
         logger.warning("Parsing page %s failed: %s", number, type(error).__name__)
         message = str(error) if isinstance(error, IngestionError) else "解析失败：" + type(error).__name__
+        diagnostic = attached_diagnostic(error, component='paddle') if method in {'ocr', 'structure'} else None
+        if diagnostic:
+            message = "本地解析引擎无法加载，请查看安全诊断与本地运行日志。"
         return PageResult(number, method, source_location=source, parsing_status="failed",
-                          error_message=message, error_type=type(error).__name__)
+                          error_message=message, error_type=type(error).__name__,
+                          raw_result={'engine_availability': diagnostic} if diagnostic else {})
 
     def parse_batch(self, paths: list[Path], mode: str = "auto", *,
                     page_numbers: list[int] | None = None) -> list[DocumentResult]:

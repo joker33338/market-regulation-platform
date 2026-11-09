@@ -21,6 +21,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--include-v02',action='store_true',help='同时执行双引擎A–J，包括真实独立PostgreSQL场景')
     args=parser.parse_args()
     qa=Path(__file__).resolve().parents[1]
     source=args.source.resolve()
@@ -45,6 +46,9 @@ def main():
     runner_env.write_text('\n'.join([f'{key}={dsn}' for key in [
         'MVP_TEST_PG_DSN','PARSING_TEST_PG_DSN','QA_ISOLATED_PG_DSN']])+\
         '\nPYTHONDONTWRITEBYTECODE=1\nHF_HUB_OFFLINE=1\nTRANSFORMERS_OFFLINE=1\n',encoding='utf-8')
+    if args.include_v02:
+        with runner_env.open('a',encoding='utf-8') as stream:
+            stream.write('MARKET_REGULATION_DUAL_ENGINE_TEST_ADAPTER=tests.dual_engine_adapter:run_scenario\n')
     metadata={'source_commit':source_sha,'qa_test_commit':test_sha,'container':container,'network':network,
               'postgres_image':pg_image,'runtime_image':app_image,'host_ports':[], 'database_data_retained':True}
     created=False
@@ -69,6 +73,8 @@ def main():
                   '--workdir','/source','--entrypoint','python',app_image,'-B','/qa-tests/run_round01_validation.py',
                   '--source','/source','--database-only','--source-commit',source_sha,'--qa-test-commit',test_sha,
                   '--result-json','/qa-output/database-execution.json']
+        if args.include_v02:
+            args_run.append('--include-v02')
         execution=subprocess.run(args_run,capture_output=True)
         (output/'database-tests.log').write_bytes(execution.stdout+execution.stderr)
         metadata['exit_code']=execution.returncode
