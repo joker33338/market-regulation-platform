@@ -46,6 +46,17 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
     config = config or MinerUConfig.from_env()
     from .dual_engine import DualEngineConfig, DualEngineRouter
     dual_config = dual_config or DualEngineConfig.from_env()
+    if dual_config.authorization_mode == 'TEST_BATCH':
+        from .test_batch_authorization import TrustedTestBatch
+        # 批次模式不能因双引擎关闭或注入旧服务而降级为直接官方上传。
+        if not dual_config.enabled:
+            raise MinerUError('test_batch_requires_dual_engine', 503)
+        if service is not None:
+            router = getattr(service, 'dual_router', None)
+            if (not isinstance(router, DualEngineRouter) or router.config.environment != 'test' or
+                    router.config.authorization_mode != 'TEST_BATCH' or not router.config.enabled or
+                    not isinstance(router.batch_authorizer, TrustedTestBatch)):
+                raise MinerUError('test_batch_requires_bound_service', 503)
     tokens = tokens if tokens is not None else json.loads(os.getenv("PARSING_API_TOKENS_JSON", "{}"))
     if not tokens or any(len(token) < 32 or not owner for token, owner in tokens.items()):
         raise MinerUError("api_auth_configuration_required", 503)
