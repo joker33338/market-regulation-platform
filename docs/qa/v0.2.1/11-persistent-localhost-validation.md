@@ -56,3 +56,32 @@ Fix可另以nft2仅在app角色增加严格loopback IPv4目的127.0.0.1:8180及�
 本地索引分别为 `persistent-ingress-b9cab9df6a`、`persistent-ingress-590b741b13`。后一结果已有active_tasks_at_end=0，恢复断点时再次只读确认仅completed2，不保持地址占用等待写报告。
 
 结论：**持久入口B/C、core、Docker重启重建及隔离检查通过；A自检查PENDING，Windows整机重启NOT_TESTED**。不会把restart=unless-stopped当作Windows重启实测。用户日后重启Windows且Docker Desktop就绪后，应先查看独立项目状态，再执行 `Test-NetConnection 127.0.0.1 -Port 8180` 和 `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8180/`；若此前为真实云切换停止了local应用，应先按已审启动脚本显式恢复local。不得通过再次临时中继冒充持久入口恢复。
+
+## nft2 最小loopback修复后的独立定向复验
+
+主QA确认云client只有空闲进程并安全停止释放互斥地址后，QA恢复local应用和入口，未操作TLS网关、源文件或云请求ledger。
+
+- 配置：`0683a17b6bae2b00fbe8fe31e931475122a1e731`。
+- 镜像：`sha256:5ee2e281796686b781e585593c0d8552c92efe25f1782545eacc2fe05368199c`，新标签nft2，不覆盖nft1。
+- 业务快照仍为 `67709c4989781594dd6c4723666fdb2c21caaa7b`。
+
+仅app角色增加lo接口且源/目标均127.0.0.1、目的8180的最小许可；没有放行整个loopback网段或Docker DNS。实际检查结果：
+
+| 定向复验 | 结果 |
+| --- | --- |
+| A app内非root真实HTTP到127.0.0.1:8180 | PASS，200 |
+| Windows host根页面、无认证info、认证info | 200、401、200 |
+| 127.0.0.1:8181、127.0.0.2:8180、127.0.0.11 TCP53 | 均拒绝，OUTPUT drop计数增加 |
+| Docker stub UDP53、IPv4/IPv6公网、其他端口/宿主桥探测 | 均未连通，nft拒绝计数增加 |
+| 两角色实际nft链、默认DROP、-150优先级、PID1五组cap全0/非root/NNP1 | PASS |
+| 仅app force-recreate后A与host恢复、实际规则重装与cap0 | PASS，app容器ID实际变化 |
+
+首次定向请求抢在应用完成启动之前收到connection refused，脚本当即保留PARTIAL证据；补齐QA等待现有host就绪后再次执行相同源码，以上定向通过，没有修改业务或为测试放宽规则。
+
+nft2只改变最小网络规则，所以本轮复用nft1同业务源码已完成的合成完整core、Docker restart/recreate与幂等持久性证据，没有重跑191方法或真实模型。本段没有把nft2未重复的完整解析行为伪称为重新执行。
+
+测试后只读确认active_tasks=0，QA正常停止local app并立即通知Fix/主QA，释放地址给后续云client；ingress保持运行，停止local app是明确资源交接，不是服务故障。没有强杀任务或修改云ledger。
+
+本地 `persistent-ingress-f14c53adcb/summary.json` 原始字节SHA256：`1abed23d231dec06e29034ba4a11f5eb4966b19f9495f16c7d2d12f019de88c0`。
+
+更新结论：**独立持久local入口A/B/C及最小隔离边界已通过；Windows整机重启仍NOT_TESTED**。当前若云client占用同地址，local app保持停止；云任务完成后需用已审脚本显式恢复local，再由用户执行Windows重启后的实际检查，不能把unless-stopped或容器重建结果扩称为整机重启通过。
