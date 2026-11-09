@@ -1,12 +1,12 @@
 {
-  "handoff_id": "v021-TEST_BATCH-2158077",
+  "handoff_id": "v021-TEST_BATCH-ee7dd7e-QTB001",
   "version": "v0.2.1",
   "source_agent": "Fix",
   "target_agent": "QA",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+  "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
   "baseline_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
-  "qa_test_commit": "5f4417ef905f3feacf3f266bfbbb81a6047116c5",
+  "qa_test_commit": "a812eaebfa4d9543b4d30a9f0d43376e6f1aa65a",
   "qa_handoff_commit": "72148f4f298eb37bb5eea87c77141315c5b68272",
   "status": "ready",
   "handoff_type": "feature-regression",
@@ -20,12 +20,12 @@
     "docs/qa/v0.2.1/test-batch-handoff-to-qa.md"
   ],
   "report_sha256": {
-    "docs/qa/v0.2.1/08-缺陷修复报告.md": "5c1563f84e9554614405aaab0240862328828b9e57a0915b0acd9d0e3f7281f8",
-    "docs/qa/v0.2.1/test-batch-handoff-to-qa.md": "e21aa83b5ae8f87acc59eec6bcc01548691216706764c3385f50eee145aa7ff7"
+    "docs/qa/v0.2.1/08-缺陷修复报告.md": "99d9a5cf9dd13f2f80b8c19c5b37dd711eaa9ecdfb7d4e4a486131001c678af2",
+    "docs/qa/v0.2.1/test-batch-handoff-to-qa.md": "6ca708a25b137b10ad236d993ae3f0981d0582e7f02fdf1aab7fca032b1d90a3"
   },
   "local_validation": {
-    "total_methods": 106,
-    "passed": 106,
+    "total_methods": 55,
+    "passed": 55,
     "failed": 0,
     "skipped": 0
   },
@@ -38,5 +38,13 @@
     "真实调用需协调器放行",
     "不重置32调用或3唯一内容预算",
     "不Push/合并/部署"
-  ]
+  ],
+  "additional_qa_handoff": "ee764692596ee4b6196b6e4cccccbcf5c27e31bd",
+  "bug_ids": [
+    "QTB-001"
+  ],
+  "prior_feature_validation": {
+    "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+    "passed": 106
+  }
 }
