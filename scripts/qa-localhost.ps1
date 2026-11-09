@@ -28,9 +28,15 @@ try {
     if ($Action -eq 'rebuild') {
         & docker tag sha256:b4010953b65e06c2d1000fdcd129f6fcceeed9b9a5d48a12266d3365a610a2b1 market-regulation-qa-base:b4010953
         if ($LASTEXITCODE -ne 0) { throw '基础镜像不存在或不匹配。' }
-        & docker build --pull=false -f deploy/qa-gateway/Dockerfile -t market-regulation-qa-gateway:v0.2.1-nft2 .
+        $sourceShort = (& git rev-parse --short=12 HEAD).Trim()
+        $lockShort = (Get-FileHash -LiteralPath 'deploy/qa-gateway/package-lock.json' -Algorithm SHA256).Hash.Substring(0,12).ToLowerInvariant()
+        $buildStamp = [DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')
+        $candidateTag = "candidate-$sourceShort-$lockShort-$buildStamp"
+        $candidateImage = "market-regulation-qa-gateway:$candidateTag"
+        & docker build --pull=false --build-arg "QA_TOOL_VERSION=$candidateTag" -f deploy/qa-gateway/Dockerfile -t $candidateImage .
         if ($LASTEXITCODE -ne 0) { throw '新独立镜像构建失败。' }
-        Write-Output '新镜像已构建；未自动重建正在运行的任务。'
+        Write-Output "新候选镜像：$candidateImage"
+        Write-Output '固定镜像标签、Compose映射与运行任务均未替换；审核测试后再显式切换版本。'
     } elseif ($Action -eq 'start') {
         $cloud = & docker @composeArgs --profile cloud ps --status running --services
         if ($cloud -match 'client') { throw '独立云测试客户端正在运行；先安全完成任务并停止。' }
