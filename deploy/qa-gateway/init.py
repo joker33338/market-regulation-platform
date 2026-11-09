@@ -28,6 +28,10 @@ def rules(role, pins):
     elif role in {'app', 'client'}:
         incoming = f'ip saddr {INGRESS} tcp dport 8180 ct state {{ new, established }} counter accept' if role == 'app' else ''
         outgoing = f'ip daddr {TLS} tcp dport 8080 ct state {{ new, established }} counter accept'
+        if role == 'app':
+            # 只允许固定应用自检，不放开Docker DNS或其它回环地址、端口。
+            incoming += '\niifname "lo" ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp dport 8180 ct state { new, established } counter accept'
+            outgoing += '\noifname "lo" ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp dport 8180 ct state { new, established } counter accept'
     else:
         incoming = f'ip saddr {APP} tcp dport 8080 ct state {{ new, established }} counter accept'
         outgoing = '\n'.join(f'{"ip6" if ":" in address else "ip"} daddr {address} tcp dport 443 '
