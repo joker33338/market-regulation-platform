@@ -110,3 +110,10 @@ class BatchHTTPFlow(unittest.IsolatedAsyncioTestCase):
             await self.execute(self.service())
         self.assertEqual(self.requests, [])
         self.assertFalse(self.authority.usage_path.exists())
+
+    async def test_duplicate_manifest_fields_fail_closed(self):
+        raw = json.dumps(self.manifest).replace('"revoked": false', '"revoked": false, "revoked": false')
+        self.path.write_text(raw)
+        task = dict(owner='alice', parse_options=dict(sensitive=False))
+        self.authority.bind_task(task)
+        self.assertFalse(self.authority.authorize(task, dict(source_path=str(self.source), sha256=self.sha))[0])

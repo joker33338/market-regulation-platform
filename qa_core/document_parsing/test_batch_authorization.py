@@ -12,6 +12,16 @@ from qa_core.utils import file_sha256
 from .mineru_client import MinerUError
 
 
+def unique_object(pairs):
+    """重复JSON字段视为无效，不能依赖后值覆盖前值解释授权。"""
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError('重复JSON字段')
+        value[key] = item
+    return value
+
+
 @contextmanager
 def locked(path):
     """操作系统锁覆盖整个读改写；锁文件不删除，异常退出自动释放锁。"""
@@ -76,7 +86,7 @@ class TrustedTestBatch:
                 return False, 'test_batch_sensitive_denied'
             if self.path.stat().st_size > 1024 * 1024:
                 return False, 'test_batch_manifest_invalid'
-            manifest = json.loads(self.path.read_text(encoding='utf-8-sig'))
+            manifest = json.loads(self.path.read_text(encoding='utf-8-sig'), object_pairs_hook=unique_object)
             expiry = manifest.get('expires_at')
             if (type(manifest.get('version')) is not int or manifest['version'] != 1 or
                     manifest.get('owner') != self.owner or manifest.get('batch_id') != self.batch_id or
@@ -111,7 +121,7 @@ class TrustedTestBatch:
         try:
             with locked(self.usage_path.with_name(self.usage_path.name + '.lock')):
                 identity = dict(owner=self.owner, batch_id=self.batch_id)
-                ledger = json.loads(self.usage_path.read_text('utf-8')) if self.usage_path.exists() else {
+                ledger = json.loads(self.usage_path.read_text('utf-8'), object_pairs_hook=unique_object) if self.usage_path.exists() else {
                     **identity, 'calls': 0, 'files': [], 'methods': {}}
                 if any(ledger.get(key) != value for key, value in identity.items()):
                     raise MinerUError('test_batch_ledger_identity_mismatch', 409)
