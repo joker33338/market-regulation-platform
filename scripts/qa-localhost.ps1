@@ -33,8 +33,16 @@ try {
         $buildStamp = [DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')
         $candidateTag = "candidate-$sourceShort-$lockShort-$buildStamp"
         $candidateImage = "market-regulation-qa-gateway:$candidateTag"
-        & docker build --pull=false --build-arg "QA_TOOL_VERSION=$candidateTag" -f deploy/qa-gateway/Dockerfile -t $candidateImage .
-        if ($LASTEXITCODE -ne 0) { throw '新独立镜像构建失败。' }
+        # Docker正常构建进度写stderr，Windows PowerShell不能把它误作终止错误。
+        $buildErrorPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & docker build --pull=false --build-arg "QA_TOOL_VERSION=$candidateTag" -f deploy/qa-gateway/Dockerfile -t $candidateImage .
+            $buildExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $buildErrorPreference
+        }
+        if ($buildExitCode -ne 0) { throw '新独立镜像构建失败。' }
         Write-Output "新候选镜像：$candidateImage"
         Write-Output '固定镜像标签、Compose映射与运行任务均未替换；审核测试后再显式切换版本。'
     } elseif ($Action -eq 'start') {
