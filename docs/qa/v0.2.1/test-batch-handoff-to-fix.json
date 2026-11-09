@@ -1,0 +1,40 @@
+{
+  "handoff_id": "v021-test-batch-authorization-v1",
+  "version": "v0.2.1",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
+  "qa_test_commit": "5f4417ef905f3feacf3f266bfbbb81a6047116c5",
+  "status": "ready",
+  "handoff_type": "feature",
+  "target_branch": "codex/fix-v0.2.1",
+  "feature_ids": [
+    "TEST_BATCH"
+  ],
+  "test_commands": [
+    "python -B -m unittest tests.test_v021_test_batch_authorization -v"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.1/test-batch-handoff-to-fix.md"
+  ],
+  "baseline": {
+    "total_methods": 23,
+    "production_http_control_passed": 4,
+    "feature_methods_not_implemented": 18,
+    "config_missing_parameter_error": 1
+  },
+  "real_upload_allowed": false,
+  "release_conditions": [
+    "新授权Mock全部通过",
+    "批次成员与owner和期限固定",
+    "敏感/第三方资格明确",
+    "root明确放行首批顺序3文件总账32调用"
+  ],
+  "constraints": [
+    "不改production默认及原corpus harddeny",
+    "不接受HTTP manifest/path/batch_id注入",
+    "不重置跨task/strategy/resume预算",
+    "敏感或unknown一律拒绝",
+    "不泄露Key/原文件名/正文"
+  ]
+}
