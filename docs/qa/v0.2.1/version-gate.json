@@ -64,7 +64,8 @@
     "current-table-formats.json": "c20b3b056c12556f3625190591b584ad840cf646bd006ecef369a5379569bd86",
     "source621-full-baseline-summary.json": "0598e702008d8531d75a39ed4e0cdd50ae0daf7464075d7cd9040a3b6c595ef3",
     "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118",
-    "source215-full-result.json": "4e00ab1b73004f85348c3d442d5d84f6408d3eb98e11e4709af2e5319e998d69"
+    "source215-full-result.json": "4e00ab1b73004f85348c3d442d5d84f6408d3eb98e11e4709af2e5319e998d69",
+    "source215-real-http-restart.json": "15196579a62916d9f120c37a2a055e71eb42bcea985a2138e9534aa479b538a2"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
@@ -124,5 +125,13 @@
     "errors": 0,
     "skipped": 0,
     "overlap_with_source_suite": 29
+  },
+  "real_service_checks": {
+    "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+    "internal_http": "PASS",
+    "docker_restart": "PASS",
+    "host_port_8180": "BLOCKED",
+    "provider": "synthetic-mock",
+    "counted_in_unit_methods": false
   }
 }
