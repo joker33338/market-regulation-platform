@@ -22,7 +22,7 @@
   ],
   "checked_at": "2026-11-09T01:38:45.113273+00:00",
   "mock_status": "BLOCKED",
-  "integration_status": "NOT_REQUIRED",
+  "integration_status": "BLOCKED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
     "当前完整基线7项环境条件SKIP未覆盖",
@@ -58,11 +58,15 @@
     "S00007-real-on-summary.json": "6b2f91b9df734992fbbadea8a4920935ba411081a54a4793567eb3708ab1b91b",
     "S00008-real-on-p1-summary.json": "2f98efb6f05a46538f316eaecee7e51034609947583519e7ffc50d0d780fddde",
     "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926",
-    "fixed-source-focused-result.json": "25a217415795efda9708cd8cdc78459b5a66f0b649b3a5bebc749b5a0d7efa70"
+    "fixed-source-focused-result.json": "25a217415795efda9708cd8cdc78459b5a66f0b649b3a5bebc749b5a0d7efa70",
+    "current-truth-metrics.json": "952291482df83db0c0b09172916caada371207d26501b22811668cf8946a5eb7",
+    "current-table-formats.json": "c20b3b056c12556f3625190591b584ad840cf646bd006ecef369a5379569bd86",
+    "source621-full-baseline-summary.json": "0598e702008d8531d75a39ed4e0cdd50ae0daf7464075d7cd9040a3b6c595ef3",
+    "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
-  "functional_status": "PASS",
+  "functional_status": "BLOCKED",
   "tested_commit_sha": "6216ae5f40727871b369dfc8c54868ac748c4648",
   "fix_transport_commit": "a4863c463a0e8f6082c33d125965e4a1ec5c79fd",
   "closed_bug_ids": [
@@ -71,7 +75,6 @@
   ],
   "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
   "business_code_changed_by_qa": false,
-  "integration_not_required_reason": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
   "report_path": "docs/qa/v0.2.1/09-完整回归结果.md",
   "manual_truth_status": "LABELED",
   "manual_truth_tasks": 4,
@@ -104,5 +107,12 @@
     "passed": 4,
     "feature_missing_failures": 18,
     "config_parameter_missing_errors": 1
-  }
+  },
+  "previous_bugfix_functional_status": "PASS",
+  "prior_fix_only_integration_waiver": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
+  "integration_blocked_reason": "本次用户新增官方API TEST_BATCH范围，必须完成新边界实现/Mock及资格审查后再真实HTTP；先前异常兜底/CLI修复无需新推理的豁免不适用于此新增范围。",
+  "test_commands": [
+    "python -B -m unittest discover -s tests -v",
+    "python -B -m unittest tests.test_v021_test_batch_authorization -v"
+  ]
 }
