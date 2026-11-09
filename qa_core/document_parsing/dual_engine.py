@@ -44,8 +44,13 @@ class DualEngineConfig:
     max_cloud_pages: int = 50
     min_request_interval: float = 0.25
     thresholds: RoutingThresholds = field(default_factory=RoutingThresholds)
+    environment: str = 'production'
+    authorization_mode: str = 'FILE_SHA'
 
     def __post_init__(self):
+        if (self.environment not in {'production', 'test'} or self.authorization_mode not in {'FILE_SHA', 'TEST_BATCH'}
+                or self.authorization_mode == 'TEST_BATCH' and self.environment != 'test'):
+            raise ValueError('未知或不允许的授权环境/模式')
         if (self.max_fallbacks not in {0, 1} or min(self.max_cloud_calls, self.max_task_calls,
                 self.max_cloud_files, self.max_cloud_pages) < 1 or self.min_request_interval < 0):
             raise ValueError("Invalid dual-engine budgets")
@@ -55,7 +60,9 @@ class DualEngineConfig:
         values = {name: int(os.environ['DUAL_OCR_' + name.upper()]) for name in
                   ('max_fallbacks', 'max_cloud_calls', 'max_task_calls', 'max_cloud_files', 'max_cloud_pages')
                   if 'DUAL_OCR_' + name.upper() in os.environ}
-        return cls(enabled=os.getenv('DUAL_OCR_ENABLED', '0') == '1',
+        return cls(environment=os.getenv('DUAL_OCR_ENVIRONMENT', 'production'),
+                   authorization_mode=os.getenv('DUAL_OCR_AUTHORIZATION_MODE', 'FILE_SHA'),
+                   enabled=os.getenv('DUAL_OCR_ENABLED', '0') == '1',
                    cloud_enabled=os.getenv('DUAL_OCR_CLOUD_ENABLED', '0') == '1',
                    thresholds=RoutingThresholds(
                        low_confidence=float(os.getenv('DUAL_OCR_LOW_CONFIDENCE', '0.8')),
@@ -65,10 +72,15 @@ class DualEngineConfig:
 
 class DualEngineRouter:
     def __init__(self, config, remote_config, *, grants=None, parser_factory=DocumentParser,
-                 client_factory=OfficialMinerUClient):
+                 client_factory=OfficialMinerUClient, batch_authorizer=None):
         self.config, self.remote_config = config, remote_config
         self.grants = grants if grants is not None else {}
         self.parser_factory, self.client_factory = parser_factory, client_factory
+        self.batch_authorizer = batch_authorizer
+        if config.authorization_mode == 'TEST_BATCH':
+            from .test_batch_authorization import TrustedTestBatch
+            if isinstance(batch_authorizer, TrustedTestBatch):
+                batch_authorizer.max_calls = min(batch_authorizer.max_calls, config.max_task_calls, 32)
         self._rate_lock = asyncio.Lock()
         self._last_call = 0.0
         if remote_config.provider != 'official' or remote_config.mode != 'remote':
@@ -76,6 +88,18 @@ class DualEngineRouter:
 
     def authorization(self, task, file):
         options = task.get('parse_options', {})
+        if self.config.authorization_mode == 'TEST_BATCH':
+            from .test_batch_authorization import TrustedTestBatch
+            if not self.config.cloud_enabled or options.get('allow_cloud_fallback') is not True:
+                return False, 'cloud_disabled_or_not_requested'
+            if self.config.environment != 'test' or not isinstance(self.batch_authorizer, TrustedTestBatch):
+                return False, 'test_batch_unconfigured'
+            allowed, reason = self.batch_authorizer.authorize(task, file)
+            if not allowed:
+                return allowed, reason
+            if not self.remote_config.api_key:
+                return False, 'cloud_token_unconfigured'
+            return allowed, reason
         # A browser flag, authentication token or API key never grants transfer.
         owner_grants = self.grants.get(task['owner'], {}) if isinstance(self.grants, dict) else {}
         grant = owner_grants.get(file['sha256'], {}) if isinstance(owner_grants, dict) else {}
@@ -229,12 +253,24 @@ class DualEngineRouter:
                 raise MinerUError('task_canceled', 409)
             async with self._rate_lock:
                 await asyncio.sleep(max(0, self.config.min_request_interval - (time.monotonic() - self._last_call)))
+                # 限流等待期间也可能撤销授权或替换源文件，发送前必须再次复验。
+                if not self.authorization(task, file)[0]:
+                    raise MinerUError('file_authorization_revoked', 403)
+                if await asyncio.to_thread(file_sha256, file['source_path']) != file['sha256']:
+                    raise MinerUError('source_integrity_mismatch', 409)
+                if self.config.authorization_mode == 'TEST_BATCH':
+                    await save(task)
+                    if task.get('cancel_requested'):
+                        raise MinerUError('task_canceled', 409)
+                    self.batch_authorizer.reserve_request(task, file, method)
                 self._last_call = time.monotonic()
         client.before_request = before_request
         try:
             service = MinerUService(config, TaskRepository(config.result_dir / 'tasks.sqlite3'), client)
+            remote_name = (self.batch_authorizer.remote_name(file) if self.config.authorization_mode == 'TEST_BATCH'
+                           else file['file_name'])
             child, _ = await service.submit(task['owner'], task['id'] + ':' + file['id'],
-                                            [(file['file_name'], Path(file['source_path']), file['source_file_id'])])
+                                            [(remote_name, Path(file['source_path']), file['source_file_id'])])
             state['remote_task_id'] = child.get('remote_id')
             state['child_task_id'] = child['id']
             await save(task)

@@ -38,7 +38,7 @@ def redact_paths(value):
     return value
 
 
-def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None):
+def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None, batch_authorizer=None):
     # Optional API dependencies do not affect import of CLI/business modules.
     from fastapi import Depends, FastAPI, Request
     from fastapi.exceptions import RequestValidationError
@@ -57,7 +57,18 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
             if cloud_grants is None:
                 grant_file = os.getenv('DUAL_OCR_GRANTS_FILE')
                 cloud_grants = json.loads(Path(grant_file).read_text(encoding='utf-8')) if grant_file else {}
-            dual_router = DualEngineRouter(dual_config, remote_config, grants=cloud_grants)
+            if dual_config.authorization_mode == 'TEST_BATCH' and batch_authorizer is None:
+                from .test_batch_authorization import TrustedTestBatch
+                manifest = os.getenv('DUAL_OCR_TEST_BATCH_MANIFEST')
+                if not manifest:
+                    raise MinerUError('test_batch_configuration_required', 503)
+                try:
+                    batch_authorizer = TrustedTestBatch(manifest, owner=os.getenv('DUAL_OCR_TEST_BATCH_OWNER'),
+                                                        batch_id=os.getenv('DUAL_OCR_TEST_BATCH_ID'))
+                except ValueError as exc:
+                    raise MinerUError('test_batch_configuration_required', 503) from exc
+            dual_router = DualEngineRouter(dual_config, remote_config, grants=cloud_grants,
+                                           batch_authorizer=batch_authorizer)
         from .mineru_mock import mock_transport
         repository = TaskRepository(config.result_dir / "tasks.sqlite3")
         if config.provider == "official":
