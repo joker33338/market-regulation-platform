@@ -48,6 +48,35 @@ PowerShell 5.1 AST无错误；Add-Type编译成功。用冻结证据执行默认
 
 此新增阻塞记作 **SANDBOX_RESTRICTION（仅指已经观察到的执行工具策略拒绝）**。它与此前 Docker internal-only 无默认网关而不发布端口是两个独立问题。没有证据证明 Windows 防火墙、WDAC 或本机 PowerShell 自身拒绝了中继，不能把工具拒绝归因给它们。
 
+### 错误原文与层级澄清
+
+进一步审计将具体执行策略来源标为 **UNDETERMINED_EXECUTION_POLICY**。前述 SANDBOX_RESTRICTION 只是历史工具拒绝的泛称，不代表已定位某个操作系统沙箱或安全产品。
+
+既有工具返回的固定原文部分为：
+
+```text
+Script error:
+exec_command failed: CreateProcess { message: "Rejected(\"... rejected: blocked by policy\")" }
+```
+
+省略号表示工具显示中间命令时已经使用截断标记，不是可恢复的完整原始日志；此处不补造被截断内容。可确认字段为外层 `exec_command failed`、`CreateProcess`、`message` 中的 `Rejected` 和末尾 `rejected: blocked by policy`。该返回没有正常 shell 的 `exit_code`、`output`、`session_id`，也没有 Windows Win32Exception、NativeErrorCode 或 PowerShell Start-Process 错误记录。
+
+被拒绝的是以下整体工具调用结构，并非一条已经返回 OS 错误的 Start-Process：
+
+```text
+exec_command(
+  cmd = 创建唯一QA本地输出目录；构造固定脚本/EvidenceDirectory/StopFile/-Enable参数；
+        Start-Process powershell.exe -NoProfile -File <已审脚本> ... -WindowStyle Hidden；
+        保存PID；读取启动日志；Invoke-WebRequest http://127.0.0.1:8180/,
+  yield_time_ms = 1000,
+  max_output_tokens = 650
+)
+```
+
+没有secret参数。工具展示的被拒命令外层是 WindowsPowerShell powershell.exe `-Command`。本地预定的运行目录与 active-relay-run.txt 未产生，后续只读确认没有脚本后台进程或8180监听，支持“整体调用在实际启动脚本前被工具拦截”；但没有工具内部策略日志，不能进一步证明是哪条规则或具体安全层拦截。尤其不能说“Windows Start-Process 本身被操作系统拒绝”。
+
+分层验证方法仍是用户在原生 Windows PowerShell 前台运行下节同一已审脚本：若预检通过并开始监听，说明脚本和本机正常前台执行路径可用，此前工具托管路径仍需单独诊断；若原生运行失败，记录其真实错误类型与字段再判定。前台运行不验证 Start-Process 隐藏启动路径，也不应把它的成功扩大为所有启动方式均成功。代理没有重试任何启动。
+
 后续只读核对排除了诊断命令自身：`-File ...start_qa_loopback_relay.ps1` 后台进程数为0，Windows 8180监听数为0。未再次尝试启用，没有遗留需要停止的中继进程。应用容器的内部服务不受影响，宿主访问仍为BLOCKED。
 
 ## 用户在 Windows 宿主手动执行的同一入口
