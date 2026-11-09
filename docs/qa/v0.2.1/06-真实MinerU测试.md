@@ -1,4 +1,4 @@
-﻿# TEST_BATCH 官方 API 真实验证
+# TEST_BATCH 官方 API 真实验证
 
 受测源码：`ee7dd7e6c8243e98c9f1bf995a4c57c555611786`。Fix 交接：`e16b4e241651a0641bdccac8420a64290e40869f`。
 
@@ -38,3 +38,8 @@
 没有新的 Paddle、Structure 或 MinerU 完整集预测。历史选页结果仍绑定原始源码与文件 SHA；选页缓存不能冒充整个 PDF 的生产候选，也不能直接与云端全文计算 CER。auto 若本地足够好不上传，须如实报告零回退；remote 对照不等于自动回退已覆盖。
 
 先定位云链路独立 ImportError；本地执行策略需管理员核准既有组件后恢复，不得绕过。恢复仍沿用同一批次、任务与账本，先核验 POST 状态。生产默认、主分支和服务配置均不改变。业务尚无验收阈值，本轮只提供有分母、来源和覆盖边界的技术指标，版本继续 BLOCKED。
+
+
+## 最新无网络诊断
+
+官方客户端独立构造已确认httpx→ssl的libssl被Windows执行策略拒绝，与Paddle的sklearn扩展拒绝分别有CodeIntegrity 3033/3077佐证。导入审计未加载Paddle，网络尝试为零。LOCAL_DEPENDENCY_ERROR未证实；MinerU为NOT_TESTED/BLOCKED，Dual为BLOCKED，不是API_FAIL。见[Windows执行策略诊断](10-Windows执行策略诊断.md)。新增8项合成诊断合同（0通过、2失败、6错误）和构造异常Q021-003已正式交接，不能通过代码修改解除系统策略，也不能把合同转绿当真实API成功。

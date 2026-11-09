@@ -1,0 +1,23 @@
+{
+  "version": "v0.2.1",
+  "handoff_type": "diagnostics-and-bounded-constructor-fallback",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
+  "qa_test_commit": "5e752376d8c8855a974be5add9f0902c324fc22d",
+  "status": "ready",
+  "feature_ids": ["OBS021-001"],
+  "bug_ids": ["Q021-003"],
+  "severity": "P2",
+  "reproducer": "tests.test_v021_engine_diagnostics.ConstructorFailureContract.test_failed_local_constructor_kept_and_cloud_not_misreported",
+  "expected": "构造异常保存本地失败候选并保留复核，按原授权检查尝试远端；远端初始化失败记BLOCKED/NOT_TESTED和零请求",
+  "actual": "parser_factory构造在try外直接抛出，未保存候选或进入远端；现有附件与结构化诊断缺失",
+  "accepted_scope": ["安全诊断helper", "运行时可pickle附件", "页级附件保留", "本地构造异常兜底", "远端未发HTTP状态区分"],
+  "forbidden_scope": ["系统策略规避", "依赖或新环境", "真实模型重跑", "数据库", "业务阈值", "授权或预算变化", "客户端重构", "真实请求重试"],
+  "baseline_result": {"total": 8, "passed": 0, "failed": 2, "errors": 6, "skipped": 0, "model_calls": 0, "http_requests": 0},
+  "test_commands": ["python -B -m unittest tests.test_v021_engine_diagnostics -v"],
+  "report_paths": ["docs/qa/v0.2.1/diagnostics-handoff-to-fix.md", "docs/qa/v0.2.1/10-Windows执行策略诊断.md"],
+  "system_policy_status": "BLOCKED",
+  "mineru_api_observation": "NOT_TESTED",
+  "gate_status": "BLOCKED"
+}

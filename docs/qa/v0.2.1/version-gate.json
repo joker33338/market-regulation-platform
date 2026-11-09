@@ -18,16 +18,17 @@
     "docs/qa/v0.2.1/05-表格准确率.md",
     "docs/qa/v0.2.1/06-真实MinerU测试.md",
     "docs/qa/v0.2.1/07-缺陷与待裁决.md",
-    "docs/qa/v0.2.1/09-完整回归结果.md"
+    "docs/qa/v0.2.1/09-完整回归结果.md",
+    "docs/qa/v0.2.1/10-Windows执行策略诊断.md"
   ],
-  "checked_at": "2026-11-09T03:07:04.115885+00:00",
+  "checked_at": "2026-11-09T03:24:23.011027+00:00",
   "mock_status": "PASS",
   "integration_status": "BLOCKED",
   "qa_status": "BLOCKED",
   "blocked_reasons": [
     "旧MVP数据库生命周期方法包含未经批准DDL/合成投影DELETE，尚未执行",
     "宿主端口8180不可达，容器内部HTTP和重启已通过",
-    "首批本地Paddle组件受应用程序控制阻止；云链路另捕获ImportError待独立诊断",
+    "系统CodeIntegrity事件确认本地sklearn扩展及独立官方客户端libssl各自WINDOWS_POLICY_BLOCKED",
     "真实官方HTTP为0，未获得MinerU技术对照；局部历史页指标不能覆盖完整集或所有引擎"
   ],
   "routing_exact_label_agreement": {
@@ -69,7 +70,12 @@
     "sourceee7-coverage-after-pg-five.json": "ab91ab04a60e18bbad9ed76e8f7b1edaea61593eb35ed12c32d27523f222bbe8",
     "sourceee7-pg-five-result.json": "1d68d100fb22fde16b584204803ba84ea71e342a52df6baae80378feb0a3aea0",
     "sourceee7-batch-preflight.json": "ac4f17be1d825773d5e64804b1a2ce42ee739ad5e94d24da6eb11109ae70d077",
-    "sourceee7-cloud-execution.json": "f34c190eb7ee805f3dfc5e4987bef291acc21193f33150ff8fe69e76c48da39b"
+    "sourceee7-cloud-execution.json": "f34c190eb7ee805f3dfc5e4987bef291acc21193f33150ff8fe69e76c48da39b",
+    "official-constructor-diagnosis.json": "a9b34f9a5939ad137014e260324cffc013a377a09de91b2167dd2806137e2b6b",
+    "official-import-audit.json": "ad9c8985f1616f27991ed1f72fe169b7ee14e14c55fe439731d5e75fad29820b",
+    "policy-matches.json": "d14a13eeb5230bdbe7d31c5b8d73e6a8e15d35a297a8d6ff4c3825f725da1dab",
+    "policy-file-inventory.json": "52ff12911df0ba60d72058714271d9a156f2a0b54c71941de85cf9a12ea4db62",
+    "diagnostics-contract-red-corrected.json": "65934df699e031ef40aa37555b775c53696989ed2ce8d9873ee595bb0f5bf800"
   },
   "confirmed_bug_ids": [],
   "fix_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
@@ -162,5 +168,26 @@
     "usage_ledger_created": false
   },
   "current_real_quality_status": "BLOCKED",
-  "business_threshold_status": "NOT_DEFINED_BY_USER"
+  "business_threshold_status": "NOT_DEFINED_BY_USER",
+  "local_engine_status": "LOCAL_ENGINE_UNAVAILABLE",
+  "local_engine_reason": "WINDOWS_POLICY_BLOCKED",
+  "local_dependency_error_confirmed": false,
+  "mineru_api_observation": "NOT_TESTED",
+  "mineru_api_status": "BLOCKED",
+  "dual_engine_status": "BLOCKED",
+  "pending_diagnostics_contract": {
+    "qa_test_commit": "5e752376d8c8855a974be5add9f0902c324fc22d",
+    "total": 8,
+    "passed": 0,
+    "failed": 2,
+    "errors": 6,
+    "skipped": 0,
+    "feature_ids": [
+      "OBS021-001"
+    ],
+    "bug_ids": [
+      "Q021-003"
+    ],
+    "note": "新增合成诊断合同与构造兜底；独立于最终源码191方法，不混为历史功能结果"
+  }
 }
