@@ -1,0 +1,7 @@
+**
+!deploy
+!deploy/qa-gateway
+!deploy/qa-gateway/*.py
+!deploy/qa-gateway/package-lock.json
+!tests
+!tests/qa_mineru_egress_proxy.py
