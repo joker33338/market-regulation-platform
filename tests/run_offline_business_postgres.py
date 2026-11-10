@@ -157,8 +157,14 @@ def main():
         result=unittest.TextTestRunner(verbosity=2,resultclass=RecordingResult).run(suite)
     # 原CLI实际读取本轮合成记录；只读连接，不向结果库写入。
     preview_status='BLOCKED_NO_SYNTHETIC_ROW'
-    if successful:
-        chosen=next(iter(successful));config=output/'private-runtime.json'
+    candidates=[]
+    for pid in sorted(successful):
+        raw=select('SELECT original_result FROM document_review.documents WHERE parse_id=%s',(pid,))[0][0]
+        if any(b.get('kind') not in {'table','image','header','footer','number','footnote'} and b.get('raw_text','').strip()
+               for p in raw.get('pages',[]) for b in p.get('layout_blocks',[])):
+            candidates.append(pid)
+    if candidates:
+        chosen=candidates[0];config=output/'private-runtime.json'
         config.write_text(json.dumps({'PARSING_RESULT_PG_DSN':dsn}),encoding='utf-8')
         spec=importlib.util.spec_from_file_location('offline_business_cli',source/'scripts/preview_offline_ingestion.py')
         cli=importlib.util.module_from_spec(spec);spec.loader.exec_module(cli)
