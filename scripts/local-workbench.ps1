@@ -37,7 +37,7 @@ try {
         }
         if ($Action -eq 'start') {
             # 不自动替换不同镜像的运行服务，防止中断正在执行的解析。
-            $runningImage = & docker @composeArgs ps --status running --format '{{.Image}}'
+            $runningImage = & docker @composeArgs ps --status running --format '{{.Image}}' app
             if ($runningImage -and $runningImage -ne $deployment.image) {
                 throw '工作台仍在运行旧镜像；请完成任务后先 stop，再 start。'
             }
