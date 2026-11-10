@@ -109,7 +109,7 @@ def main():
                 name=text[len('CREATE SCHEMA '):]
                 if self.owned or not re.fullmatch('mvp_test_[0-9a-f]{32}',name):raise RuntimeError('拒绝不安全Schema')
                 if select('SELECT 1 FROM pg_namespace WHERE nspname=%s',(name,)):raise RuntimeError('测试Schema已存在')
-                value=super().execute(query,params);self.owned=name;retained.append(name);events.append('CREATE_OWN_SCHEMA');return value
+                value=super().execute(query,params);self.owned=name;retained.append(name);events.append('CREATE_SCHEMA');return value
             if upper.startswith('SET SEARCH_PATH TO '):
                 if text not in ['SET search_path TO '+str(self.owned)+', public','SET search_path TO public']:
                     raise RuntimeError('非法search_path')
@@ -120,6 +120,11 @@ def main():
                 raise RuntimeError('不允许删除Schema或表')
             if upper=='CREATE EXTENSION IF NOT EXISTS VECTOR':
                 events.append('REUSED_EXISTING_VECTOR');return super().execute('SELECT 1')
+            if upper in {'COMMIT','ROLLBACK'} or upper=='SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY':
+                # 事务控制前不能插入探测SELECT：隔离级别必须在事务首个查询之前设置，
+                # 已失败事务也必须允许直接ROLLBACK。BEGIN前及业务语句前仍核验绑定。
+                if not self.owned:raise RuntimeError('事务尚未绑定测试Schema')
+                return super().execute(query,params)
             if upper.startswith(('ALTER ','TRUNCATE ','GRANT ','REVOKE ','CREATE EXTENSION')) or re.search(r'\b(?:public|document_review)\s*\.',query,re.I):
                 raise RuntimeError('禁止改变现有业务对象')
             with self.connection.cursor() as cursor:
@@ -127,7 +132,8 @@ def main():
             if not self.owned or current!=self.owned:raise RuntimeError('SQL不在本次测试Schema')
             if self.ready:self.own_bindings()
             if upper.startswith(('INSERT ','UPDATE ','DELETE ','CREATE TABLE','CREATE INDEX','LOCK TABLE')):
-                events.append(upper.split()[0]+'_OWN_SCHEMA')
+                operation='_'.join(upper.split()[:2]) if upper.startswith('CREATE ') else upper.split()[0]
+                events.append(operation+'_OWN_SCHEMA')
             return super().execute(query,params)
         def initialize(self):
             super().initialize();self.own_bindings();self.ready=True
