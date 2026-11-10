@@ -15,6 +15,27 @@ TABLE_MODELS = (
 )
 
 
+class ParsingSafetyError(IngestionError):
+    """不可通过换引擎绕过的本地资源拒绝，保留安全机器码。"""
+    MESSAGES = {"image_pixel_limit": "图片像素数超过配置上限。",
+                "file_byte_limit": "文件大小超过配置上限。",
+                "pdf_page_limit": "PDF 页数超过配置上限。"}
+
+    def __init__(self, code):
+        self.code = code
+        super().__init__(self.MESSAGES[code])
+
+
+def validate_image_safety(path: Path, config):
+    from PIL import Image
+    try:
+        with Image.open(path) as image:
+            if image.width * image.height > config.max_image_pixels:
+                raise ParsingSafetyError("image_pixel_limit")
+    except Image.DecompressionBombError as exc:
+        raise ParsingSafetyError("image_pixel_limit") from exc
+
+
 @dataclass(frozen=True)
 class ParsingConfig:
     model_root: Path = ROOT / "models" / "ocr"

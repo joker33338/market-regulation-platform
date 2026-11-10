@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import tempfile
 import time
 from dataclasses import replace
@@ -10,7 +11,7 @@ from pathlib import Path
 
 from qa_core.config.settings import ROOT
 from qa_core.utils import IngestionError, file_sha256
-from .config import ParsingConfig
+from .config import ParsingConfig, ParsingSafetyError, validate_image_safety
 from .diagnostics import attached_diagnostic
 from .native import docx_document, pdf_page
 from .normalizer import normalize_text
@@ -55,6 +56,19 @@ def has_hidden_text_layer(page) -> bool:
     total = sum(len(span.get("chars", [])) for span in traces)
     hidden = sum(len(span.get("chars", [])) for span in traces if span.get("type") == 3)
     return total > 0 and hidden / total >= 0.8
+
+
+def has_text_table_hint(page) -> bool:
+    """Aligned text is a routing hint, never a replacement for verified cells."""
+    for table in page.find_tables(strategy="text").tables:
+        rows = [[str(cell or "").strip() for cell in row] for row in table.extract()]
+        rows = [row for row in rows if sum(bool(cell) for cell in row) >= 2]
+        if len(rows) < 3 or table.col_count < 2:
+            continue
+        numeric_rows = sum(any(re.search(r"\d", cell) for cell in row) for row in rows[1:])
+        if numeric_rows >= max(2, math.ceil((len(rows) - 1) / 2)):
+            return True
+    return False
 
 
 def has_grid(image_path: Path) -> bool:
@@ -102,7 +116,7 @@ class DocumentParser:
         if path.suffix.lower() not in SUPPORTED:
             raise IngestionError("不支持该文件格式；支持 PDF、JPG、JPEG、PNG、DOCX、TXT、MD。")
         if path.stat().st_size > self.config.max_file_bytes:
-            raise IngestionError("文件大小超过配置上限。")
+            raise ParsingSafetyError("file_byte_limit")
         return path
 
     def _infer(self, method: str, image: Path, page_number: int, source: dict) -> PageResult:
@@ -165,6 +179,7 @@ class DocumentParser:
             result.error_message = "PDF 没有可提取的正文，请核对原始文件。"
         result.processing_time = time.perf_counter() - started
         result.quality = assess_document(result, self.config.low_confidence)
+        result.requires_review = result.requires_review or result.quality["review_required"]
         if any(page.parsing_status == "needs_review" for page in result.pages) and result.parsing_status == "success":
             result.parsing_status = "needs_review"
         logger.info("Parsed document=%s pages=%d status=%s elapsed=%.3f",
@@ -173,9 +188,10 @@ class DocumentParser:
 
     def _prepare_image(self, path: Path, directory: Path, source: dict):
         from PIL import Image, ImageOps
+        validate_image_safety(path, self.config)
         with Image.open(path) as image:
             if image.width * image.height > self.config.max_image_pixels:
-                raise IngestionError("图片像素数超过配置上限。")
+                raise ParsingSafetyError("image_pixel_limit")
             original = image.size
             prepared = ImageOps.exif_transpose(image).convert("RGB")
             prepared.thumbnail((self.config.max_image_side, self.config.max_image_side))
@@ -193,7 +209,7 @@ class DocumentParser:
             if pdf.needs_pass:
                 raise IngestionError("PDF 已加密，需要先提供可读取的本地副本。")
             if len(pdf) > self.config.max_pages:
-                raise IngestionError("PDF 页数超过配置上限。")
+                raise ParsingSafetyError("pdf_page_limit")
             if page_numbers is not None:
                 if any(number < 1 or number > len(pdf) for number in page_numbers):
                     raise IngestionError("指定页码超出 PDF 页数范围。")
@@ -228,8 +244,14 @@ class DocumentParser:
                             native = pdf_page(page, page_no, page_source)
                             if native.raw_text.strip():
                                 native_candidate = native
+                            text_table_hint = (self.config.enable_tables and not native.tables
+                                               and has_text_table_hint(page))
+                            if text_table_hint:
+                                page_source["text_table_hint"] = True
+                                page_source["complex_layout"] = True
+                                native.source_location.update(page_source)
                             native.source_location["complex_layout"] = bool(native.tables) or page_source["complex_layout"]
-                            if native.tables or not looks_multicolumn(page):
+                            if native.tables or (not looks_multicolumn(page) and not text_table_hint):
                                 native.processing_time = time.perf_counter() - page_started
                                 result.pages.append(native)
                                 continue
@@ -299,7 +321,10 @@ class DocumentParser:
                 from qa_core.utils import stable_hash
                 results.append(DocumentResult(stable_hash(str(Path(path).resolve())), Path(path).name,
                                               Path(path).suffix, {"file_path": str(Path(path).resolve())},
-                                              parsing_status="failed", error_message=error))
+                                              parsing_status="failed", error_message=error,
+                                              requires_review=True,
+                                              quality={"safety_rejection": {"status": "SAFE_REJECT", "code": exc.code}}
+                                              if isinstance(exc, ParsingSafetyError) else {}))
         return results
 
 

@@ -70,7 +70,8 @@ def main():
     if not (models / "bge-m3/config.json").is_file():
         raise ValueError("缺少已准备的 BGE-M3 模型；不会自动下载。")
     base = json.loads(run("docker", "image", "inspect", "market-regulation-app:local"))[0]["Id"]
-    source_paths = ("qa_core", "query.py", "scripts/verify_mineru_cloud.py", "deploy/local/Dockerfile",
+    source_paths = ("qa_core", "query.py", "scripts/verify_mineru_cloud.py", "scripts/preview_offline_ingestion.py",
+                    "scripts/run_test_batch.py", "deploy/local/Dockerfile",
                     "deploy/local/entrypoint.py", "deploy/local/Dockerfile.dockerignore")
     tree = run("git", "ls-tree", "-r", source_commit, *source_paths)
     identity = hashlib.sha256(base.encode() + tree).hexdigest()[:16]

@@ -4,6 +4,8 @@
 !query.py
 !scripts/
 !scripts/verify_mineru_cloud.py
+!scripts/preview_offline_ingestion.py
+!scripts/run_test_batch.py
 !deploy/
 !deploy/local/
 !deploy/local/entrypoint.py

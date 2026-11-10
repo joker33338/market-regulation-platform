@@ -21,6 +21,7 @@ from qa_core.document_parsing.test_batch_authorization import TrustedTestBatch, 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--manifest', type=Path, required=True)
+    p.add_argument('--usage-path', type=Path, help='复用已登记的原始调用账本；不得用新账本重置预算')
     p.add_argument('--owner', required=True)
     p.add_argument('--batch-id', required=True)
     p.add_argument('--input', type=Path, nargs='+', required=True)
@@ -52,7 +53,8 @@ async def run(args):
         args.manifest.parent.mkdir(parents=True, exist_ok=True)
         atomic_json(args.manifest, value)
         return dict(status='BLOCKED', reason='候选资格未知，须可信操作方确认；未执行HTTP')
-    authority = TrustedTestBatch(args.manifest, owner=args.owner, batch_id=args.batch_id)
+    authority = TrustedTestBatch(args.manifest, owner=args.owner, batch_id=args.batch_id,
+                                 usage_path=args.usage_path)
     preflight = []
     for source, sha in sources:
         task = dict(owner=args.owner, parse_options=dict(allow_cloud_fallback=True, sensitive=False))

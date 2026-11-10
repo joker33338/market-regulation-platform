@@ -13,6 +13,7 @@ import tempfile
 import time
 
 from qa_core.utils import file_sha256
+from .config import ParsingConfig, ParsingSafetyError, validate_image_safety
 from .document_router import DocumentParser
 from .diagnostics import attached_diagnostic, safe_diagnostic
 from .mineru_client import MinerUError
@@ -145,6 +146,9 @@ class DualEngineRouter:
                     failed = DocumentResult(file['sha256'], file['file_name'], Path(file['file_name']).suffix,
                                             {'file_path': file['source_path'], 'file_sha256': file['sha256']},
                                             parsing_status='failed', error_message=type(exc).__name__, requires_review=True)
+                    if isinstance(exc, ParsingSafetyError):
+                        failed.error_message = str(exc)
+                        failed.quality['safety_rejection'] = {'status': 'SAFE_REJECT', 'code': exc.code}
                     diagnostic = attached_diagnostic(exc, component='paddle', loading=loading)
                     if diagnostic:
                         failed.quality['engine_availability'] = diagnostic
@@ -180,7 +184,13 @@ class DualEngineRouter:
         for engine in self.engines(local):
             route['parser_versions'][engine] = None
         selected = local
-        if candidate:
+        if local.quality.get('safety_rejection', {}).get('status') == 'SAFE_REJECT':
+            route['route_reason'] = 'safety_rejected'
+            route['failure_reason'] = local.quality['safety_rejection']['code']
+            route['safety_rejection'] = local.quality['safety_rejection']
+            route['cloud_transfer_authorized'] = False
+            route['requires_review'] = True
+        elif candidate:
             route['route_reason'] = 'local_quality_requires_review'
             route['requires_review'] = True
             if not allowed:
@@ -208,6 +218,10 @@ class DualEngineRouter:
                 except Exception as exc:
                     route['failure_reason'] = exc.code if isinstance(exc, MinerUError) else type(exc).__name__
                     route['route_reason'] = 'cloud_failed_local_preserved'
+                    if isinstance(exc, ParsingSafetyError):
+                        route.update(route_reason='safety_rejected', failure_reason=exc.code,
+                                     cloud_transfer_authorized=False,
+                                     safety_rejection={'status': 'SAFE_REJECT', 'code': exc.code})
                     diagnostic = safe_diagnostic(getattr(exc, 'diagnostic', None))
                     if diagnostic and state['calls'] == 0:
                         route['remote_availability'] = {**diagnostic, 'status': 'BLOCKED', 'api_status': 'NOT_TESTED'}
@@ -219,6 +233,10 @@ class DualEngineRouter:
         result.quality['routing_trace'] = route
         result.requires_review = route['requires_review'] or bool(result.quality.get('review_required'))
         result.quality['review_required'] = result.requires_review
+        if route.get('safety_rejection'):
+            result.quality['safety_rejection'] = route['safety_rejection']
+            result.parsing_status = 'failed'
+            result.error_message = ParsingSafetyError.MESSAGES[route['safety_rejection']['code']]
         result.source_location.update(input_sha256=file['sha256'], source_file_id=file['source_file_id'],
                                       selected_engine=route['selected_engine'], remote_task_id=route['remote_task_id'])
         if route.get('failure_reason') and result.parsing_status == 'success':
@@ -228,6 +246,12 @@ class DualEngineRouter:
     async def _remote(self, task, file, save):
         from .mineru_service import MinerUService
         state = file['routing_state']
+        # 恢复旧候选时也从当前原文件复验，不能依赖旧报告是否带安全码。
+        local_limits = ParsingConfig.from_env()
+        if Path(file['source_path']).stat().st_size > local_limits.max_file_bytes:
+            raise ParsingSafetyError('file_byte_limit')
+        if Path(file['source_path']).suffix.lower() in {'.png', '.jpg', '.jpeg'}:
+            validate_image_safety(Path(file['source_path']), local_limits)
         allowed, _ = self.authorization(task, file)
         if not allowed:
             raise MinerUError('file_authorization_required', 403)

@@ -318,6 +318,9 @@ class MinerUService:
                     file.update(selected_engine=trace['selected_engine'], requires_review=result.requires_review,
                                 fallback_reason=trace.get('failure_reason') or trace['fallback_reason'])
                 if result.parsing_status in {"failed", "partial"}:
+                    rejection = result.quality.get('safety_rejection', {})
+                    if rejection.get('status') == 'SAFE_REJECT':
+                        raise MinerUError(rejection['code'], 413)
                     raise MinerUError("local_parse_failed")
                 if self.result_sink:
                     file["database_parse_id"] = await asyncio.to_thread(self.result_sink.save, task, file, result)
