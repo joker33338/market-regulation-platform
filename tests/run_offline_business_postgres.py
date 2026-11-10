@@ -54,7 +54,7 @@ def main():
     def select(query,params=()):
         with connection.cursor() as cursor:
             cursor.execute(query,params);return cursor.fetchall()
-    identity=select('SELECT current_database(),current_user,inet_server_addr()::text,inet_server_port()')[0]
+    identity=select('SELECT current_database(),current_user,host(inet_server_addr()),inet_server_port()')[0]
     if identity!=(scope['database'],scope['user'],scope['host'],int(scope['port'])):
         raise RuntimeError('实际数据库身份错误')
     extension=select("SELECT n.nspname FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace WHERE e.extname='vector'")
@@ -142,7 +142,7 @@ def main():
         self.dsn=dsn;self.connection=psycopg2.connect(dsn,connect_timeout=5)
         self.addCleanup(self.connection.close)
         with self.connection.cursor() as cursor:
-            cursor.execute('SELECT current_database(),current_user,inet_server_addr()::text,inet_server_port()')
+            cursor.execute('SELECT current_database(),current_user,host(inet_server_addr()),inet_server_port()')
             self.assertEqual(cursor.fetchone(),identity)
         self.connection.rollback()
     suite=unittest.TestSuite()
