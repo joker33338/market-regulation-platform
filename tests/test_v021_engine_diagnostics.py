@@ -9,6 +9,7 @@ import pickle
 import tempfile
 import time
 import unittest
+from PIL import Image
 from unittest.mock import MagicMock, patch
 
 from qa_core.document_parsing.document_router import DocumentParser
@@ -90,7 +91,7 @@ class ConstructorFailureContract(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root/'synthetic.png'
-            source.write_bytes(b'synthetic non-confidential fixture')
+            Image.new('RGB', (10, 10), 'white').save(source)
             sha = hashlib.sha256(source.read_bytes()).hexdigest()
             local_error = IngestionError('合成本地引擎无法初始化')
             local_error.diagnostic = dict(status='LOCAL_ENGINE_UNAVAILABLE', reason='WINDOWS_POLICY_BLOCKED',

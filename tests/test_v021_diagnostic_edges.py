@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from PIL import Image
 from unittest.mock import MagicMock, patch
 
 from qa_core.document_parsing.diagnostics import attached_diagnostic, engine_unavailable, safe_diagnostic
@@ -80,7 +81,7 @@ class LocalContextFailureEdges(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'synthetic.png'
-            source.write_bytes(b'synthetic-only')
+            Image.new('RGB', (10, 10), 'white').save(source)
             sha = hashlib.sha256(source.read_bytes()).hexdigest()
             parser = MagicMock()
             parser.__enter__.side_effect = ImportError('PRIVATE_TOKEN synthetic/private.dll')

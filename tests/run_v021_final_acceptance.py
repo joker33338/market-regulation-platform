@@ -19,12 +19,28 @@ def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], text=True, encoding='utf-8').strip()
 
 
+def valid_png_fixture_override(name, original, updated):
+    """仅允许两处无效PNG夹具改为真PNG，逐字符约束其余代码及断言不变。"""
+    payloads = {
+        'test_v021_diagnostic_edges.py': "source.write_bytes(b'synthetic-only')",
+        'test_v021_engine_diagnostics.py': "source.write_bytes(b'synthetic non-confidential fixture')",
+    }
+    old = payloads.get(name)
+    if not old or original.count(old) != 1 or original.count('import unittest\n') != 1:
+        return False
+    expected = original.replace('import unittest\n', 'import unittest\nfrom PIL import Image\n', 1)
+    expected = expected.replace(old, "Image.new('RGB', (10, 10), 'white').save(source)", 1)
+    return updated == expected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--source-sha', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--api-packages', type=Path)
+    parser.add_argument('--qa-fixture-overrides', nargs='*', default=[],
+                        choices=['test_v021_diagnostic_edges.py', 'test_v021_engine_diagnostics.py'])
     args = parser.parse_args()
     source = args.source.resolve()
     qa = Path(__file__).resolve().parents[1]
@@ -64,10 +80,20 @@ def main():
         bindings[name] = str(path)
     files = {p.name: p for p in (source / 'tests').glob('test_*.py')}
     identical_tests = {}
+    fixture_overrides = {}
     for file in (qa / 'tests').glob('test_*.py'):
         if file.name in files:
-            if files[file.name].read_text(encoding='utf-8') != file.read_text(encoding='utf-8'):
-                raise RuntimeError('同名测试存在不同断言，需单独审阅：' + file.name)
+            original = files[file.name].read_text(encoding='utf-8')
+            updated = file.read_text(encoding='utf-8')
+            if original != updated:
+                if file.name not in args.qa_fixture_overrides or not valid_png_fixture_override(file.name, original, updated):
+                    raise RuntimeError('同名测试存在不同断言，需单独审阅：' + file.name)
+                fixture_overrides[file.name] = dict(
+                    reason='无效PNG占位字节改为10x10真PNG；其余代码及断言逐字符保持',
+                    source_raw_sha256=hashlib.sha256(files[file.name].read_bytes()).hexdigest(),
+                    qa_raw_sha256=hashlib.sha256(file.read_bytes()).hexdigest())
+                files[file.name] = file
+                continue
             identical_tests[file.name] = dict(
                 normalization='CRLF/CR -> LF only',
                 normalized_sha256=hashlib.sha256(file.read_text(encoding='utf-8').encode()).hexdigest(),
@@ -79,7 +105,13 @@ def main():
     test_paths = {}
     for name, file in sorted(files.items()):
         module_name = 'tests.' + file.stem
-        module = importlib.import_module(module_name)
+        if name in fixture_overrides:
+            spec = importlib.util.spec_from_file_location(module_name, file)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+        else:
+            module = importlib.import_module(module_name)
         test_paths[module_name] = str(Path(module.__file__).resolve())
         suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(module))
     result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
@@ -98,6 +130,7 @@ def main():
                     source_path=str(source), qa_path=str(qa), python=sys.version,
                     executable=sys.executable, initial_bindings=bindings, imported_business_modules=origins,
                     test_paths=test_paths, qa_identical_test_hashes=identical_tests,
+                    fixture_overrides=fixture_overrides,
                     total=result.testsRun, outcomes=result.outcomes,
                     failures=[t.id() for t, _ in result.failures], errors=[t.id() for t, _ in result.errors],
                     skips=[dict(test=t.id(), reason=r) for t, r in result.skipped],
