@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_VERSION = "legal-structure-mvp-v1"
 CLEANER_VERSION = "conservative-v1"
+CHUNKER_VERSION = "legal-parent-child-v2"
 
 
 @dataclass(frozen=True)

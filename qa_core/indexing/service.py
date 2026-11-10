@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import asdict
 
-from qa_core.config.settings import CLEANER_VERSION, SCHEMA_VERSION, Settings
+from qa_core.config.settings import CHUNKER_VERSION, CLEANER_VERSION, SCHEMA_VERSION, Settings
 from qa_core.indexing.chunking import split_articles
 from qa_core.indexing.legal_cleaner import clean_lines
 from qa_core.indexing.legal_structure import parse_articles
@@ -22,14 +22,15 @@ def prepare_document(document: LegalDocument, *, model_signature: str, max_chars
     lines, cleaner = clean_lines(document.lines)
     articles = document.articles if document.articles is not None else parse_articles(lines)
     doc_id = stable_hash(namespace, document.law_id or document.law_name)
-    processing = stable_hash(SCHEMA_VERSION, CLEANER_VERSION, model_signature, max_chars)
+    processing = stable_hash(SCHEMA_VERSION, CLEANER_VERSION, CHUNKER_VERSION, model_signature, max_chars)
     revision = stable_hash(doc_id, document.law_name, document.source_hash, processing)
     chunks = split_articles(articles, law_name=document.law_name, doc_version_id=revision,
                             model_signature=model_signature, max_chars=max_chars)
     quality = validate_chunks(chunks, max_chars)
     return doc_id, revision, chunks, {
         **document.metadata, "cleaning": cleaner, "quality": quality, "source_path": document.source_path,
-        "law_id": document.law_id, "schema_version": SCHEMA_VERSION, "processing_signature": processing,
+        "law_id": document.law_id, "schema_version": SCHEMA_VERSION, "chunker_version": CHUNKER_VERSION,
+        "processing_signature": processing,
     }
 
 
@@ -55,7 +56,7 @@ def ingest_documents(documents: Iterable[LegalDocument], *, database: Database, 
         raise IngestionError("MVP 每个数据库只支持一个 market_regulation 发布域。")
     if database.postgres and (embeddings.dimension != 1024 or isinstance(embeddings, DemoEmbeddings)):
         raise IngestionError("PostgreSQL 入库要求真实 1024 维模型；demo 向量仅允许用于 SQLite 演示。")
-    signature = stable_hash(SCHEMA_VERSION, CLEANER_VERSION, embeddings.signature, settings.max_chunk_chars)
+    signature = stable_hash(SCHEMA_VERSION, CLEANER_VERSION, CHUNKER_VERSION, embeddings.signature, settings.max_chunk_chars)
     database.create_version(version, signature, embeddings.signature, embeddings.dimension, full_snapshot=full_snapshot)
     stats = {"documents_seen": 0, "documents_reused": 0, "chunks_embedded": 0, "vectors_reused": 0,
              "duplicate_inputs": 0, "full_snapshot": full_snapshot}

@@ -8,13 +8,8 @@ from qa_core.utils import IngestionError, stable_hash
 from .schemas import DocumentResult, json_safe
 
 
-def to_legal_document(result: DocumentResult, *, reviewer: str, law_name: str, law_id: str | None = None) -> LegalDocument:
-    if result.parsing_status not in {"success", "needs_review"} or not result.pages:
-        raise IngestionError("失败或部分失败的解析结果不能交给正式入库。")
-    if not reviewer.strip() or not law_name.strip():
-        raise IngestionError("需要明确复核人及法规名称；OCR 质量检查不能替代审核。")
-    if any(page.tables or any(block.kind == "table" for block in page.layout_blocks) for page in result.pages):
-        raise IngestionError("当前法律切分器不消费表格；请保留 tables，另用表格入库适配器，禁止摊平成法条。")
+def source_lines(result: DocumentResult):
+    """复用解析块与原页号；预览不借此生成任何审核记录。"""
     lines = []
     evidence = []
     for page in result.pages:
@@ -27,6 +22,17 @@ def to_legal_document(result: DocumentResult, *, reviewer: str, law_name: str, l
                 lines.append(SourceLine(text, page.page_number, line_number, index == 0, block.bbox))
             evidence.append({"page": page.page_number, "block": block.block_id,
                              "location": block.source_location, "raw_text": block.raw_text})
+    return lines, evidence
+
+
+def to_legal_document(result: DocumentResult, *, reviewer: str, law_name: str, law_id: str | None = None) -> LegalDocument:
+    if result.parsing_status not in {"success", "needs_review"} or not result.pages:
+        raise IngestionError("失败或部分失败的解析结果不能交给正式入库。")
+    if not reviewer.strip() or not law_name.strip():
+        raise IngestionError("需要明确复核人及法规名称；OCR 质量检查不能替代审核。")
+    if any(page.tables or any(block.kind == "table" for block in page.layout_blocks) for page in result.pages):
+        raise IngestionError("当前法律切分器不消费表格；请保留 tables，另用表格入库适配器，禁止摊平成法条。")
+    lines, evidence = source_lines(result)
     fingerprint = stable_hash(result.document_id, result.schema_version, evidence)
     return LegalDocument(law_name.strip(), fingerprint, result.source_location.get("file_path", result.file_name),
                          lines, law_id, metadata={
