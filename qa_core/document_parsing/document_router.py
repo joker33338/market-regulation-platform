@@ -155,6 +155,14 @@ class DocumentParser:
             result.parsing_status = "failed"
             result.error_message = "文档没有可解析页面。"
         result.requires_review = any(page.parsing_method in {"ocr", "structure"} or page.warnings for page in result.pages)
+        if (result.file_type == ".pdf" and result.parsing_status == "success"
+                and not any(page.raw_text.strip() or any(
+                    cell.get("text", "").strip() for table in page.tables for cell in table.cells
+                ) for page in result.pages)):
+            # 合法空白页仍可留在混合文档中；整份无正文不能报解析成功。
+            result.parsing_status = "needs_review"
+            result.requires_review = True
+            result.error_message = "PDF 没有可提取的正文，请核对原始文件。"
         result.processing_time = time.perf_counter() - started
         result.quality = assess_document(result, self.config.low_confidence)
         if any(page.parsing_status == "needs_review" for page in result.pages) and result.parsing_status == "success":
@@ -180,6 +188,8 @@ class DocumentParser:
                    page_numbers: list[int] | None = None):
         import fitz
         with fitz.open(path) as pdf:
+            if not pdf.is_pdf:
+                raise IngestionError("文件内容不是 PDF，与扩展名不符。")
             if pdf.needs_pass:
                 raise IngestionError("PDF 已加密，需要先提供可读取的本地副本。")
             if len(pdf) > self.config.max_pages:
