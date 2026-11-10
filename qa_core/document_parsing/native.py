@@ -58,6 +58,66 @@ def pdf_page(page, page_number: int, source: dict) -> PageResult:
                       raw_result={"text_blocks": raw_blocks, "tables": [table.rows for table in tables]})
 
 
+def _docx_table_html(element) -> tuple[str, list[str]]:
+    """按 OOXML 网格追踪相邻行的合并锚点，再交给现有 HTML 标准化。"""
+    rows, anchors, warnings = [], [], []
+    active = {}
+    for row_number, row in enumerate(element.findall(W + "tr")):
+        before = row.find(W + "trPr/" + W + "gridBefore")
+        column = int(before.get(W + "val", "0")) if before is not None else 0
+        if not 0 <= column <= 1000:
+            raise IngestionError("DOCX 表格省略列数超过资源上限。")
+        current, next_active = [], {}
+        for cell in row.findall(W + "tc"):
+            text = "\n".join("".join(node.text or "" for node in paragraph.iter(W + "t"))
+                             for paragraph in cell.findall(W + "p"))
+            span = cell.find(W + "tcPr/" + W + "gridSpan")
+            merge = cell.find(W + "tcPr/" + W + "vMerge")
+            colspan = max(1, int(span.get(W + "val", "1"))) if span is not None else 1
+            if colspan > 1000:
+                raise IngestionError("DOCX 表格列跨度超过资源上限。")
+            key = (column, colspan)
+            state = merge.get(W + "val", "continue") if merge is not None else None
+            if state == "continue" and key in active:
+                anchor = active[key]
+                anchor["rowspan"] += 1
+                if text:
+                    # 非空延续格也不能丢字；原 XML 另行完整保留供核对。
+                    anchor["text"] += ("\n" if anchor["text"] else "") + text
+                    warnings.append("DOCX 纵向合并延续格含正文，已保留至锚点，需人工检查。")
+                next_active[key] = anchor
+            else:
+                anchor = {"row": row_number, "column": column, "rowspan": 1,
+                          "colspan": colspan, "text": text}
+                current.append(anchor)
+                anchors.append(anchor)
+                if state == "restart":
+                    next_active[key] = anchor
+                elif state is not None:
+                    warnings.append("DOCX 纵向合并标记没有匹配的上行锚点，已保留独立格及原 XML。")
+            column += colspan
+        rows.append(current)
+        active = next_active
+
+    markup = []
+    for row_number, cells in enumerate(rows):
+        occupied = {col for anchor in anchors
+                    if anchor["row"] < row_number < anchor["row"] + anchor["rowspan"]
+                    for col in range(anchor["column"], anchor["column"] + anchor["colspan"])}
+        column, values = 0, []
+        for cell in cells:
+            # gridBefore 省略的网格位置须保留；跨行占位由 HTML rowspan 表达。
+            while column < cell["column"]:
+                if column not in occupied:
+                    values.append("<td></td>")
+                column += 1
+            attrs = "".join(f' {key}="{cell[key]}"' for key in ("rowspan", "colspan") if cell[key] > 1)
+            values.append("<td" + attrs + ">" + html.escape(cell["text"]).replace("\n", "<br>") + "</td>")
+            column = cell["column"] + cell["colspan"]
+        markup.append("<tr>" + "".join(values) + "</tr>")
+    return "<table>" + "".join(markup) + "</table>", list(dict.fromkeys(warnings))
+
+
 def docx_document(path: Path, source: dict, max_bytes: int) -> PageResult:
     with ZipFile(path) as archive:
         if sum(info.file_size for info in archive.infolist()) > max_bytes:
@@ -82,24 +142,10 @@ def docx_document(path: Path, source: dict, max_bytes: int) -> PageResult:
             texts.append(raw)
             markdown.append(raw)
         elif element.tag == W + "tbl":
-            rows = []
-            merged = False
-            for row in element.findall(W + "tr"):
-                cells = []
-                for cell in row.findall(W + "tc"):
-                    text = "\n".join("".join(node.text or "" for node in paragraph.iter(W + "t"))
-                                     for paragraph in cell.findall(W + "p"))
-                    span = cell.find(".//" + W + "gridSpan")
-                    merge = cell.find(".//" + W + "vMerge")
-                    colspan = int(span.get(W + "val", "1")) if span is not None else 1
-                    merged = merged or merge is not None
-                    cells.append("<td" + (f' colspan="{colspan}"' if colspan > 1 else "") + ">" +
-                                 html.escape(text) + "</td>")
-                rows.append("<tr>" + "".join(cells) + "</tr>")
-            table = table_from_html("<table>" + "".join(rows) + "</table>", str(len(tables)),
+            markup, warnings = _docx_table_html(element)
+            table = table_from_html(markup, str(len(tables)),
                                     source={**source, "body_index": index})
-            if merged:
-                table.warnings.append("DOCX 包含纵向合并标记；原始 XML 保留，行合并需人工检查。")
+            table.warnings.extend(warnings)
             tables.append(table)
             markdown.append(table.markdown)
     raw = "\n".join(texts)
