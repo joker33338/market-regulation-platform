@@ -103,3 +103,35 @@ python -B -m unittest tests.test_v021_final_acceptance_edges tests.test_v021_qfa
 不修改现有持久入口；运行服务仍可能是历史快照，不能以当前页面可用宣称本提交已部署。
 质量阈值、三栏/auto 表格质量观测、过期云授权和既有预算、整机重启、数据库生命周期及 S00019 意图冲突，均维持最新 QA 的未决状态。
 未 Push、合并 main、部署、改动原/QA 工作区、安装依赖或修改语料、模型、真值与云账本。
+
+## 2026-11-10 用户追加：服务验证与本地 Docker 整理
+
+此项在上述四项 Bug 完成后由用户另行授权：使用其 Docker PostgreSQL，检查已提供的 MinerU API，补齐持久入口，
+清理旧容器/镜像，统一一个项目；用户随后明确要求保留 MySQL、Redis。这里是本地部署，不是生产发布。
+
+- 部署代码提交：`a8f7031bfd3bdc6cc7df5f9adb190a75eee8a968`。
+- 项目/8180 入口整合：`e29ac56b1f55cca8af64f1638e0d6a0d59ffdded`。
+- 实际迁移中发现并修复启动脚本将数据库镜像误判为旧 app：`8e80f73`，已用实际统一项目启动验证。
+- 修改/新增 `compose.local.yaml`、`deploy/local/`、`scripts/local-workbench.ps1`、`tests/test_local_workbench_config.py`；业务解析源码未再变化。
+- 最终仅 `market-regulation` 一个项目，app/db/mysql/redis 四容器健康；入口 `http://127.0.0.1:8180`。
+
+| 实际执行 | 结果 |
+| --- | --- |
+| 用户数据库只读连接、解析表与 pgvector | 通过；应用配置目标与用户提供地址一致 |
+| 官方客户端 GET 一个历史已完成批次 | HTTP 200、code=0、关联匹配、1 done；1 次 GET，0 新任务、0 上传 |
+| 新增部署后的完整方法并集，冻结于 a8f7031 完整 SHA | 245 个唯一方法，239 PASS、0 FAIL/ERROR、6 PostgreSQL SKIP |
+| 部署配置安全测试 | 2/2 PASS，已含在245项内；合并项目后再定向通过，不另加总 |
+| 实际本机 HTTP：认证、合成 PDF 上传/任务/结果、PostgreSQL 与幂等 | 通过；仅新增1份合成记录（2页），原8份仍保留 |
+| 容器 restart 与跨项目迁移后的任务/结果和数据库记录 | 通过；单条合成记录未重复，当前数据库9份 |
+| 新镜像非root实际 PaddleOCR | 合成图片识别24字，success，requires_review=true，离线拦截4次；无新数据库写入 |
+| PowerShell 语法、现有数据容器保留 | 通过 |
+
+完整回归记录 `full-with-deploy/suite-result.json` 的受测 SHA 是 a8f7031 完整 SHA，开始/结束干净。
+其后仅改 Compose 项目/端口、prepare 默认端口和 app 镜像保护检查；已用真实启动与持久任务读取验证，未重复整套耗时模型测试。
+最初合成 HTTP 辅助脚本误用 upload_id 字段，在创建任务前失败；已按实际 file_id/file_ids 契约修正，未修改接口或测试断言。
+当前容器复用原依赖，镜像 API 依赖版本与宿主测试环境不同，已明确记录在部署说明，不宣称镜像全套独立 QA 已通过。
+
+本次按新授权进行了一次本地合成结果提交，不再适用上一批次“未写数据库”的范围表述；仍未执行 DDL、DELETE 或生产迁移。
+清理13个旧实例，保留全部卷（含3个历史QA库卷）、证据、模型与批次账本；清理5份旧QA/候选镜像及2个重复标签，保留重建所需镜像。
+新入口以同一 state 目录保持数据，旧8181入口撤销。正式中文部署说明为 `deploy/local/README.md`。
+真实云解析/恢复、质量阈值、整机重启与完整 PostgreSQL 生命周期的 QA 未决项不因本次连接成功而变为 PASS。
