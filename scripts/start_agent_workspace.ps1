@@ -3,8 +3,8 @@ $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $workspaceRoot
 $branch = (& git branch --show-current).Trim()
-$expected = if ($Role -eq 'QA') { 'qa/round1' } else { 'fix/round1' }
-if ($branch -ne $expected) { throw "Expected branch $expected; found $branch" }
+$expected = if ($Role -eq 'QA') { @('qa/round1', 'codex/qa-v0.2.1') } else { @('fix/round1', 'codex/fix-v0.2.1') }
+if ($branch -notin $expected) { throw "Expected branch $($expected -join ' or '); found $branch" }
 $common = (& git rev-parse --path-format=absolute --git-common-dir).Trim()
 $configFile = Join-Path $common 'agent-local.json'
 if (-not (Test-Path -LiteralPath $configFile)) { throw 'Missing local agent configuration.' }
