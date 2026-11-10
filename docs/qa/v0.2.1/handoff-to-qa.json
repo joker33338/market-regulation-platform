@@ -1,43 +1,93 @@
 {
-  "handoff_id": "v021-fix-6216ae5-Q021-001-Q021-002",
+  "handoff_id": "v021-fix-73c9f10-QFA-001-004",
   "version": "v0.2.1",
   "source_agent": "Fix",
   "target_agent": "QA",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "6216ae5f40727871b369dfc8c54868ac748c4648",
-  "baseline_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
-  "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
-  "qa_handoff_commit": "bc0219e9e723f91f38c3f04c3b513a6ee45b6437",
+  "source_commit": "73c9f10a04b2d375b2aec542b29e9ef9a1112a4e",
+  "baseline_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+  "qa_test_commit": "78b7e05e747656414badd8350c83d48b672ecc16",
+  "qa_handoff_commit": "0881807ee0524503c54b0f08fcca96c922f9828e",
+  "imported_test_commit": "509f823ae8217855e3a4ea6ed1b98cfdd62f0fac",
   "status": "ready",
   "handoff_type": "regression",
   "qa_status": "PENDING",
   "gate_status": "BLOCKED",
   "bug_ids": [
-    "Q021-001",
-    "Q021-002"
+    "QFA-001",
+    "QFA-002",
+    "QFA-003",
+    "QFA-004"
   ],
+  "fix_commits": {
+    "QFA-001": "708002475d942b21288e84971ece094cc00b1caa",
+    "QFA-002": "5df48af877265213d58566af28e5b2bb47b08cf0",
+    "QFA-003": "708002475d942b21288e84971ece094cc00b1caa",
+    "QFA-004": "73c9f10a04b2d375b2aec542b29e9ef9a1112a4e"
+  },
   "report_paths": [
     "docs/qa/v0.2.1/fix-plan.md",
     "docs/qa/v0.2.1/fix-report.md",
     "docs/qa/v0.2.1/handoff-to-qa.md"
   ],
   "report_sha256": {
-    "docs/qa/v0.2.1/fix-plan.md": "848857fa5c15d0541ada770ddd2dcb992290296ccacf58c1bc14b8c795c50f03",
-    "docs/qa/v0.2.1/fix-report.md": "990e985e548be5150f4dbde21cfa1ca556a8e7a7477608b44cda09486dbbf7fe",
-    "docs/qa/v0.2.1/handoff-to-qa.md": "d2fed2868647ff525380abc24b319fa4033897bcb72aef5edd16fb9fade84ad5"
+    "docs/qa/v0.2.1/fix-plan.md": "74e83dcc64f2dcce4cf1d908cfe70f30b95f3b759db0fab1e0cf07532a8b86d8",
+    "docs/qa/v0.2.1/fix-report.md": "24be44fdc6a8d1dc5d4609b22044bd9c335cae89c090e039839a660e6a1bfff9",
+    "docs/qa/v0.2.1/handoff-to-qa.md": "063e4954492b673ad52cbbb1122acde25e7fcb332c4d221e4de98763e4e2d27e"
   },
   "test_commands": [
-    "python -B -m unittest tests.test_v021_native_preservation tests.test_v021_table_cli tests.test_v021_fix_edges -v"
+    "python -B -m unittest tests.test_v021_final_acceptance_edges tests.test_v021_qfa_pdf tests.test_v021_qfa_docx tests.test_v021_agent_launcher tests.test_document_parsing tests.test_v021_native_preservation tests.test_v021_fix_edges -v",
+    "python -B tests/run_v021_final_acceptance.py --source $FixRoot --source-sha $FinalFixSha --api-packages $ApiPackages --output local/v021-qfa-regression"
   ],
   "local_validation": {
-    "unique_focused_methods": 71,
-    "passed": 71,
-    "failed": 0,
-    "skipped": 0
+    "focused": {
+      "total": 49,
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    "complete_unique_methods": {
+      "total": 243,
+      "passed": 237,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 6
+    },
+    "source_clean": true,
+    "source_bound": true,
+    "raw_evidence_directory": "local/v021-qfa-fix",
+    "samples": {
+      "S00016": {
+        "table_count": 2,
+        "table0_cells": 257,
+        "vertical_merges": 32,
+        "exact_spans_and_text": true
+      },
+      "S00022": {
+        "status": "REJECTED"
+      },
+      "S00025": {
+        "status": "needs_review"
+      },
+      "source_hashes_unchanged": true
+    },
+    "live_postgres_run": false,
+    "real_cloud_requests": 0,
+    "live_model_inference_run": false
   },
+  "transport_commit_policy": "最终回复提供报告传输完整SHA；若工作区HEAD包含该提交，先确认相对source_commit仅文档变化，再以该HEAD运行QA绑定入口。",
   "remaining_scope": [
-    "九处标签差异未修改",
-    "真实质量真值不足不伪装PASS",
-    "由QA独立验收，不自动合并main"
-  ]
+    "R-01业务质量阈值待确认；MEASURED不等于PASS",
+    "R-02扩展真值已交付评估，不要求重交",
+    "R-03至R-05真实官方任务恢复、质量及auto回退仍需有效授权并保留既有账本",
+    "R-06整机重启待用户确认",
+    "R-07数据库生命周期DDL/清理范围未授权；本轮6项PG跳过不伪装通过",
+    "R-08 S00019意图冲突待裁定，不放宽资源限额",
+    "由QA独立验收，现有持久入口未更新，不自动Push、合并main或部署"
+  ],
+  "auto_wakeup_performed": false,
+  "release_ready": false,
+  "push_allowed": false,
+  "merge_main_allowed": false,
+  "production_deployment_allowed": false
 }
