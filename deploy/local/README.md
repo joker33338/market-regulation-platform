@@ -3,6 +3,9 @@
 本机入口：`http://127.0.0.1:8180`。访问码在忽略目录 `local/workbench-access-code.txt`，不要提交或放进聊天。
 当前是等待 QA 放行的本地候选部署，不表示生产验收通过。
 
+2026-11-10 最终收尾另行构建了独立冻结候选，尚未替换下述活动实例。候选镜像、源码完整 SHA、
+切换／回滚和新增回归要求见 [最终收尾 Fix 交接](../../docs/qa/v0.2.1/release-closure-fix-handoff.md)。
+
 ## 一个项目、四个容器
 
 Docker Desktop 统一显示 `market-regulation`：
