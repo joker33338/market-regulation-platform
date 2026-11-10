@@ -184,11 +184,14 @@ $HandoffSha = (& git -C $FixRoot rev-parse HEAD).Trim()
 
 ## 补充：六项 PostgreSQL 跳过用例的处理方案
 
-本补充来自用户在源码冻结后的独立询问。Fix 仅阅读测试代码并只读核对数据库清单，未执行集成测试、建库或 DDL。
+**最新授权：用户明确指示“直接用业务库测试就可以”。QA 可使用现有 `market_regulation` 业务库补跑下列六项用例，无须再申请独立数据库。**
+这项授权替代此前“新建 qa_round01 测试库”的建议，不扩大为真实资料清洗、生产发布或删除已有业务数据。
+执行者仍为 QA；Fix 仅更新说明，未执行集成测试、建库或 DDL。
 观察时现有 PostgreSQL 只有 `market_regulation`、`postgres` 两个非模板可连接数据库，业务连接的 QA 隔离标记为空。
-应用连接可用不能代替测试隔离条件；不得将业务连接直接填入全部测试变量。
+QA 从已提供的私密本地配置读取连接，显式配置本次受控补跑；不把密码写入命令、Git 或报告。
+业务库没有 QA 隔离标记属于正常状态，不应为通过旧夹具而伪造标记。
 
-| 用例 | 跳过/执行条件 | 实际副作用 |
+| 用例 | 现有代码原来的跳过/执行条件 | 实际副作用 |
 | --- | --- | --- |
 | ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved | `PARSING_TEST_PG_DSN`，既有 document_review 表 | 提交合成结果并重复写入验证幂等，记录保留 |
 | ParsingPostgresTests.test_child_failure_rolls_back_parent_insert | 同上 | 故意触发子表约束错误，验证父记录事务回滚 |
@@ -200,17 +203,29 @@ $HandoffSha = (& git -C $FixRoot rev-parse HEAD).Trim()
 另一个确定原因：`tests/run_v021_final_acceptance.py` 会主动清空测试 DSN。此默认保护应保留，QA 使用单独的受控数据库补跑入口，
 仍验证 Fix 完整 SHA、源码来源和工作区干净状态；不要删除默认保护或把连接异常改成通过。
 
-建议由 QA 在**现有 PostgreSQL 容器内**准备独立 `qa_round01` 数据库和受限测试账号，不新增常驻容器，不使用业务账号执行测试。
-准备范围为：独立测试库/账号、仅该库内的 pgvector 和既有测试表、明确的 QA 隔离标记及测试权限。
-这属于待批准的初始化方案，不是 Fix 已执行的修改。
+### 业务库补跑的明确范围
 
-QA 需核对原夹具的 `host=qa-postgres` 假设与同容器独立数据库方案的差异；如需适配，应在 QA 分支加强连接身份/角色/库名/标记核验，
-保留业务断言并记录依据，不能只移除主机断言、伪造标记或通过换 DSN 指向业务库来求通过。
+1. 前五项仅使用合成数据、随机任务/文件 ID 和独立测试标识；允许写入既有 `document_review` 表并验证幂等、冲突和事务回滚。
+   保留合成记录，不用真实上传文件当故障夹具，不批量清理、不覆盖测试前已有记录。
+2. 第六项在同一业务库内创建全新 `mvp_test_<随机UUID>` Schema，仅在此处初始化测试表、构建合成版本、发布/查询/回滚。
+   这不是新建数据库，也不改现有 `public`、`document_review` 的表结构。
+3. 第六项的发布/回滚允许更新或删除**本次新建测试 Schema 内**的合成投影，禁止触及业务 `public.law_chunks`、
+   `public.mr_active`、`public.mr_active_chunk_map` 等现有对象和真实 ACTIVE 版本。
+4. 测试表建立后，QA 应核对这些未限定 Schema 的表名实际解析至本次随机 Schema，再继续发布/回滚；不得因 search_path 解析回退操作 public。
+5. 只复用已安装的 pgvector；若实际表结构/扩展缺失，记录条件差异交回，不自动迁移业务表或安装扩展。
+6. 原六个用例的业务断言全部保留，连接或隔离预检失败应报告实际失败/阻塞，不能伪装成业务通过。
+7. 对测试前已有业务记录及知识库版本保存只读摘要，测试后核对其保持不变；合成新增记录单独统计。结束后保留测试 Schema 和数据，不 DROP、不删除卷。
 
-最后一项需单独确认随机测试 Schema 的 CREATE/表初始化、测试投影发布/回滚和清理范围。
-已有 `tests/run_preserved_postgres_validation.py` 是需明确批准的复核入口，可保留新建测试 Schema 而不 DROP；
-不能因该入口抑制 DROP 就声称没有任何 DDL 或 DELETE，其业务测试仍会操作独立测试 Schema 的投影。
-建议保留测试数据与 Schema，结束后不自动 DROP DATABASE、DELETE 历史记录或删除卷。
+### QA 入口适配与结果记录
 
-批准后由 QA 将补跑结果按相同方法 ID 替换对应 SKIP，不与全量方法数重复相加，并记录受测 SHA、隔离身份、命令和副作用。
-目前仅完成原因与方案核对，六项仍未在本轮实际执行，不能改记 PASS。
+现有两个 Round01 用例和 `run_preserved_postgres_validation.py` 仍硬性要求旧 QA 库名/主机/标记，原样不能直接运行在业务库。
+由 QA 在自己的分支为本次明确授权加入受控的业务库补跑方式：核对批准的连接目标、实际库名与账号、合成数据范围和随机 Schema，
+保留原默认隔离入口及所有字段/幂等/回滚断言；不能简单移除保护、伪造 qa_round01 身份或向业务库设置 test-only 标记。
+此处不要求 QA 开发业务功能，变化仅限测试夹具和执行入口。
+
+原生命周期用例末尾会 DROP Schema CASCADE，本次应复用“保留测试 Schema”的清理抑制思路，并显式适配为已授权的业务库目标。
+只抑制本次测试 Schema 的末尾删除，不跳过用例主体，也不能把它表述成完全无 DDL/DELETE。
+全量默认入口清空测试 DSN 的保护不变；另行受控补跑并记录实际模块来源及受测完整 SHA。
+
+QA 将补跑结果按相同方法 ID 替换对应 SKIP，不与全量方法数重复相加；记录本次用户授权、连接身份、命令和全部实际副作用。
+目前授权已明确，但 Fix 未运行六项测试，结果仍待 QA，不能预先改记 PASS。
