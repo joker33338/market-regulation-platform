@@ -1,0 +1,91 @@
+{
+  "version": "v0.2.1",
+  "scope": "offline_ingestion_optimization",
+  "status": "PASS",
+  "before_commit": "c78530f191bad1a46fcfade4bb597b4e422a5754",
+  "source_commit": "8ecff8866232ca33d0e350e6ead311fe8570aa89",
+  "handoff_commit": "967cff1e6eec0277b5103182b47098720367c228",
+  "qa_test_commit": "553c8562eee40d06aa0ae0281f916535892a42d0",
+  "postgres_qa_commit": "83ee78cb5dd0b5e5640fc5523bf9efd752ad8791",
+  "checked_at": "2026-11-10T06:05:48.768317+00:00",
+  "off_qa_results": {
+    "OFF-QA-01": "PASS",
+    "OFF-QA-02": "PASS",
+    "OFF-QA-03": "PASS",
+    "OFF-QA-04": "PASS",
+    "OFF-QA-05": "PASS",
+    "OFF-QA-06": "PASS",
+    "OFF-QA-07": "PASS",
+    "OFF-QA-08": "PASS",
+    "OFF-QA-09": "PASS",
+    "OFF-QA-10": "PASS",
+    "OFF-QA-11": "PASS",
+    "OFF-QA-12": "PASS",
+    "OFF-QA-13": "PASS",
+    "OFF-QA-14": "PASS",
+    "OFF-QA-15": "PASS",
+    "OFF-QA-16": "PASS",
+    "OFF-QA-17": "PASS"
+  },
+  "unique_methods": 267,
+  "passed": 267,
+  "failed": 0,
+  "blocked": 0,
+  "raw_windows": {
+    "total": 267,
+    "outcomes": {
+      "PASS": 260,
+      "SKIP": 7
+    }
+  },
+  "postgres_supplement": {
+    "total": 6,
+    "passed": 6
+  },
+  "linux_special": {
+    "total": 20,
+    "passed": 20
+  },
+  "deduplication": "按相同方法ID替换Windows的6项数据库和1项符号链接SKIP；不重复相加",
+  "new_business_bugs": [],
+  "legal_positive_cases": 9,
+  "legal_negative_cases": 2,
+  "legal_chunks_before": 81,
+  "legal_chunks_after": 78,
+  "body_reference_matches": "9/9",
+  "parent_links_before": "81/81",
+  "parent_links_after": "78/78",
+  "fragment_metadata_before": "76/81",
+  "fragment_metadata_after": "78/78",
+  "real_case_section_accuracy": "NOT_LABELED",
+  "semantic_accuracy": "NOT_LABELED",
+  "real_bge": {
+    "count": 6,
+    "dimension": 1024,
+    "max_observed_tokens": 510,
+    "token_limit": 2048
+  },
+  "original_corpus_unchanged": true,
+  "real_cloud_calls": 0,
+  "business_database_scope": "user explicitly confirmed in current chat; synthetic rows and random test Schema only",
+  "existing_business_rows_unchanged": true,
+  "real_active_unchanged": true,
+  "ddl_executed": true,
+  "test_schema_delete_executed": true,
+  "retained_test_schemas": 2,
+  "retained_objects_per_schema": {
+    "tables": 8,
+    "indexes": 14,
+    "sequences": 1
+  },
+  "synthetic_document_records_added_total": 11,
+  "real_business_publish_executed": false,
+  "report_path": "docs/qa/v0.2.1/offline-ingestion-final-qa-report.md",
+  "evidence_manifest": "local/offline-ingestion-qa/evidence-manifest.json",
+  "evidence_manifest_sha256": "29b0040288f8abbbb34159aa247d6fd87bf54e2b13ec852ece6d5fe7a2cb8dc6",
+  "overall_version_gate_changed": false,
+  "overall_version_status": "NOT_REASSESSED; existing gate remains BLOCKED",
+  "merge_main_allowed": false,
+  "push_performed": false,
+  "production_deployment_allowed": false
+}
