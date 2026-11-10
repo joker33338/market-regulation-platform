@@ -30,7 +30,8 @@ def preview_chunks(result, document_type: str, *, max_chars=800):
     lines, _ = source_lines(result)
     lines, _ = clean_lines(lines)
     tables = [{"page_number": page.page_number, **asdict(table)} for page in result.pages for table in page.tables]
-    if document_type == "law" and tables:
+    table_blocks = any(block.kind == "table" for page in result.pages for block in page.layout_blocks)
+    if document_type == "law" and (tables or table_blocks):
         raise IngestionError("法规含表格，须独立处理表格并复核，不能摊平成法条。")
     strategy_version = CHUNKER_VERSION if document_type == "law" else CASE_VERSION
     revision = stable_hash(result.document_id, result.schema_version, document_type, strategy_version, max_chars,
@@ -118,12 +119,16 @@ def preview_chunks(result, document_type: str, *, max_chars=800):
                 if block.kind in {"image", "header", "footer", "number", "footnote"} and block.raw_text.strip()]
     mismatched_pages = [page.page_number for page in result.pages if not page.tables and
                         compact(page.raw_text) != compact("".join(block.raw_text for block in page.layout_blocks))]
+    unstructured_table_pages = [page.page_number for page in result.pages if not page.tables and
+                               any(block.kind == "table" for block in page.layout_blocks)]
     if missing_pages:
         warnings.append("有页面正文未进入文本切分，请检查版面块与解析正文是否一致。")
     if excluded:
         warnings.append("存在按版面类型排除的页眉、页脚、注释或图片说明，原结果保留，须核对是否含业务内容。")
     if mismatched_pages:
         warnings.append("有页面的解析正文与版面块文字不一致，切分覆盖通过不代表该差异已解决。")
+    if unstructured_table_pages:
+        warnings.append("有表格版面块缺少结构化表格结果；未混入文本切分，请对照原解析结果补全并复核。")
     return {"mode": "preview", "document_type": document_type, "revision": revision,
             "file_name": result.file_name, "input_sha256": result.document_id, "max_chars": max_chars,
             "chunk_count": len(chunks), "parent_count": len(parents), "chunks": chunks,
@@ -133,6 +138,7 @@ def preview_chunks(result, document_type: str, *, max_chars=800):
                         "all_chunks_located": located, "body_characters_without_whitespace": len(compact(expected_body)),
                         "pages_with_body": sorted(body_pages), "pages_without_body_chunks": missing_pages,
                         "pages_with_text_layout_mismatch": mismatched_pages,
+                        "pages_with_unstructured_tables": unstructured_table_pages,
                         "small_chunks_under_80_chars": sum(len(chunk["content"]) < 80 for chunk in chunks),
                         "unassigned_preface_lines": len(unassigned), "excluded_layout_blocks": excluded,
                         "scope": "仅检查解析正文到切分结果的完整性，不代表OCR与原文件逐字一致或法律结构已复核。"},
