@@ -2,349 +2,311 @@
   "version": "v0.2.1",
   "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-  "qa_test_commit": "38837ea464717d943a46cb4e1917c12b5688d1df",
-  "total_tests": 111,
-  "passed_tests": 111,
-  "failed_tests": 0,
-  "skipped_tests": 0,
-  "blocked_tests": 0,
-  "critical_issues": [],
-  "report_paths": [
-    "docs/qa/v0.2.1/01-测试集盘点.md",
-    "docs/qa/v0.2.1/02-标准答案完整性.md",
-    "docs/qa/v0.2.1/03-路由准确率.md",
-    "docs/qa/v0.2.1/04-OCR准确率.md",
-    "docs/qa/v0.2.1/05-表格准确率.md",
-    "docs/qa/v0.2.1/06-真实MinerU测试.md",
-    "docs/qa/v0.2.1/07-缺陷与待裁决.md",
-    "docs/qa/v0.2.1/09-完整回归结果.md",
-    "docs/qa/v0.2.1/10-Windows执行策略诊断.md",
-    "docs/qa/v0.2.1/11-Linux官方API隔离预检.md",
-    "docs/qa/v0.2.1/11-persistent-localhost-validation.md",
-    "docs/qa/v0.2.1/final-qa-report.md"
-  ],
-  "checked_at": "2026-11-09T08:55:39.196619+00:00",
-  "mock_status": "PASS",
+  "source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+  "qa_branch": "codex/qa-v0.2.1",
+  "qa_initial_commit": "3bdcfdf007a30d29201760518263d12bca05924c",
+  "qa_test_commit": "78b7e05e747656414badd8350c83d48b672ecc16",
+  "checked_at": "2026-11-10T02:13:05.989787+00:00",
+  "report_path": "docs/qa/v0.2.1/final-acceptance-report.md",
+  "report_commit_reference": "包含本文件的Git提交；最终回复提供实际完整SHA，文件不自引用尚未生成的SHA",
+  "total_tests": 232,
+  "passed_tests": 228,
+  "failed_tests": 3,
+  "blocked_tests": 1,
+  "method_count_policy": "unittest232个唯一方法；独立PG5个按相同ID替换SKIP；剩余原始SKIP1按验收BLOCKED解释；探针与质量任务不相加",
+  "raw_suite": {
+    "total": 232,
+    "passed": 223,
+    "failed": 3,
+    "skipped": 6
+  },
+  "postgres_supplement": {
+    "total": 5,
+    "passed": 5,
+    "skipped": 0
+  },
+  "automated_regression_status": "FAIL",
+  "existing_mock_suite_status": "PASS",
   "integration_status": "BLOCKED",
-  "qa_status": "BLOCKED",
-  "blocked_reasons": [
-    "Windows Smart App Control仍阻止本地sklearn扩展及独立HTTPS依赖libssl；独立Linux获准并已执行，不等于Windows解除",
-    "首批真实官方流程PARTIAL：S7完整链PASS但表格质量告警；S10上传后轮询超时，结果未下载；S14代理拒绝占位保留",
-    "旧ee7完整191中MVP生命周期仍缺独立DDL及合成投影DELETE许可",
-    "完整测试集各引擎质量覆盖及业务验收阈值未完成；Dual仍BLOCKED"
+  "known_p0_p1": [],
+  "confirmed_issues": [
+    {
+      "id": "QFA-001",
+      "priority": "P2",
+      "status": "FAIL"
+    },
+    {
+      "id": "QFA-002",
+      "priority": "P2",
+      "status": "FAIL"
+    },
+    {
+      "id": "QFA-003",
+      "priority": "P2",
+      "status": "FAIL"
+    },
+    {
+      "id": "QFA-004",
+      "priority": "P2",
+      "status": "FAIL"
+    }
   ],
-  "routing_exact_label_agreement": {
-    "numerator": 44,
-    "denominator": 53,
-    "percent": 83.02,
-    "mode": "DocumentParser + FakeRuntime，非端到端OCR"
+  "remaining_items": {
+    "R-01": {
+      "status": "PENDING_USER_CONFIRMATION",
+      "reason": "业务质量阈值未确认；不要求重复提交真值"
+    },
+    "R-02": {
+      "status": "PASS",
+      "reason": "最新扩展交付与声明范围已核验，4项新增任务均MEASURED；不外推未标注页质量"
+    },
+    "R-03": {
+      "status": "BLOCKED",
+      "reason": "原官方批次授权已过期，旧SHA预检与12次占位保留，当前SHA远端恢复未执行"
+    },
+    "R-04": {
+      "status": "BLOCKED",
+      "reason": "归因材料已读，本轮本地Structure精确；缺当前SHA真实官方预测及同标准质量评估"
+    },
+    "R-05": {
+      "status": "BLOCKED",
+      "reason": "真实本地模型与auto已测，本地到Mock回退已测，真实云端auto回退未完成"
+    },
+    "R-06": {
+      "status": "PENDING_USER_CONFIRMATION",
+      "reason": "当天启动时间与持久入口200已读，未观测完整整机恢复过程并取得确认"
+    },
+    "R-07": {
+      "status": "BLOCKED",
+      "reason": "现有Schema5项PASS；完整kb_version/发布回滚的DDL及清理范围未获明确授权"
+    },
+    "R-08": {
+      "status": "PENDING_USER_CONFIRMATION",
+      "reason": "安全拒绝已实测；新意图同一行同时接受拒绝与修复后正常OCR，需裁决冲突"
+    }
   },
-  "synthetic_structure_exact": {
-    "numerator": 1,
-    "denominator": 1
-  },
-  "unauthorized_cloud_submissions": 0,
-  "original_files_hash_unchanged": {
-    "numerator": 25,
-    "denominator": 25
-  },
-  "business_code_changed": true,
-  "merge_main_allowed": false,
-  "evidence_sha256": {
-    "inventory.json": "f4720457abd2e00ba26082026c85ea8c32d2594f077fc46be0bff03d8c08bcef",
-    "mock.json": "4fa6ec904d2a8017d083b4ec0f2d4fc6418f4c60b85a8d66c9e3d914cad9242b",
-    "routing.json": "8d753aeae0268f83ba22fd4c1f5e4def6c5496ac7b3a69a1b90bbd555dab67cb",
-    "S00003-real-off-summary.json": "8b3f9d7b1fd3fca3d63555f31a906b5d8a33775ceb1ca7c77a47d76340b75fa7",
-    "S00007-real-off-p4-summary.json": "c84b4f6c47f187087461fdf21a869a0c25fd5d7e9688963c56c52480254de612",
-    "S00007-real-off-summary.json": "746de762ea241df8c9e3c1e4537bca9e44ae55f9ffb703606d84d25c88c51e23",
-    "S00007-real-on-p4-summary.json": "93d8d013b6f7ef4cd0e9404329a50b2ae20bef9713522616d1bc8198c01fb91e",
-    "S00007-real-on-summary.json": "6b2f91b9df734992fbbadea8a4920935ba411081a54a4793567eb3708ab1b91b",
-    "S00008-real-on-p1-summary.json": "2f98efb6f05a46538f316eaecee7e51034609947583519e7ffc50d0d780fddde",
-    "synthetic-structure.json": "7dd1097ebe9ec817c0ad32a915aff2545d7ed428911b2a1c85f5c40cfb2fb926",
-    "fixed-source-focused-result.json": "25a217415795efda9708cd8cdc78459b5a66f0b649b3a5bebc749b5a0d7efa70",
-    "current-truth-metrics.json": "952291482df83db0c0b09172916caada371207d26501b22811668cf8946a5eb7",
-    "current-table-formats.json": "c20b3b056c12556f3625190591b584ad840cf646bd006ecef369a5379569bd86",
-    "source621-full-baseline-summary.json": "0598e702008d8531d75a39ed4e0cdd50ae0daf7464075d7cd9040a3b6c595ef3",
-    "source621-full-baseline-result.json": "6eb44e8f952124e796978778d3b200f9263d7aa38f6bc613ad5ad8259a64b118",
-    "source215-full-result.json": "4e00ab1b73004f85348c3d442d5d84f6408d3eb98e11e4709af2e5319e998d69",
-    "source215-real-http-restart.json": "15196579a62916d9f120c37a2a055e71eb42bcea985a2138e9534aa479b538a2",
-    "sourceee7-security-result.json": "658d5c056bd0ce58a5d484b4a7ce46efde4ba31f9c43a3f562d9950683863519",
-    "sourceee7-coverage-after-pg-five.json": "ab91ab04a60e18bbad9ed76e8f7b1edaea61593eb35ed12c32d27523f222bbe8",
-    "sourceee7-pg-five-result.json": "1d68d100fb22fde16b584204803ba84ea71e342a52df6baae80378feb0a3aea0",
-    "sourceee7-batch-preflight.json": "ac4f17be1d825773d5e64804b1a2ce42ee739ad5e94d24da6eb11109ae70d077",
-    "sourceee7-cloud-execution.json": "f34c190eb7ee805f3dfc5e4987bef291acc21193f33150ff8fe69e76c48da39b",
-    "official-constructor-diagnosis.json": "a9b34f9a5939ad137014e260324cffc013a377a09de91b2167dd2806137e2b6b",
-    "official-import-audit.json": "ad9c8985f1616f27991ed1f72fe169b7ee14e14c55fe439731d5e75fad29820b",
-    "policy-matches.json": "d14a13eeb5230bdbe7d31c5b8d73e6a8e15d35a297a8d6ff4c3825f725da1dab",
-    "policy-file-inventory.json": "52ff12911df0ba60d72058714271d9a156f2a0b54c71941de85cf9a12ea4db62",
-    "diagnostics-contract-red-corrected.json": "65934df699e031ef40aa37555b775c53696989ed2ce8d9873ee595bb0f5bf800",
-    "source67709-independent.json": "7988194e6170aa67db6bd0f4fdb59d768596cdeb9bfc35b1e2ad66e2dc5c08dc",
-    "source0770-independent.json": "584be41de8e09e79f82933faeaa079d62686657570a04a8fd35be0811d5bf5e1",
-    "windows-policy-kind.json": "1eae3a85f017deabdbbd4e36caa5a0c55a2f716b45340b8e4146cbe0557e58ec",
-    "sourceee7-host-relay-summary.json": "fd663581a4b5668a245d0286b75d581c8efec6847cf101eec078b3c26477586b",
-    "linux-final-cloud-evidence.json": "a276b30aa508969d6ee684ca8715a3d500976d9992fd8abfaa3145f909f95cee",
-    "S00007-html-offline-analysis-with-cell-counts.json": "3e5563a8af29fb79132805c726c1912ec1f17da4edf2d7c9ac92c6fb3d4e384d",
-    "post-cloud-source-integrity.json": "ee9b3a858adc5539833d8bce04cce709dcab4012a64a58095d624dd90d249a64",
-    "S00014-failed-no-origin-http-proof.json": "4d11d099d244e0c19ea9450fce2ca94ce0b66b5ef22efed2f20f8bae17bce6c0",
-    "nft3-independent-result.json": "aaa7bf1105ba8a7088ffa96746af4227b5e7a0667b1f1c83c21b2d6d5b5c3f5e",
-    "proxy-independent-10-result.json": "f77252fac5d72538e21b284b52fcac4ac985da930cdda74c147db5ebed967675",
-    "post-cloud-localhost-verification.json": "848484d2ee0f8539e0bc97cda825c8f452de751d34d4328e4aa3b7655b4ebe41"
-  },
-  "confirmed_bug_ids": [],
-  "fix_handoff_commit": "16b397cc79bd0c3a7710ba4722959cb3eae73c26",
-  "functional_status": "PASS",
-  "tested_commit_sha": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-  "fix_transport_commit": "949bc4b109e98ddd6f8b939971b1ac2dbf9955ae",
-  "closed_bug_ids": [
-    "Q021-001",
-    "Q021-002",
-    "QTB-001",
-    "Q021-003",
-    "Q021-004",
-    "Q021-005"
-  ],
-  "metric_source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
-  "business_code_changed_by_qa": false,
-  "report_path": "docs/qa/v0.2.1/final-qa-report.md",
-  "manual_truth_status": "LABELED",
-  "manual_truth_tasks": 4,
-  "routing_original_label_rate": {
-    "numerator": 44,
-    "denominator": 53
-  },
-  "routing_manual_accepted_rate": {
-    "numerator": 52,
-    "denominator": 53
-  },
-  "cer_raw": {
-    "edits": 53,
-    "reference_characters": 736,
-    "pages": 2,
-    "prediction_source": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b"
-  },
-  "cer_normalized": {
-    "edits": 53,
-    "reference_characters": 736,
-    "normalization": "NFC/newline_only"
-  },
-  "real_table_structure_exact": {
-    "numerator": 2,
-    "denominator": 2
-  },
-  "real_cloud_requests": 11,
-  "test_batch_contract_baseline": {
-    "total": 23,
-    "passed": 4,
-    "feature_missing_failures": 18,
-    "config_parameter_missing_errors": 1
-  },
-  "previous_bugfix_functional_status": "PASS",
-  "prior_fix_only_integration_waiver": "本轮差异仅异常路径保留原生候选及复核信号、CLI配置继承和报告effective值；runtime、模型目录、paddle_structure、依赖及成功推理路径未变。74项定向合成/Mock已覆盖异常、成功、强制模式与跨页控制，因此本轮无需新增真实模型或数据库执行。历史真实指标仍绑定metric_source_commit，不冒充当前SHA集成实测。",
-  "integration_blocked_reason": "Linux官方完整链仅S7通过，首批PARTIAL；Windows本地OCR策略和完整质量覆盖仍受限，不能据单链或工具Mock放行整版。",
-  "test_commands": [
-    "python -B -m unittest tests.test_v021_document_io_diagnostics tests.test_v021_engine_diagnostics -v",
-    "受影响DocumentParsing/DualEnginePolicy/TEST_BATCH/API及QA HTTP边界；完整模块与唯一方法ID见本地111项证据"
-  ],
-  "independent_security_tests": {
-    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "total": 38,
-    "passed": 38,
-    "failed": 0,
-    "errors": 0,
-    "skipped": 0,
-    "overlap_with_targeted": 38,
-    "deduplication_note": "38包含于111，不相加"
-  },
-  "real_service_checks": {
-    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "infrastructure_commit": "04ea352cb60a43f429f09415fad455be74067787",
-    "network_status": "PARTIAL",
-    "continuous_host_entry": "PASS",
-    "host_port_8180": "PASS",
-    "host_binding": "127.0.0.1_ONLY",
-    "listener_process": "com.docker.backend",
-    "temporary_relay_used": false,
-    "container_restart": "PASS",
-    "container_recreate": "PASS",
-    "self_loopback": "PASS",
-    "kernel_negative": "PASS",
-    "windows_host_reboot": "NOT_TESTED",
-    "docker_original_nat": "NOT_REPAIRED",
-    "post_cloud_restore": "PASS",
-    "root_http_status": 200,
-    "cloud_client_stopped": true,
-    "cloud_gateway_stopped": true,
-    "report_commit": "4a6d669053b5670393b0147df24b13127485cafb",
-    "provider": "synthetic-mock",
-    "counted_in_unit_methods": false
-  },
-  "real_cloud_uploads": 2,
-  "test_batch_preflight": {
-    "qualified_files": 19,
-    "source_sha_verified": 19,
-    "acl": "PASS",
-    "dry_run": "READY",
-    "coordinator_released": true,
-    "selected_samples": [
-      "S00014",
-      "S00007",
-      "S00010"
-    ],
-    "selected_pages": 13,
-    "max_calls": 32,
-    "max_unique_sha": 3,
-    "max_calls_per_task": 8,
-    "poll_seconds": 10,
-    "started_tasks": 3,
-    "completed_cloud_tasks": 1,
-    "usage_ledger_created": true,
-    "actual_budget_reservations": 12,
-    "actual_unique_sha": 3,
-    "original_batch_reused": true,
-    "expiry_extended": false
-  },
-  "current_real_quality_status": "BLOCKED",
-  "business_threshold_status": "NOT_DEFINED_BY_USER",
-  "local_engine_status": "LOCAL_ENGINE_UNAVAILABLE",
-  "local_engine_reason": "WINDOWS_POLICY_BLOCKED",
-  "local_dependency_error_confirmed": false,
-  "mineru_api_observation": "PARTIAL_FIRST_BATCH",
-  "mineru_api_status": "PASS",
-  "dual_engine_status": "BLOCKED",
-  "diagnostics_validation": {
-    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "contract_tests": 11,
-    "contract_passed": 11,
-    "targeted_unique_methods": 111,
-    "passed": 111,
-    "includes_contracts": true,
-    "fix_rounds": 2,
-    "max_rounds": 3,
-    "prior_source": "0770e65578b6cf128cb497afbd521901b59e6719",
-    "prior_total": 110,
-    "prior_passed": 107,
-    "prior_failed": 3
-  },
-  "full_regression_history": {
-    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
-    "total": 191,
-    "passed": 190,
-    "failed": 0,
-    "blocked": 1,
-    "new_source_full_suite_rerun": false,
-    "reuse_basis": "本轮仅诊断/helper、runtime异常包装、页附件及构造兜底；受影响模块定向复验。依赖/模型/官方客户端/授权/预算/API/数据库代码未改；历史191不冒充新SHA全量实跑。"
-  },
-  "windows_policy": {
-    "status": "BLOCKED",
-    "kind": "Smart App Control",
-    "policy_name": "VerifiedAndReputableDesktop",
-    "event_id": 3077,
-    "citool_list": "FAILED_NONZERO",
-    "individual_app_exception_supported": false,
-    "policy_changed": false
-  },
-  "real_cloud_requests_definition": "正式官方调用尝试11；HTTP200响应10，连接超时1到源站未知；另有代理拒绝且源站确证0的预算预留1。",
-  "mineru_api_pass_scope": "仅S00007完整POST→GET→PUT→poll→CDN下载链5次HTTP200；不是首批/质量/双引擎PASS",
-  "local_engine_status_scope": "Windows Paddle/Structure仍LOCAL_ENGINE_UNAVAILABLE；Linux无OCR模型，Native S7成功及S10保留候选另列，未冒充真实OCR。",
-  "real_service_checks_history": {
-    "source_commit": "ee7dd7e6c8243e98c9f1bf995a4c57c555611786",
-    "internal_http": "PASS",
-    "docker_restart": "PASS",
-    "host_port_8180": "PASS_TEMPORARY_RELAY",
-    "relay_stopped": true,
-    "continuous_host_entry": "NOT_CONFIGURED",
-    "docker_nat": "NOT_REPAIRED",
-    "provider": "synthetic-mock",
-    "counted_in_unit_methods": false,
-    "report_commit": "1602cdac5edd6b9c418bffbdcbe362aa7795257b"
-  },
-  "linux_official_batch": {
-    "status": "PARTIAL",
-    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "proxy_fix_commit": "6ae4e19aa67853e0e54ce85faf105a6822706c12",
-    "runner_commit": "396c7cf",
-    "infrastructure_commit": "04ea352cb60a43f429f09415fad455be74067787",
-    "image": "sha256:b18606a0402b488fd31e277c5d15fed51ac7453637deeda06c4c42e1f366db9e",
-    "reservations": 12,
-    "max_calls": 32,
-    "unique_sha": 3,
-    "max_unique_sha": 3,
-    "formal_http_attempts": 11,
-    "http_200_responses": 10,
-    "connection_timeouts_origin_delivery_unknown": 1,
-    "proxy_rejected_no_origin_reservations": 1,
-    "successful_uploads": 2,
-    "complete_official_chains": 1,
-    "selected_files": 3,
-    "selected_pages": 13,
-    "remote_mode_only": true,
-    "auto_fallback_covered": false,
-    "unknown_post_replayed": false,
-    "budget_reset": false,
-    "results": [
-      {
-        "sample_id": "S00014",
-        "status": "FAILED_NO_ORIGIN_HTTP",
-        "post_reservation_preserved": true
+  "corpus": {
+    "scenarios_01_to_12": {
+      "total_files": 25,
+      "normal_files": 19,
+      "abnormal_files": 6,
+      "normal_statuses": {
+        "success": 18,
+        "REJECTED": 1
       },
-      {
-        "sample_id": "S00007",
-        "api_chain": "PASS",
-        "quality": "BLOCKED",
-        "local_native": "PASS",
-        "remote_review_reason": "table_alignment_review",
-        "final_candidate": "native"
+      "abnormal_statuses": {
+        "REJECTED": 2,
+        "failed": 2,
+        "success": 2
       },
-      {
-        "sample_id": "S00010",
-        "status": "BLOCKED",
-        "reason": "ConnectTimeout",
-        "remote_result_downloaded": false,
-        "local_native": "NEEDS_REVIEW",
-        "local_reason": "layout_enhancement_failed"
+      "normal_review": 12,
+      "parsed_pages": 62,
+      "page_methods": {
+        "native_pdf": 33,
+        "ocr": 18,
+        "structure": 8,
+        "native_docx": 3
+      },
+      "page_statuses": {
+        "success": 61,
+        "failed": 1
+      },
+      "unchanged": 25,
+      "normal_safety_rejects": [
+        "S00019"
+      ],
+      "abnormal_unexpected_success": [
+        "S00022",
+        "S00025"
+      ],
+      "forced_structure": [
+        {
+          "task_id": "CER-02",
+          "status": "MEASURED",
+          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+          "reference_characters": 250,
+          "edit_distance": 44,
+          "cer": 0.176,
+          "normalization": "newline_only"
+        },
+        {
+          "task_id": "TABLE-WIRED",
+          "status": "MEASURED",
+          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+          "reference_tables": 1,
+          "predicted_tables": 1,
+          "exact_structure": true,
+          "exact_structure_and_text": true
+        },
+        {
+          "task_id": "TABLE-WIRELESS",
+          "status": "MEASURED",
+          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+          "reference_tables": 1,
+          "predicted_tables": 1,
+          "exact_structure": true,
+          "exact_structure_and_text": true
+        }
+      ],
+      "docx_scope": {
+        "reference_tables": 1,
+        "document_predicted_tables": 2,
+        "reference_rows": 66,
+        "reference_columns": 5,
+        "reference_cells": 257,
+        "predicted_table0_cells": 330,
+        "reference_vertical_merges": 32,
+        "predicted_vertical_merges": 0
       }
-    ]
+    },
+    "source_hash_unchanged": "25/25",
+    "legal_special": {
+      "total": 11,
+      "passed": 11,
+      "scope": "source parsing and chunking only; not OCR-reviewed PG lifecycle"
+    }
   },
-  "linux_official_table_comparison": {
-    "sample_id": "S00007",
-    "page": 4,
-    "source_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "html_structure": {
-      "numerator": 1,
-      "denominator": 1
-    },
-    "html_structure_and_all_text": {
-      "numerator": 0,
-      "denominator": 1
-    },
-    "exact_text_cells": {
-      "numerator": 25,
-      "denominator": 30
-    },
-    "rows": 14,
-    "columns": 4,
-    "normalized_cells": "NOT_AVAILABLE",
-    "html_preserved": true,
-    "markdown_semantics": "NOT_EVALUATED",
-    "full_page_cer": "NOT_EVALUATED",
-    "scope": "单页同SHA已审真实标准，不能外推完整集"
+  "truth_package": {
+    "version": "v0.2.2 expansion",
+    "matrix_records": 66,
+    "page_records": 60,
+    "file_records": 6,
+    "full_text_references": 4,
+    "table_references": 4,
+    "new_tasks": [
+      {
+        "task_id": "CER-03",
+        "sample_id": "S00004",
+        "status": "MEASURED"
+      },
+      {
+        "task_id": "LAYOUT-01",
+        "sample_id": "S00011",
+        "status": "MEASURED"
+      },
+      {
+        "task_id": "TAB-DOCX-01",
+        "sample_id": "S00016",
+        "status": "MEASURED"
+      },
+      {
+        "task_id": "TAB-CROSS-01",
+        "sample_id": "S00012",
+        "status": "MEASURED"
+      }
+    ],
+    "protected_files_unchanged": 29,
+    "original_expansion_unchanged": true
   },
-  "qa_helper_checks": {
-    "proxy": {
-      "source_commit": "6ae4e19aa67853e0e54ce85faf105a6822706c12",
-      "tests": 10,
-      "passed": 10
+  "current_quality_measurements": [
+    {
+      "task_id": "CER-01",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_characters": 486,
+      "edit_distance": 9,
+      "cer": 0.018518518518518517,
+      "normalization": "newline_only"
     },
-    "runner": {
-      "qa_commit": "396c7cf",
-      "tests": 4,
-      "passed": 4
+    {
+      "task_id": "CER-02",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_characters": 250,
+      "edit_distance": 47,
+      "cer": 0.188,
+      "normalization": "newline_only"
     },
-    "not_added_to_business_111": true
+    {
+      "task_id": "TABLE-WIRED",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_tables": 1,
+      "predicted_tables": 1,
+      "exact_structure": false,
+      "exact_structure_and_text": false
+    },
+    {
+      "task_id": "TABLE-WIRELESS",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_tables": 1,
+      "predicted_tables": 0,
+      "exact_structure": false,
+      "exact_structure_and_text": false
+    },
+    {
+      "task_id": "CER-03",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_characters": 648,
+      "edit_distance": 16,
+      "cer": 0.024691358024691357,
+      "normalization": "newline_only"
+    },
+    {
+      "task_id": "LAYOUT-01",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_characters": 1857,
+      "edit_distance": 1664,
+      "cer": 0.8960689283791061,
+      "normalization": "newline_only"
+    },
+    {
+      "task_id": "TAB-DOCX-01",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_tables": 1,
+      "predicted_tables": 2,
+      "exact_structure": false,
+      "exact_structure_and_text": false
+    },
+    {
+      "task_id": "TAB-CROSS-01",
+      "status": "MEASURED",
+      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+      "reference_tables": 1,
+      "predicted_tables": 1,
+      "exact_structure": true,
+      "exact_structure_and_text": true
+    }
+  ],
+  "local_ocr_status": "REAL_INFERENCE_COMPLETED",
+  "local_structure_status": "REAL_TABLE_INFERENCE_COMPLETED",
+  "real_bge_status": "PASS",
+  "real_bge_dimensions": 1024,
+  "real_mineru_api_status": "BLOCKED",
+  "real_mineru_requests_this_round": 0,
+  "real_local_to_mock_fallback": {
+    "local": "real PaddleOCR",
+    "cloud": "MockTransport",
+    "authorized_mock_calls": 5,
+    "sensitive_mock_calls": 0
   },
-  "post_cloud_original_files_hash_unchanged": {
-    "numerator": 3,
-    "denominator": 3
-  }
+  "real_http_status": "PASS",
+  "dedicated_container_restart_status": "PASS",
+  "postgres_existing_schema_status": "PASS",
+  "postgres_lifecycle_status": "BLOCKED",
+  "persistent_entry": {
+    "http_status": 200,
+    "host_binding": "127.0.0.1",
+    "snapshot_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
+    "scope": "infrastructure only; current Fix integration independently tested with explicit source binding"
+  },
+  "pytest_status": "BLOCKED_NOT_INSTALLED",
+  "python_ast_status": "PASS",
+  "compose_config_status": "PASS",
+  "typescript_status": "NOT_APPLICABLE",
+  "evidence_manifest": "local/v021-final-a860abf/evidence-manifest.json",
+  "evidence_manifest_sha256": "431c7718a59c30f3694856b21752ade6bf85e8210b1e9a1ba790f8f39ced8408",
+  "business_code_changed_by_qa": false,
+  "production_database_used": false,
+  "ddl_executed": false,
+  "delete_executed": false,
+  "merge_main_allowed": false,
+  "push_allowed": false,
+  "production_deployment_allowed": false,
+  "handoff_status": "NEEDS_FIX",
+  "historical_evidence_policy": "旧报告保留在Git及既有文档；不把旧SHA的云端、模型或数据库记录计入本轮PASS"
 }
