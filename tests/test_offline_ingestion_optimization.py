@@ -88,6 +88,16 @@ class OfflineOptimizationAcceptance(unittest.TestCase):
                 self.assertTrue(all(len(p)<=64 for p in parts))
         with self.assertRaises(IngestionError):bounded_parts('1'*200,64)
 
+    def test_OFF_QA_02_embedding_context_truncation_keeps_full_body(self):
+        intro='共同适用的合成条件。'*50
+        r=result(['第一条 '+intro,'（一）合成事项甲。','（二）合成事项乙。'],title='合成超长法规名称'*150)
+        p=preview_chunks(r,'law',max_chars=96)
+        self.assertIn(intro,p['parents'][0]['text'])
+        self.assertTrue(p['quality']['body_roundtrip_equal'])
+        self.assertTrue(all(c['metadata']['embedding_heading_truncated'] for c in p['chunks']))
+        self.assertTrue(any(c['metadata']['embedding_context_truncated'] for c in p['chunks']))
+        self.assertTrue(all(len(c['embedding_text'])<=96+64+32+2 for c in p['chunks']))
+
     def test_OFF_QA_04_short_units_are_packed(self):
         lines=['第一条 总体条件。']+[f'（{i}）条件甲；' for i in range(1,30)]
         p=preview_chunks(result(lines),'law',max_chars=80)
