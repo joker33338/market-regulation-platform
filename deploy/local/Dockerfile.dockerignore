@@ -1,0 +1,9 @@
+*
+!qa_core/
+!qa_core/**
+!query.py
+!deploy/
+!deploy/local/
+!deploy/local/entrypoint.py
+**/__pycache__
+**/*.pyc

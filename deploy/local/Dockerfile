@@ -1,0 +1,14 @@
+ARG LOCAL_BASE_IMAGE=market-regulation-app:local
+FROM ${LOCAL_BASE_IMAGE}
+ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.title="market-regulation-workbench" \
+      org.opencontainers.image.revision="${SOURCE_COMMIT}"
+USER root
+WORKDIR /app
+COPY qa_core ./qa_core
+COPY query.py ./
+COPY deploy/local/entrypoint.py /opt/workbench/entrypoint.py
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+USER 65534:65534
+ENTRYPOINT ["python", "-B", "/opt/workbench/entrypoint.py"]

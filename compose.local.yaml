@@ -1,0 +1,51 @@
+name: market-regulation-workbench
+services:
+  app:
+    image: ${LOCAL_APP_IMAGE:?请使用本地工作台启动脚本}
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    stop_grace_period: 60s
+    ports:
+      - "127.0.0.1:${LOCAL_APP_PORT:-8181}:8180"
+    volumes:
+      - type: bind
+        source: ${LOCAL_WORKBENCH_ROOT:?请使用本地工作台启动脚本}/runtime.json
+        target: /private/runtime.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LOCAL_WORKBENCH_ROOT}/state
+        target: /state
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LOCAL_WORKBENCH_ROOT}/state/logs
+        target: /app/reports
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LOCAL_MODELS_ROOT:?需要已有离线模型}
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m,mode=1777
+    healthcheck:
+      test: ["CMD", "python", "-B", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8180/', timeout=5).close()"]
+      interval: 15s
+      timeout: 6s
+      start_period: 20s
+      retries: 4
+    networks: [database]
+networks:
+  database:
+    external: true
+    name: ${LOCAL_DATABASE_NETWORK:-market-regulation_default}
