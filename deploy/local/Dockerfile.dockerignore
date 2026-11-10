@@ -2,6 +2,8 @@
 !qa_core/
 !qa_core/**
 !query.py
+!scripts/
+!scripts/verify_mineru_cloud.py
 !deploy/
 !deploy/local/
 !deploy/local/entrypoint.py

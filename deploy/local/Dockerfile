@@ -7,6 +7,7 @@ USER root
 WORKDIR /app
 COPY qa_core ./qa_core
 COPY query.py ./
+COPY scripts/verify_mineru_cloud.py ./scripts/verify_mineru_cloud.py
 COPY deploy/local/entrypoint.py /opt/workbench/entrypoint.py
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
