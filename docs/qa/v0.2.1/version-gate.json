@@ -1,312 +1,146 @@
 {
   "version": "v0.2.1",
-  "gate_status": "BLOCKED",
+  "gate_status": "FAIL",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+  "source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
+  "fix_handoff_commit": "c8e624b066a795161901b55bd472ec730b1889ea",
   "qa_branch": "codex/qa-v0.2.1",
-  "qa_initial_commit": "3bdcfdf007a30d29201760518263d12bca05924c",
-  "qa_test_commit": "78b7e05e747656414badd8350c83d48b672ecc16",
-  "checked_at": "2026-11-10T02:13:05.989787+00:00",
-  "report_path": "docs/qa/v0.2.1/final-acceptance-report.md",
-  "report_commit_reference": "包含本文件的Git提交；最终回复提供实际完整SHA，文件不自引用尚未生成的SHA",
-  "total_tests": 232,
-  "passed_tests": 228,
-  "failed_tests": 3,
-  "blocked_tests": 1,
-  "method_count_policy": "unittest232个唯一方法；独立PG5个按相同ID替换SKIP；剩余原始SKIP1按验收BLOCKED解释；探针与质量任务不相加",
-  "raw_suite": {
-    "total": 232,
-    "passed": 223,
-    "failed": 3,
-    "skipped": 6
+  "qa_test_commit": "80b9f827ffbb9ccad955a38a7af85e29cf99fd8c",
+  "execution_qa_base_commit": "7ceef1a002b837726d5febcd91aa108335553ca7",
+  "checked_at": "2026-11-10T08:40:15.358024+00:00",
+  "test_execution_at": "2026-11-10T08:34:56.276693+00:00",
+  "report_path": "docs/qa/v0.2.1/release-closure-qa-report.md",
+  "handoff_path": "docs/qa/v0.2.1/release-closure-qa-handoff-to-fix.md",
+  "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
+  "policy": {
+    "name": "功能安全门禁 + 识别质量分级 + 人工复核",
+    "confirmed_by": "用户本轮明确指示",
+    "reference_cer": {
+      "native_text": "1%-3%",
+      "ordinary_scan": "<=5%",
+      "complex_scan": "<=10%"
+    },
+    "table_reference": "结构与内容分别统计，90%试行参考；关键错误不得自动放行",
+    "routing_reference": "合理选择、正确安全拒绝、低质复核或合法回退；不机械使用95%",
+    "single_difficult_sample_is_veto": false,
+    "safety_requirements_unchanged": true
   },
-  "postgres_supplement": {
-    "total": 5,
-    "passed": 5,
-    "skipped": 0
-  },
-  "automated_regression_status": "FAIL",
-  "existing_mock_suite_status": "PASS",
+  "technical_status": "FAIL",
+  "recognition_quality_status": "MIXED",
+  "review_signal_status": "PASS",
+  "review_gate_status": "PASS_REPRESENTATIVE_AUTOMATED_COVERAGE",
   "integration_status": "BLOCKED",
-  "known_p0_p1": [],
-  "confirmed_issues": [
+  "total_tests": 276,
+  "passed_tests": 268,
+  "failed_tests": 1,
+  "skipped_tests": 7,
+  "failure_subcases": 4,
+  "method_count_policy": "276唯一方法；1失败方法含4子场景。候选158重复覆盖不相加；PG既往实测不替换本轮SKIP。",
+  "candidate_regression": {
+    "total": 158,
+    "passed": 158,
+    "overlaps_host_suite": true,
+    "qrc001_extra_reproduction": "FAIL"
+  },
+  "real_http_status": "PASS",
+  "real_local_models_status": "PASS_EXECUTED",
+  "real_official_auto_status": "PASS",
+  "old_official_task_recovery_status": "BLOCKED_HTTP_403",
+  "windows_whole_reboot_status": "NOT_TESTED",
+  "database": {
+    "current_candidate_http": "PASS",
+    "prior_lifecycle_six": "PASS",
+    "prior_source_commit": "8ecff8866232ca33d0e350e6ead311fe8570aa89",
+    "six_rerun_on_current_source": false,
+    "existing_business_rows_and_real_active_unchanged": true
+  },
+  "known_p0_p1": [
     {
-      "id": "QFA-001",
-      "priority": "P2",
-      "status": "FAIL"
-    },
-    {
-      "id": "QFA-002",
-      "priority": "P2",
-      "status": "FAIL"
-    },
-    {
-      "id": "QFA-003",
-      "priority": "P2",
-      "status": "FAIL"
-    },
-    {
-      "id": "QFA-004",
-      "priority": "P2",
-      "status": "FAIL"
+      "id": "QRC-001",
+      "priority": "P1",
+      "status": "FAIL",
+      "module": "MinerUService._local",
+      "regression": "tests/test_release_qa_acceptance.py"
     }
   ],
+  "historical_qfa_001_to_004": "已回归闭环；旧a860abf闸门失败不作为当前未修复缺陷",
   "remaining_items": {
     "R-01": {
-      "status": "PENDING_USER_CONFIRMATION",
-      "reason": "业务质量阈值未确认；不要求重复提交真值"
+      "status": "PASS",
+      "reason": "用户已确认安全门禁、质量分级和人工复核的新标准"
     },
     "R-02": {
       "status": "PASS",
-      "reason": "最新扩展交付与声明范围已核验，4项新增任务均MEASURED；不外推未标注页质量"
+      "reason": "已核验扩展真值交付范围；不声称全66条在本轮重新测量"
     },
     "R-03": {
       "status": "BLOCKED",
-      "reason": "原官方批次授权已过期，旧SHA预检与12次占位保留，当前SHA远端恢复未执行"
+      "reason": "旧任务GET恢复HTTP403；未重新POST或上传，原因待查"
     },
     "R-04": {
-      "status": "BLOCKED",
-      "reason": "归因材料已读，本轮本地Structure精确；缺当前SHA真实官方预测及同标准质量评估"
+      "status": "PASS",
+      "reason": "代表性官方候选保留/复核及审核桥门禁已测；仅风险处理通过，不等于识别质量合格"
     },
     "R-05": {
-      "status": "BLOCKED",
-      "reason": "真实本地模型与auto已测，本地到Mock回退已测，真实云端auto回退未完成"
+      "status": "PASS",
+      "reason": "真实本地优先、敏感拒绝、公开合成真实官方auto回退与幂等已测"
     },
     "R-06": {
       "status": "PENDING_USER_CONFIRMATION",
-      "reason": "当天启动时间与持久入口200已读，未观测完整整机恢复过程并取得确认"
+      "reason": "容器重启通过；Windows整机重启尚未安排与验证"
     },
     "R-07": {
-      "status": "BLOCKED",
-      "reason": "现有Schema5项PASS；完整kb_version/发布回滚的DDL及清理范围未获明确授权"
+      "status": "PASS",
+      "reason": "继承源码8ecff886授权PG六项独立实测；当前候选另测真实写入与容器重启"
     },
     "R-08": {
-      "status": "PENDING_USER_CONFIRMATION",
-      "reason": "安全拒绝已实测；新意图同一行同时接受拒绝与修复后正常OCR，需裁决冲突"
+      "status": "FAIL",
+      "reason": "新S00019安全拒绝通过，但最终缓存恢复QRC-001仍绕过当前限额"
     }
   },
-  "corpus": {
-    "scenarios_01_to_12": {
-      "total_files": 25,
-      "normal_files": 19,
-      "abnormal_files": 6,
-      "normal_statuses": {
-        "success": 18,
-        "REJECTED": 1
-      },
-      "abnormal_statuses": {
-        "REJECTED": 2,
-        "failed": 2,
-        "success": 2
-      },
-      "normal_review": 12,
-      "parsed_pages": 62,
-      "page_methods": {
-        "native_pdf": 33,
-        "ocr": 18,
-        "structure": 8,
-        "native_docx": 3
-      },
-      "page_statuses": {
-        "success": 61,
-        "failed": 1
-      },
-      "unchanged": 25,
-      "normal_safety_rejects": [
-        "S00019"
-      ],
-      "abnormal_unexpected_success": [
-        "S00022",
-        "S00025"
-      ],
-      "forced_structure": [
-        {
-          "task_id": "CER-02",
-          "status": "MEASURED",
-          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-          "reference_characters": 250,
-          "edit_distance": 44,
-          "cer": 0.176,
-          "normalization": "newline_only"
-        },
-        {
-          "task_id": "TABLE-WIRED",
-          "status": "MEASURED",
-          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-          "reference_tables": 1,
-          "predicted_tables": 1,
-          "exact_structure": true,
-          "exact_structure_and_text": true
-        },
-        {
-          "task_id": "TABLE-WIRELESS",
-          "status": "MEASURED",
-          "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-          "reference_tables": 1,
-          "predicted_tables": 1,
-          "exact_structure": true,
-          "exact_structure_and_text": true
-        }
-      ],
-      "docx_scope": {
-        "reference_tables": 1,
-        "document_predicted_tables": 2,
-        "reference_rows": 66,
-        "reference_columns": 5,
-        "reference_cells": 257,
-        "predicted_table0_cells": 330,
-        "reference_vertical_merges": 32,
-        "predicted_vertical_merges": 0
-      }
-    },
-    "source_hash_unchanged": "25/25",
-    "legal_special": {
-      "total": 11,
-      "passed": 11,
-      "scope": "source parsing and chunking only; not OCR-reviewed PG lifecycle"
-    }
-  },
-  "truth_package": {
-    "version": "v0.2.2 expansion",
-    "matrix_records": 66,
-    "page_records": 60,
-    "file_records": 6,
-    "full_text_references": 4,
-    "table_references": 4,
-    "new_tasks": [
-      {
-        "task_id": "CER-03",
-        "sample_id": "S00004",
-        "status": "MEASURED"
-      },
-      {
-        "task_id": "LAYOUT-01",
-        "sample_id": "S00011",
-        "status": "MEASURED"
-      },
-      {
-        "task_id": "TAB-DOCX-01",
-        "sample_id": "S00016",
-        "status": "MEASURED"
-      },
-      {
-        "task_id": "TAB-CROSS-01",
-        "sample_id": "S00012",
-        "status": "MEASURED"
-      }
-    ],
-    "protected_files_unchanged": 29,
-    "original_expansion_unchanged": true
-  },
-  "current_quality_measurements": [
-    {
-      "task_id": "CER-01",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_characters": 486,
-      "edit_distance": 9,
+  "recognition": {
+    "CER-01": {
       "cer": 0.018518518518518517,
-      "normalization": "newline_only"
+      "reference": "普通扫描<=5%",
+      "result": "WITHIN_REFERENCE"
     },
-    {
-      "task_id": "CER-02",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_characters": 250,
-      "edit_distance": 47,
-      "cer": 0.188,
-      "normalization": "newline_only"
-    },
-    {
-      "task_id": "TABLE-WIRED",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_tables": 1,
-      "predicted_tables": 1,
-      "exact_structure": false,
-      "exact_structure_and_text": false
-    },
-    {
-      "task_id": "TABLE-WIRELESS",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_tables": 1,
-      "predicted_tables": 0,
-      "exact_structure": false,
-      "exact_structure_and_text": false
-    },
-    {
-      "task_id": "CER-03",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_characters": 648,
-      "edit_distance": 16,
+    "CER-03": {
       "cer": 0.024691358024691357,
-      "normalization": "newline_only"
+      "reference": "普通扫描<=5%",
+      "result": "WITHIN_REFERENCE"
     },
-    {
-      "task_id": "LAYOUT-01",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_characters": 1857,
-      "edit_distance": 1664,
+    "CER-02-auto": {
+      "cer": 0.188,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "CER-02-structure": {
+      "cer": 0.176,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "LAYOUT-01": {
       "cer": 0.8960689283791061,
-      "normalization": "newline_only"
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
     },
-    {
-      "task_id": "TAB-DOCX-01",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_tables": 1,
-      "predicted_tables": 2,
-      "exact_structure": false,
-      "exact_structure_and_text": false
+    "TABLE-WIRED-auto": {
+      "reference_cells": 30,
+      "predicted_cells": 56,
+      "geometry_matching_cells": 19,
+      "text_matching_cells": 19,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
     },
-    {
-      "task_id": "TAB-CROSS-01",
-      "status": "MEASURED",
-      "prediction_source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
-      "reference_tables": 1,
-      "predicted_tables": 1,
+    "TABLE-WIRED-structure": {
       "exact_structure": true,
-      "exact_structure_and_text": true
+      "exact_text": true,
+      "matching_cells": 30
+    },
+    "TABLE-WIRELESS-auto": {
+      "exact_structure": true,
+      "exact_text": true,
+      "matching_cells": 48
     }
-  ],
-  "local_ocr_status": "REAL_INFERENCE_COMPLETED",
-  "local_structure_status": "REAL_TABLE_INFERENCE_COMPLETED",
-  "real_bge_status": "PASS",
-  "real_bge_dimensions": 1024,
-  "real_mineru_api_status": "BLOCKED",
-  "real_mineru_requests_this_round": 0,
-  "real_local_to_mock_fallback": {
-    "local": "real PaddleOCR",
-    "cloud": "MockTransport",
-    "authorized_mock_calls": 5,
-    "sensitive_mock_calls": 0
   },
-  "real_http_status": "PASS",
-  "dedicated_container_restart_status": "PASS",
-  "postgres_existing_schema_status": "PASS",
-  "postgres_lifecycle_status": "BLOCKED",
-  "persistent_entry": {
-    "http_status": 200,
-    "host_binding": "127.0.0.1",
-    "snapshot_commit": "67709c4989781594dd6c4723666fdb2c21caaa7b",
-    "scope": "infrastructure only; current Fix integration independently tested with explicit source binding"
-  },
-  "pytest_status": "BLOCKED_NOT_INSTALLED",
-  "python_ast_status": "PASS",
-  "compose_config_status": "PASS",
-  "typescript_status": "NOT_APPLICABLE",
-  "evidence_manifest": "local/v021-final-a860abf/evidence-manifest.json",
-  "evidence_manifest_sha256": "431c7718a59c30f3694856b21752ade6bf85e8210b1e9a1ba790f8f39ced8408",
-  "business_code_changed_by_qa": false,
-  "production_database_used": false,
-  "ddl_executed": false,
-  "delete_executed": false,
-  "merge_main_allowed": false,
-  "push_allowed": false,
-  "production_deployment_allowed": false,
-  "handoff_status": "NEEDS_FIX",
-  "historical_evidence_policy": "旧报告保留在Git及既有文档；不把旧SHA的云端、模型或数据库记录计入本轮PASS"
+  "evidence_root": "local/v021-release-final",
+  "deployment_status": "未切换活动旧镜像；候选验收不等于生产部署验收",
+  "automatic_release_allowed": false,
+  "automatic_next_version_ready": false
 }
