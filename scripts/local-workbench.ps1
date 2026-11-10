@@ -1,5 +1,5 @@
 param([ValidateSet('start','build','status','stop')][string]$Action = 'status',
-      [int]$Port = 8181, [string]$Python = '')
+      [int]$Port = 8180, [string]$Python = '')
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $workspace
@@ -22,7 +22,7 @@ try {
     $env:LOCAL_APP_IMAGE = $deployment.image
     $env:LOCAL_APP_PORT = [string]$deployment.port
     $env:LOCAL_DATABASE_NETWORK = $deployment.database_network
-    $composeArgs = @('compose','--project-name','market-regulation-workbench','-f','compose.local.yaml')
+    $composeArgs = @('compose','--project-name','market-regulation','-f','compose.local.yaml')
     if ($Action -in @('start','build')) {
         & docker image inspect $deployment.image *> $null
         if ($LASTEXITCODE -ne 0) {

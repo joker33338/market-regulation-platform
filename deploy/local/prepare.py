@@ -34,7 +34,7 @@ def runtime_values(values, database_host="db"):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8181)
+    parser.add_argument("--port", type=int, default=8180)
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         raise ValueError("本地入口端口无效。")

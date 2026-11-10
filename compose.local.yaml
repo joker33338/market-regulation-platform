@@ -1,4 +1,4 @@
-name: market-regulation-workbench
+name: market-regulation
 services:
   app:
     image: ${LOCAL_APP_IMAGE:?请使用本地工作台启动脚本}
@@ -12,7 +12,7 @@ services:
     pids_limit: 256
     stop_grace_period: 60s
     ports:
-      - "127.0.0.1:${LOCAL_APP_PORT:-8181}:8180"
+      - "127.0.0.1:${LOCAL_APP_PORT:-8180}:8180"
     volumes:
       - type: bind
         source: ${LOCAL_WORKBENCH_ROOT:?请使用本地工作台启动脚本}/runtime.json
