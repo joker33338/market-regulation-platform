@@ -134,6 +134,20 @@ class DualEngineRouter:
         checkpoint = directory / 'local-candidate.json'
         if checkpoint.is_file():
             local = DocumentResult.from_dict(json.loads(checkpoint.read_text(encoding='utf-8')))
+            # 旧缓存即使无需云回退，也不能豁免当前源文件的资源限额。
+            try:
+                limits = ParsingConfig.from_env()
+                source = Path(file['source_path'])
+                if source.stat().st_size > limits.max_file_bytes:
+                    raise ParsingSafetyError('file_byte_limit')
+                if source.suffix.lower() in {'.png', '.jpg', '.jpeg'}:
+                    validate_image_safety(source, limits)
+            except ParsingSafetyError as exc:
+                # 保留原 checkpoint 和识别正文；失败候选不能进入结果 sink。
+                local.parsing_status = 'failed'
+                local.error_message = str(exc)
+                local.requires_review = True
+                local.quality['safety_rejection'] = {'status': 'SAFE_REJECT', 'code': exc.code}
         else:
             def parse_local():
                 loading = True

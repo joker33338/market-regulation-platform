@@ -81,11 +81,13 @@ class ReleaseSafetyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(result['requires_review'])
 
     async def test_cached_candidate_cannot_bypass_current_input_safety(self):
-        task,result,fixture,_=await self.run_image(strategy='remote',cached=True)
-        self.assertEqual(fixture.calls,[])
-        self.assertEqual(task['status'],'failed')
-        self.assertEqual(result['quality']['routing_trace']['failure_reason'],'image_pixel_limit')
-        self.assertIn('synthetic retained candidate',str(result['quality']['routing_trace']['raw_results']))
+        for strategy in ('auto', 'local', 'remote'):
+            with self.subTest(strategy=strategy):
+                task,result,fixture,_=await self.run_image(strategy=strategy,cached=True)
+                self.assertEqual(fixture.calls,[])
+                self.assertEqual(task['status'],'failed')
+                self.assertEqual(result['quality']['routing_trace']['failure_reason'],'image_pixel_limit')
+                self.assertIn('synthetic retained candidate',str(result['quality']['routing_trace']['raw_results']))
 
     async def test_ordinary_ocr_failure_can_still_use_authorized_fallback(self):
         task,result,fixture,_=await self.run_image(fail_ocr=True)
