@@ -1,10 +1,10 @@
 {
-  "handoff_id": "v021-fix-8e80f73-QFA-001-004-local-docker",
+  "handoff_id": "v021-fix-350f5ad-three-priorities",
   "version": "v0.2.1",
   "source_agent": "Fix",
   "target_agent": "QA",
   "source_branch": "codex/fix-v0.2.1",
-  "source_commit": "8e80f7354195c969306852fe1d4dfce6917f5528",
+  "source_commit": "350f5ad3d8d0859e6dbbb2a879367e901913b556",
   "baseline_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
   "qa_test_commit": "78b7e05e747656414badd8350c83d48b672ecc16",
   "qa_handoff_commit": "0881807ee0524503c54b0f08fcca96c922f9828e",
@@ -33,13 +33,14 @@
   ],
   "report_sha256": {
     "docs/qa/v0.2.1/fix-plan.md": "74e83dcc64f2dcce4cf1d908cfe70f30b95f3b759db0fab1e0cf07532a8b86d8",
-    "docs/qa/v0.2.1/fix-report.md": "75d589e94eac7955f7280418c478dd6002df28ec1f8ae67dae7961a7d070e7b5",
-    "docs/qa/v0.2.1/handoff-to-qa.md": "abc2d9bbb21bd040daa437dc0cd4a46868884c652aa9bd8466ebf679f6d21954",
-    "deploy/local/README.md": "6c22a53a4924c3942623e8748b70bbbcc7e84a3277f225cebd20c749ed91a1d0"
+    "docs/qa/v0.2.1/fix-report.md": "849da77fd29b5c4454837cfbb0912467402e9f83d6c671b6f2bcab646aa7ff11",
+    "docs/qa/v0.2.1/handoff-to-qa.md": "c66da1e4ff8386742a5f4f546d19d3211017311305dce71d708cea58f0a67439",
+    "deploy/local/README.md": "3ea82e5ead2c9509b939d7a6520344fd63ce78824d5f7e3c0131a65a9927e5d9"
   },
   "test_commands": [
     "python -B -m unittest tests.test_v021_final_acceptance_edges tests.test_v021_qfa_pdf tests.test_v021_qfa_docx tests.test_v021_agent_launcher tests.test_document_parsing tests.test_v021_native_preservation tests.test_v021_fix_edges -v",
-    "python -B tests/run_v021_final_acceptance.py --source $FixRoot --source-sha $FinalFixSha --api-packages $ApiPackages --output local/v021-qfa-regression"
+    "python -B tests/run_v021_final_acceptance.py --source $FixRoot --source-sha $FinalFixSha --api-packages $ApiPackages --output local/v021-qfa-regression",
+    "docker exec market-regulation-app-1 python -B scripts/verify_mineru_cloud.py"
   ],
   "local_validation": {
     "focused": {
@@ -49,8 +50,8 @@
       "skipped": 0
     },
     "complete_unique_methods": {
-      "total": 245,
-      "passed": 239,
+      "total": 247,
+      "passed": 241,
       "failed": 0,
       "errors": 0,
       "skipped": 6
@@ -74,11 +75,17 @@
       "source_hashes_unchanged": true
     },
     "live_postgres_run": true,
-    "real_cloud_requests": 1,
+    "real_cloud_requests": 6,
     "live_model_inference_run": true,
     "live_postgres_suite_run": false,
-    "real_cloud_parse_tasks_created": 0,
-    "runtime_probe_scope": "单张合成图PaddleOCR、合成原生PDF本机HTTP到既有PostgreSQL；完整自动化套件仍用Mock且六项PG跳过。"
+    "real_cloud_parse_tasks_created": 1,
+    "runtime_probe_scope": "历史任务只读GET1次；新增固定单页合成云任务5次请求，完整路由下载入库，重跑请求数与记录数均不变；真实用户文件仅本地解析。",
+    "cloud_probe_focused": {
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    }
   },
   "transport_commit_policy": "最终回复提供报告传输完整SHA；若工作区HEAD包含该提交，先确认相对source_commit仅文档变化，再以该HEAD运行QA绑定入口。",
   "remaining_scope": [
@@ -95,12 +102,12 @@
   "push_allowed": false,
   "merge_main_allowed": false,
   "production_deployment_allowed": false,
-  "validation_commit": "a8f7031bfd3bdc6cc7df5f9adb190a75eee8a968",
+  "validation_commit": "350f5ad3d8d0859e6dbbb2a879367e901913b556",
   "local_deployment": {
     "project": "market-regulation",
     "endpoint": "http://127.0.0.1:8180",
-    "image": "market-regulation-workbench:local-f6affa00a3702d5a",
-    "image_source_commit": "a8f7031bfd3bdc6cc7df5f9adb190a75eee8a968",
+    "image": "market-regulation-workbench:local-4ecd995cb4be8ee4",
+    "image_source_commit": "350f5ad3d8d0859e6dbbb2a879367e901913b556",
     "services": [
       "app",
       "db",
@@ -110,8 +117,8 @@
     "restart_policy": "unless-stopped",
     "persistent_task_and_result_verified": true,
     "postgres_documents_before": 8,
-    "postgres_documents_after": 9,
-    "synthetic_documents_added": 1,
+    "postgres_documents_after": 12,
+    "synthetic_documents_added": 2,
     "postgres_schema_changed": false,
     "historical_data_deleted": false,
     "cloud_transfer_enabled": false,
@@ -144,6 +151,35 @@
       "uvicorn": "0.34.2"
     },
     "windows_reboot_verified": false,
-    "independent_qa_status": "PENDING"
+    "independent_qa_status": "PENDING",
+    "document_count_note": "观察时为原8份、两份合成验证、两份用户手动上传；用户文件不计入测试指标。",
+    "mineru_full_synthetic_probe": {
+      "status": "PASS",
+      "pages": 1,
+      "requests": 5,
+      "submissions": 1,
+      "selected_engine": "mineru_official",
+      "result_characters": 161,
+      "database_rows": 1,
+      "requires_review": true,
+      "local_candidate_preserved": true,
+      "remote_candidate_preserved": true,
+      "source_unchanged": true,
+      "repeat_created": false,
+      "repeat_requests_total": 5,
+      "repeat_database_rows": 1,
+      "request_timeout_seconds": 30,
+      "poll_interval_seconds": 20,
+      "request_limit": 8,
+      "request_breakdown": [
+        "create_task",
+        "query_waiting_file",
+        "upload_file",
+        "query_completed",
+        "download_result"
+      ],
+      "old_qa_batch_modified": false,
+      "real_corpus_uploaded": false
+    }
   }
 }

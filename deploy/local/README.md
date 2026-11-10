@@ -15,8 +15,8 @@ Docker Desktop 统一显示 `market-regulation`：
 | redis | 用户要求保留，当前解析代码尚未使用 | 16379 |
 
 所有发布端口只绑定本机回环。三个既有数据服务未重建；应用使用已有数据库网络，通过容器内 `db:5432` 访问同一个库。
-应用镜像 `market-regulation-workbench:local-f6affa00a3702d5a`，业务源码版本为
-`a8f7031bfd3bdc6cc7df5f9adb190a75eee8a968`；其中包含本轮 QFA-001～004 修复。
+应用镜像 `market-regulation-workbench:local-4ecd995cb4be8ee4`，源码版本为
+`350f5ad3d8d0859e6dbbb2a879367e901913b556`；其中包含本轮 QFA-001～004 修复和完整云验证入口。
 后续项目合并与启动校验的脚本提交不改变镜像内业务源码。
 
 ## 启动和持久化
@@ -55,9 +55,34 @@ Compose 可能提示三个服务未在本地应用文件内声明；它们是需
 数据库由 8 份增加到 9 份：仅新增一份明确的合成验证记录，未删除原数据、执行 DDL 或清理数据库。
 实际非 root 容器从只读模型目录完成一次合成图片 PaddleOCR，识别 24 字，结果保留人工复核要求；没有下载模型或外传。
 
-MinerU 使用官方 API，无需本地 MinerU 服务镜像。本次令牌检查仅 GET 读取一个历史完成任务：HTTP 200、业务码 0；
-未创建远端任务、上传文件或恢复过期授权批次。工作台的云端自动回退默认关闭，浏览器勾选不能自行授予外传权限。
+MinerU 使用官方 API，无需本地 MinerU 服务镜像。先前 GET 历史任务已返回 HTTP 200、业务码 0；
+后续已在当前应用容器内完成一页合成 PDF 的真实提交、上传、轮询、下载、标准化和 PostgreSQL 入库。
+共5次请求、1次提交，云结果161字；本地/云端候选与原文件摘要均保留。重复执行复用原任务，仍是5请求、1条入库记录。
+未使用真实语料、恢复旧授权批次或清空旧账本。工作台的云端自动回退默认关闭，浏览器勾选不能自行授予外传权限。
 PP-Structure 表格模型配置与已有模型已检查；本次没有再次执行全量真实表格性能或 BGE/数据库生命周期测试。
+
+## 查看数据库与云端受控验证
+
+宿主数据库连接为 `127.0.0.1:15432/market_regulation`，用户 `market_app`；容器内的 `db:5432` 是同一数据库的内部地址。
+工作台写入 `document_review.documents`，页、表和单元格在同一 Schema 下；不会自动发布到正式 RAG 版本。
+页面显示的数据库记录 ID 对应 `parse_id`。待人工复核的记录仍已存入解析结果表。
+
+```sql
+SELECT parse_id, file_name, parsing_status, requires_review
+FROM document_review.documents;
+```
+
+合成云探针默认只准备文件，不联网；只有明确传入 `--execute` 才运行。它不接收任意文件输入，只生成固定一页 PDF，
+为该 SHA 建立最长一小时的授权，预算最多8次请求和1页；持久任务与预算在 `/state/mineru-synthetic-check`。
+`--database` 仅把完整通过的合成云结果写入既有表。授权过期保留原记录并失败，不自动续期/新建任务绕过账本。
+
+```powershell
+docker exec market-regulation-app-1 python -B scripts/verify_mineru_cloud.py
+# 以下是显式真实调用；须在批准的测试时间和预算内执行。
+docker exec market-regulation-app-1 python -B scripts/verify_mineru_cloud.py --execute --database
+```
+
+这份新生成的合成验证不替代 QA 原真实样本的云质量、批次恢复或业务阈值验收，也不授予其他文件外传权限。
 
 复用基础镜像中实际 FastAPI 为 0.162.0、uvicorn 为 0.54.0；宿主完整回归复用的 API 环境为 0.115.12/0.34.2。
 没有升级/重装任何一边。镜像已有 HTTP/入库/OCR 实测；完整独立 QA 仍需覆盖镜像环境，不能将宿主回归直接当作镜像全量通过。

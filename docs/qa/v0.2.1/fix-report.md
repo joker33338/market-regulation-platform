@@ -135,3 +135,33 @@ python -B -m unittest tests.test_v021_final_acceptance_edges tests.test_v021_qfa
 清理13个旧实例，保留全部卷（含3个历史QA库卷）、证据、模型与批次账本；清理5份旧QA/候选镜像及2个重复标签，保留重建所需镜像。
 新入口以同一 state 目录保持数据，旧8181入口撤销。正式中文部署说明为 `deploy/local/README.md`。
 真实云解析/恢复、质量阈值、整机重启与完整 PostgreSQL 生命周期的 QA 未决项不因本次连接成功而变为 PASS。
+
+## 三项重点续验：QA 修复、真实 MinerU、Docker 可用
+
+最新源码提交：`350f5ad3d8d0859e6dbbb2a879367e901913b556`。
+QA 分支仍停留在原报告提交，尚无本轮独立复验结论；QFA-001～004 的业务修复未再改动，不伪造 QA PASS。
+
+新增 `scripts/verify_mineru_cloud.py`，复用 OfficialMinerUClient、DualEngineRouter、MinerUService 和 PostgresResultSink，
+只处理代码生成的固定单页合成 PDF，默认无网络。显式执行才逐 SHA 授权；最多1页、1文件、8请求，
+授权、任务、结果及使用次数持久保存；已有内容不符拒绝覆盖/上传，过期不自动续期，未知 POST 不另建任务。
+不改工作台的默认云开关、不导入真实语料、不修改过期 QA 批次账本。
+镜像纳入探针脚本，prepare 的镜像摘要包含脚本，保证脚本变更不会复用错误镜像；新增两项无网络保护测试。
+
+| 实际执行 | 结果 |
+| --- | --- |
+| 新增探针、部署配置及路由策略定向回归 | 18/18 PASS |
+| 最新冻结提交完整并集 | 247 个唯一方法，241 PASS、0 FAIL/ERROR、6 PostgreSQL SKIP；18项已包含，不能相加 |
+| 现有应用容器内真实官方 API 全链路 | 1页合成文件，5请求、1提交，完整下载/标准化；选择 mineru_official，云正文161字，本地与云候选均保留 |
+| 合成云结果写用户既有 PostgreSQL | 1条记录，正文161字；不创建表，不删除旧数据，仍需人工复核 |
+| 同一探针再次执行 | created=false，仍5请求、1提交、1条入库记录；没有额外网络/重复写入 |
+| 用户手动上传与数据库地址核对 | 同一 parse_id 在工作台与用户 DBX 连接均可见，用户已确认；数据在 document_review.documents |
+
+Docker 仍只有同一项目的 app/db/mysql/redis 四容器，应用已更新至 `market-regulation-workbench:local-4ecd995cb4be8ee4`。
+更新前确认无运行中的解析任务，仅替换 app；三个数据容器和原持久状态未更改。
+正式数据库连接 `127.0.0.1:15432/market_regulation` 与容器的 `db:5432` 经端口映射和同一记录交叉核验。
+这解决了“已上传但未在所查看表找到”的定位疑问，没有证据将其认定为丢失数据 Bug，也未为此修改业务源码。
+
+完整回归证据在 `local/v021-qfa-fix/full-cloud-probe/`，云结果在当前持久 state 的 `mineru-synthetic-check/`，
+脱敏摘要复制至 `local/v021-qfa-fix/mineru-full-verification.json`。合成验证新增1条云结果；用户自行上传不计作自动化样本。
+该实测补齐“仅令牌/GET可用”之后的完整云解析证据，但不能替代原 QA 样本的远端恢复、真实质量或业务阈值。
+六项跳过与独立 QA、整机重启、生命周期和样本意图冲突仍保留；未 Push、合并 main、部署生产或输出密钥。
