@@ -181,3 +181,36 @@ $HandoffSha = (& git -C $FixRoot rev-parse HEAD).Trim()
 - 用户最新职责界定：Fix 完成代码优化、静态与必要轻量检查和冻结交接；独立测试、真实样本验证、性能对照和最终验收由 QA 完成。
 - 六份源码已冻结；文档传输提交完成后须再次确认工作区干净、且相对源码提交只有文档差异，再正式接收。
 - 本文件的 READY_FOR_QA 仅表示可绑定版本开始测试，不改变此前 QA 闸门，不宣称优化效果或生产验收通过。
+
+## 补充：六项 PostgreSQL 跳过用例的处理方案
+
+本补充来自用户在源码冻结后的独立询问。Fix 仅阅读测试代码并只读核对数据库清单，未执行集成测试、建库或 DDL。
+观察时现有 PostgreSQL 只有 `market_regulation`、`postgres` 两个非模板可连接数据库，业务连接的 QA 隔离标记为空。
+应用连接可用不能代替测试隔离条件；不得将业务连接直接填入全部测试变量。
+
+| 用例 | 跳过/执行条件 | 实际副作用 |
+| --- | --- | --- |
+| ParsingPostgresTests.test_transactional_insert_idempotency_and_existing_rows_preserved | `PARSING_TEST_PG_DSN`，既有 document_review 表 | 提交合成结果并重复写入验证幂等，记录保留 |
+| ParsingPostgresTests.test_child_failure_rolls_back_parent_insert | 同上 | 故意触发子表约束错误，验证父记录事务回滚 |
+| Round01PostgresAcceptance.test_mapping_idempotency_conflict_preserves_existing_result | `QA_ISOLATED_PG_DSN`，还校验 qa_round01、qa-postgres 和隔离标记 | 提交合成父子表、验证字段映射及冲突不覆盖旧行 |
+| Round01PostgresAcceptance.test_cell_failure_rolls_back_all_levels_and_preserves_prior_row | 同上 | 保留合成基准行，制造单元格错误验证多级事务回滚 |
+| DualEngineAcceptance.test_I_repeat_and_failure_do_not_duplicate_or_replace_database_rows | `QA_ISOLATED_PG_DSN` 和既有双引擎测试适配器 | 合成数据提交后模拟中断、恢复及重复请求，验证不重复入库 |
+| PostgreSQLIntegration.test_isolated_schema_build_publish_query_rollback | `MVP_TEST_PG_DSN`，pgvector 与测试 Schema 权限 | 原用例 CREATE Schema/表、发布/回滚时 DELETE 测试投影，末尾 DROP Schema CASCADE |
+
+另一个确定原因：`tests/run_v021_final_acceptance.py` 会主动清空测试 DSN。此默认保护应保留，QA 使用单独的受控数据库补跑入口，
+仍验证 Fix 完整 SHA、源码来源和工作区干净状态；不要删除默认保护或把连接异常改成通过。
+
+建议由 QA 在**现有 PostgreSQL 容器内**准备独立 `qa_round01` 数据库和受限测试账号，不新增常驻容器，不使用业务账号执行测试。
+准备范围为：独立测试库/账号、仅该库内的 pgvector 和既有测试表、明确的 QA 隔离标记及测试权限。
+这属于待批准的初始化方案，不是 Fix 已执行的修改。
+
+QA 需核对原夹具的 `host=qa-postgres` 假设与同容器独立数据库方案的差异；如需适配，应在 QA 分支加强连接身份/角色/库名/标记核验，
+保留业务断言并记录依据，不能只移除主机断言、伪造标记或通过换 DSN 指向业务库来求通过。
+
+最后一项需单独确认随机测试 Schema 的 CREATE/表初始化、测试投影发布/回滚和清理范围。
+已有 `tests/run_preserved_postgres_validation.py` 是需明确批准的复核入口，可保留新建测试 Schema 而不 DROP；
+不能因该入口抑制 DROP 就声称没有任何 DDL 或 DELETE，其业务测试仍会操作独立测试 Schema 的投影。
+建议保留测试数据与 Schema，结束后不自动 DROP DATABASE、DELETE 历史记录或删除卷。
+
+批准后由 QA 将补跑结果按相同方法 ID 替换对应 SKIP，不与全量方法数重复相加，并记录受测 SHA、隔离身份、命令和副作用。
+目前仅完成原因与方案核对，六项仍未在本轮实际执行，不能改记 PASS。
