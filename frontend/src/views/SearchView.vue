@@ -3,62 +3,113 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">法规知识检索</h1>
-        <p class="page-desc">BGE-M3 向量检索 · 法条级定位 · 版本可追溯（法律依据必须可追溯）</p>
+        <p class="page-desc">public ACTIVE 知识库 · 法条级定位 · 结果以后端真实返回为准（前端不生成任何法律原文）</p>
       </div>
-      <DemoBadge />
+      <div class="header-tags">
+        <el-tag type="success" effect="plain">真实接口 /api/knowledge/search</el-tag>
+        <el-tag :type="contractState === 'ready' ? 'success' : 'warning'" effect="plain">{{ contractLabel[contractState] }}</el-tag>
+      </div>
     </div>
 
-    <!-- 接口未接入：禁止伪造法条原文与生成式结论 -->
     <el-alert
-      type="warning"
+      type="info"
       :closable="false"
-      show-icon
-      title="检索接口未接入 · 未提供任何法律依据"
-      description="后端 qa_core/retrieval/ 仅有服务层，无检索 HTTP 接口。为遵守「禁止伪造法律原文、不能让前端编造法规结论」，本页不返回任何法条文本或检索结论；下方仅展示接口交付后的结果字段契约。"
-    />
+      class="scope-notice"
+      title="检索范围与真实性边界"
+      description="仅检索 public schema 的 ACTIVE 版本；后端只提供检索，不提供 AI 问答或生成式结论。keyword_match 分数只表示关键词匹配，rrf 是融合排序分，均不是法律准确率。尚无效力日期、发布机关等可靠字段时页面不编造，也不支持历史版本查询；请求体仅含 query / mode / limit，附加字段会被后端 422 拒绝。" />
 
+    <!-- 检索输入：只暴露后端契约支持的参数 -->
     <el-card shadow="never" style="margin-top: 16px">
       <div class="search-bar">
         <el-input
           v-model="query"
           size="large"
-          placeholder="检索接口未接入，暂不可查询"
-          disabled
+          placeholder="输入法规名称、条号或业务关键词（内容原样提交后端，前端不做语义补全）"
+          clearable
+          @keyup.enter="runSearch"
         >
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-tooltip :content="disabledHint" placement="top">
-          <span><el-button type="primary" size="large" disabled>检索</el-button></span>
-        </el-tooltip>
+        <el-button type="primary" size="large" :disabled="!canSearch" :loading="search.loading.value" @click="runSearch">检索</el-button>
+        <el-button size="large" @click="clearQuery">清空</el-button>
       </div>
       <div class="filter-row">
-        <el-select v-model="filters.kbVersion" size="small" placeholder="法规版本" disabled style="width: 130px" />
-        <el-select v-model="filters.authority" size="small" placeholder="发布机关" disabled style="width: 200px" />
-        <el-select v-model="filters.effectiveOnly" size="small" placeholder="生效状态" disabled style="width: 130px" />
-        <el-checkbox v-model="filters.semantic" size="small" disabled>语义检索</el-checkbox>
-        <el-checkbox v-model="filters.hybrid" size="small" disabled>混合检索（后端真实支持时启用）</el-checkbox>
-        <span class="mr-disabled-hint">{{ disabledHint }}</span>
+        <el-select v-model="mode" size="small" style="width: 200px">
+          <el-option label="keyword（关键词，不加载模型）" value="keyword" />
+          <el-option label="hybrid（BGE-M3 混合检索）" value="hybrid" />
+        </el-select>
+        <span class="limit-label">返回条数 limit</span>
+        <el-input-number v-model="limit" :min="1" :max="50" :step="1" size="small" controls-position="right" style="width: 110px" />
+        <span class="mr-disabled-hint">已移除「法规版本 / 发布机关 / 生效状态 / semantic-only」筛选器：v0.2.2 契约未提供这些字段</span>
+      </div>
+      <div class="mr-disabled-hint" style="margin-top: 8px">
+        hybrid 模式要求本地向量模型签名与 ACTIVE 版本一致，单进程并发受限时后端返回 429；页面如实显示错误态，不降级为模拟结果。
       </div>
     </el-card>
 
-    <!-- 未检索到相关依据 -->
-    <el-card shadow="never" style="margin-top: 16px">
-      <el-empty description="未检索到相关依据（检索接口未接入）">
-        <template #default>
-          <p class="empty-note">
-            无可靠检索依据时，本页不会生成任何法规名称、条号、原文或结论。
-            接口交付后，结果将包含下列字段，且每条命中都可追溯到来源文件与原始分数。
-          </p>
-        </template>
-      </el-empty>
-    </el-card>
-
-    <!-- 结果字段契约（不含任何法条内容） -->
+    <!-- 结果区：unpublished / 无命中 / 真实命中 三种明确状态 -->
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <div class="card-head">
-          <span>检索结果字段契约（接口交付后启用）</span>
-          <span class="card-sub">POST /api/knowledge/search</span>
+          <span>检索结果 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">
+            <template v-if="search.data.value">
+              状态 {{ search.data.value.status }} · kb_version {{ search.data.value.kb_version || '—' }} ·
+              模式 {{ search.data.value.mode }} · 命中 {{ search.data.value.count }} · 来源 {{ search.data.value.source }}
+            </template>
+            <template v-else>尚无检索结果</template>
+          </span>
+        </div>
+      </template>
+
+      <AsyncPanel :state="search.state.value" :error="search.error.value" @retry="runSearch">
+        <template #empty>
+          <el-empty :image-size="70" :description="search.data.value?.status === 'unpublished'
+            ? '知识库尚未发布：public schema 无 ACTIVE 版本，后端返回 status=unpublished'
+            : '未检索到相关依据（后端返回空列表）'">
+            <p class="empty-note">
+              本页不会生成任何法规名称、条号、原文或结论；接口异常时显示错误态而非空结果。
+              <template v-if="!submittedQuery">请输入检索词并发起一次真实检索。</template>
+            </p>
+            <el-button size="small" @click="runSearch">重新检索</el-button>
+          </el-empty>
+        </template>
+
+        <el-alert type="success" :closable="false" style="margin-bottom: 12px"
+          title="以下法条文本与元数据均来自后端真实响应"
+          description="article_text 按不可信纯文本渲染（不使用 v-html、不执行 HTML / 脚本）；raw_score 仅作排序参考，不得解释为法律适用结论。引用时请结合 source 元数据与 kb_version 追溯原文。" />
+
+        <div v-for="(hit, i) in hits" :key="`${hit.chunk_id}-${i}`" class="hit-card">
+          <div class="hit-head">
+            <span class="hit-index num">{{ i + 1 }}</span>
+            <b>{{ hit.regulation_name || '〔后端未返回法规名称〕' }}</b>
+            <el-tag v-if="hit.article_no" size="small" effect="plain">{{ hit.article_no }}</el-tag>
+            <el-tag v-if="hit.chapter" size="small" type="info" effect="plain">{{ hit.chapter }}</el-tag>
+            <span class="hit-score">
+              {{ hit.score_kind }}：<b class="num">{{ hit.raw_score ?? '—' }}</b>
+            </span>
+          </div>
+          <pre class="hit-text">{{ hit.article_text || '〔后端未返回该条法条原文，前端不补写〕' }}</pre>
+          <div class="hit-meta">
+            <span>kb_version：<code class="mono">{{ hit.kb_version || '—' }}</code></span>
+            <span>chunk_id：<code class="mono">{{ hit.chunk_id || '—' }}</code></span>
+            <span>doc_version_id：<code class="mono">{{ hit.doc_version_id || '—' }}</code></span>
+          </div>
+          <el-collapse v-if="hasSource(hit)">
+            <el-collapse-item title="source 溯源元数据（后端原始字段）">
+              <pre class="result-pre">{{ asJson(hit.source) }}</pre>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+      </AsyncPanel>
+    </el-card>
+
+    <!-- 结果字段契约说明（不含任何法条内容） -->
+    <el-card shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>结果字段契约</span>
+          <span class="card-sub">POST /api/knowledge/search · frontend-api-v0.2.2-1</span>
         </div>
       </template>
       <div class="field-grid">
@@ -66,47 +117,106 @@
       </div>
       <el-divider />
       <div class="mode-grid">
-        <div><b>自然语言检索</b><span>输入监管业务问题，返回相关法条与依据</span></div>
-        <div><b>关键词检索</b><span>按法规名称、条号、文号精确匹配</span></div>
-        <div><b>语义检索</b><span>BGE-M3 向量召回，展示原始分数</span></div>
-        <div><b>混合检索</b><span>仅当后端真实支持时启用，前端不模拟</span></div>
+        <div><b>keyword 模式</b><span>复用关键词检索，不加载向量模型，返回 keyword_match 标记</span></div>
+        <div><b>hybrid 模式</b><span>复用 BGE-M3 混合检索，返回 rrf 融合排序分；模型签名须与 ACTIVE 一致</span></div>
+        <div><b>unpublished</b><span>public 知识库无 ACTIVE 版本时返回空列表，页面显示「尚未发布」而非伪造命中</span></div>
+        <div><b>不支持</b><span>AI 问答、生成式结论、历史版本查询、semantic-only 与未实现的筛选参数</span></div>
       </div>
       <div class="mr-disabled-hint" style="margin-top: 12px">
-        接口未接入期间，筛选器、检索按钮与结果区全部禁用，不出现「演示命中」或伪造的相关度分数。
+        请求体任何额外字段都会被后端以 422 拒绝，因此页面不提供可自由拼接的筛选条件；
+        法效日期、发布机关等字段在后端未提供前一律不展示、不推断。
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
-import DemoBadge from '@/components/DemoBadge.vue'
-import { RESULT_FIELDS } from '@/api/mock/search'
-import { unimplementedHint } from '@/api/dataSource'
+import AsyncPanel from '@/components/AsyncPanel.vue'
+import { useAsyncData } from '@/composables/useAsyncData'
+import { searchKnowledge } from '@/api/frontend'
+import { contractState, contractLabel } from '@/api/dataSource'
+import type { SearchRequest, SearchResponse, SearchHit } from '@/api/types'
 
-const disabledHint = unimplementedHint('POST /api/knowledge/search')
+/**
+ * v0.2.2 法规检索
+ * - 唯一数据源 POST /api/knowledge/search（仅 public ACTIVE）
+ * - 请求体严格 {query,mode,limit}；不传后端不支持的筛选字段
+ * - 法条原文只渲染后端 article_text，纯文本 <pre>，禁止 v-html
+ * - unpublished / 空列表 / 接口异常 / 未认证 / 契约未加载 分别呈现，绝不伪造法条
+ */
 const query = ref('')
-const filters = ref({
-  kbVersion: '',
-  authority: '',
-  effectiveOnly: '',
-  semantic: false,
-  hybrid: false
-})
+const submittedQuery = ref('')
+const mode = ref<SearchRequest['mode']>('keyword')
+const limit = ref(8)
+
+const RESULT_FIELDS = [
+  'chunk_id', 'doc_version_id', 'regulation_name', 'article_no', 'article_text',
+  'chapter', 'kb_version', 'raw_score', 'score_kind', 'source',
+  'status', 'count', 'mode', 'kb_version（响应级）', 'source（响应级）'
+]
+
+const canSearch = computed(() =>
+  !!query.value.trim() && !search.loading.value && limit.value >= 1 && limit.value <= 50
+)
+
+const search = useAsyncData<SearchResponse>(
+  (signal) => searchKnowledge(
+    { query: submittedQuery.value, mode: mode.value, limit: limit.value },
+    signal
+  ),
+  { immediate: false }
+)
+search.state.value = 'empty'
+
+function runSearch() {
+  if (!query.value.trim() || search.loading.value) return
+  submittedQuery.value = query.value.trim()
+  void search.load()
+}
+
+function clearQuery() {
+  query.value = ''
+  submittedQuery.value = ''
+  search.cancel()
+  search.data.value = null
+  search.state.value = 'empty'
+}
+
+const hits = computed<SearchHit[]>(() => search.data.value?.list || [])
+
+function hasSource(hit: SearchHit): boolean {
+  return !!hit.source && typeof hit.source === 'object' && Object.keys(hit.source).length > 0
+}
+
+function asJson(value: unknown): string {
+  return JSON.stringify(value ?? {}, null, 2)
+}
 </script>
 
 <style scoped>
-.card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.header-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.scope-notice { margin-bottom: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; gap: 12px; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
 .search-bar { display: flex; gap: 12px; }
 .filter-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-.empty-note { max-width: 560px; margin: 0 auto; color: var(--mr-text-2); font-size: 13px; line-height: 1.8; }
+.limit-label { font-size: 12px; color: var(--mr-text-2); }
+.empty-note { max-width: 620px; margin: 0 auto 8px; color: var(--mr-text-2); font-size: 13px; line-height: 1.8; }
 .field-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .mode-grid > div { padding: 10px 12px; border: 1px solid var(--mr-line); border-radius: 6px; background: #fafbfe; display: flex; flex-direction: column; gap: 4px; }
 .mode-grid b { font-size: 13px; }
 .mode-grid span { font-size: 12px; color: var(--mr-text-2); }
+.hit-card { border: 1px solid var(--mr-line); border-radius: 6px; background: #fafbfe; padding: 12px; margin-bottom: 12px; }
+.hit-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.hit-index { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--mr-primary); color: #fff; font-size: 12px; }
+.hit-score { margin-left: auto; font-size: 12px; color: var(--mr-text-2); }
+.hit-text { font-family: var(--mr-font); font-size: 13px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; margin: 10px 0; padding: 10px; background: #fff; border: 1px solid var(--mr-line); border-radius: 4px; }
+.hit-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--mr-text-2); }
+.mono { font-family: monospace; font-size: 12px; }
+.result-pre { font-family: var(--mr-font); font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; margin: 0; }
 @media (max-width: 1366px) {
   .mode-grid { grid-template-columns: 1fr; }
 }
