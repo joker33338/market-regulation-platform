@@ -22,7 +22,8 @@ import DemoBadge from './DemoBadge.vue'
 
 const props = defineProps<{
   label: string
-  value: number
+  /** number 为真实计数；string 用于后端 available=false / null 时显示「暂无数据」，绝不显示 0 假装已连接 */
+  value: number | string
   hint?: string
   color?: string
   /** DEMO 数据必须置 demo=true，徽章贴近数值显示 */
@@ -33,7 +34,9 @@ const props = defineProps<{
   scope?: string
 }>()
 
-const formatted = computed(() => props.value.toLocaleString('zh-CN'))
+const formatted = computed(() =>
+  typeof props.value === 'number' ? props.value.toLocaleString('zh-CN') : props.value
+)
 </script>
 
 <style scoped>
