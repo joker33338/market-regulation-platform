@@ -146,6 +146,8 @@ FRONTEND_INTEGRATION_READY
 
 > 浏览器侧联调证据（Edge headless + CDP，1440×900 七页面全量 + 1366/1920 抽查，`errors=[]` / `apiFails=[]`、无横向溢出）见 `frontend/docs/frontend-api-integration-report.md` §3–§4。
 >
+> QA 只读核验入口：仓库内 ignored 路径 `local/frontend-evidence/README.md`（本机截图目录、采集产物说明、采集结论出处）与 `local/frontend-evidence/evidence-manifest.json`（40 张截图 SHA256 清单）。该目录不入库、不提交；原始 CDP 事件流未落盘为 JSON，未补造或重新采集，详见索引内 `raw_cdp_capture` 字段。
+>
 > `409 / 413 / 415 / 429 / 503` 的真实触发需构造幂等冲突、超限文件或模型并发，可能改动业务数据或触发远程动作，本轮未执行；前端 `ApiError` 已按契约归一化这些状态码。
 
 ### 3.3 真实性边界（本轮实测值）

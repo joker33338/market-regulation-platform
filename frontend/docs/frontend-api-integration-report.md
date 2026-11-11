@@ -104,7 +104,7 @@ FRONTEND_INTEGRATION_READY
 | 缓存 | `Network.setCacheDisabled(true)`，确保加载最新构建产物 |
 | 视口 | 1440×900 七页面全量；1366×768（dashboard/review）、1920×1080（system）响应式抽查；三者 `scrollWidth === clientWidth`，无横向溢出 |
 | 采集 | CDP `Network.responseReceived` / `loadingFailed`、`Runtime.exceptionThrown`、`Log.entryAdded`、DOM `innerText`、按钮禁用态、`Page.captureScreenshot` |
-| 截图 | 本机临时目录（七页面 + 初始/结果检索 + 1366/1920 抽查），仅本机证据，不入库、不记录绝对路径 |
+| 截图 | 本机临时目录（七页面 + 初始/结果检索 + 1366/1920 抽查，共 24 张 PNG），仅本机证据，不入库；QA 只读核验入口见仓库内 ignored 路径 `local/frontend-evidence/README.md`（含本机目录）与 `evidence-manifest.json`（含 SHA256 清单）。版本基线内不记录绝对机器路径 |
 
 **最终七页面扫描结果（1440×900）**：全部 `label=v0.2.2 运行期联调通过 · 只读`、旧标签 `待运行期联调` 已消失、`契约就绪` = true、`errors=[]`、`apiFails=[]`。
 
@@ -267,7 +267,7 @@ FRONTEND_INTEGRATION_READY
 | `frontend/docs/frontend-api-mapping-v0.2.2.md` | 接口映射矩阵，§5 已同步为 READY 结论 |
 | `frontend/docs/frontend-api-mapping.md`、`backend-api-requirements.md`、`frontend-optimization-report.md`、`frontend-api-integration-update-2026-11-11.md` | 历史轮次文档，保留作为决策记录 |
 | `frontend/src/**` | 七页面 + 唯一请求层 + 共享组件 + 类型契约（工作区干净） |
-| 浏览器截图 | 本机临时目录，仅供本轮验收复核，不入库 |
+| 浏览器截图 | 本机临时目录（24 张 PNG，含 `final/` 12 张最终态），仅供本轮验收复核，不入库；只读核验索引见 `local/frontend-evidence/evidence-manifest.json`（ignored，含全部截图 SHA256、ID 映射 JSON 说明与采集结论出处；原始 CDP 事件流未落盘，未补造） |
 
 ---
 
