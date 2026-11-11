@@ -1,0 +1,13 @@
+"""按模块注册接口，复用调用方认证和现有任务服务。"""
+from fastapi import Depends
+from .common import FrontendReader
+
+
+def register_frontend(app, service, config, owner, reader=None):
+    reader = reader or FrontendReader(service, config)
+    @app.get("/api/openapi.json", include_in_schema=False)
+    def openapi(identity=Depends(owner)):
+        return app.openapi()
+    from .documents import register_documents
+    register_documents(app, service, config, owner, reader)
+    app.state.frontend_reader = reader

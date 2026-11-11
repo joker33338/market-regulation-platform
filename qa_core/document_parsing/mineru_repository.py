@@ -62,3 +62,11 @@ class TaskRepository:
         with self.connect() as connection:
             rows = connection.execute("SELECT payload FROM parse_tasks WHERE status IN ('created','uploading','pending','running') ORDER BY rowid LIMIT ?", (limit,)).fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def owned_tasks(self, owner):
+        """只读一致性快照；列表、文件关联和统计共用现有任务，不创建第二套队列。"""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT payload,cancel_requested FROM parse_tasks WHERE owner=? ORDER BY rowid DESC",
+                (owner,)).fetchall()
+        return [{**json.loads(row[0]), "cancel_requested": bool(row[1])} for row in rows]
