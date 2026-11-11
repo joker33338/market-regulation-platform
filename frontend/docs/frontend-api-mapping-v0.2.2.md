@@ -89,23 +89,30 @@
 4. 写操作（审核 4 个、入库发布/回滚）依据 `review_write_supported` 与契约「明确不支持」保持禁用，不前端改状态假装成功。
 5. 原始文件预览：Axios 取 `ArrayBuffer` → 创建 Blob URL → PDF 用浏览器内置渲染、图片用 `<img>`、DOCX 按后端 attachment 契约提供授权下载；离开页面 `revokeObjectURL`。**不引入新依赖**，不把带鉴权要求的接口 URL 塞进无请求头的 iframe。
 
-## 4. 待后端/用户交付（阻塞真实联调）
+## 4. 联调前置条件（2026-11-11 复测：已满足）
 
-| 阻塞项 | 影响 | 责任方 |
-|---|---|---|
-| 8180 活动实例仍为 v0.2.1 旧镜像，未加载新路由 | 全部新接口运行期 404，无法完成浏览器联调 | 用户授权切换候选镜像（须先做活动任务检查、任务库备份、旧镜像回滚准备） |
-| 未提供 ≥32 位联调 Token（`PARSING_API_TOKENS_JSON`） | 所有 `/api/*` 返回 401，无法验证 owner 隔离 | 用户提供测试 Token |
-| 审核写入、正式入库批次/发布/回滚、结构化日志、资源监控接口 | 相关按钮与页面能力保持禁用/空态 | 后端后续迭代（缺口清单见 `docs/frontend-api-integration-report.md`） |
-| 正式 public 知识库 ACTIVE 版本 | 检索页按后端真实 `status=unpublished` 显示「知识库尚未发布」 | 后端/QA 按既有授权流程发布，前端不写库 |
+| 原阻塞项 | 上一轮状态 | 本轮实测 | 责任/结果 |
+|---|---|---|---|
+| 8180 活动实例为 v0.2.1 旧镜像 | 新接口全部 404 | 已重建为 `market-regulation-workbench:candidate-v022-4fc4cf124a12`，`market-regulation-app-1` healthy；`GET /api/openapi.json` 200 / 22 路径 / `0.2.2-api-candidate` | 用户已交付 `docs/integration/v0.2.2-local-runtime-handoff.md`；前端未自行切换 Docker |
+| 缺少联调 Token | `/api/*` 全 401 | 复用本机 ignored 私有运行配置中的已有会话凭证（owner=`local-user`，长度 43），仅内存 + sessionStorage | 未写入任何源码、文档或 Git |
+| 审核写入、正式入库批次/发布/回滚、结构化日志、资源监控接口 | 保持禁用/空态 | 契约「明确不支持」，仍保持禁用 | 后端后续迭代（缺口清单见 `frontend/docs/frontend-api-integration-report.md` §10） |
+| 正式 public 知识库 ACTIVE 版本 | 检索页空态 | `POST /api/knowledge/search` 实测 `status=unpublished, count=0`，页面显示「知识库尚未发布」 | 后端/QA 按既有授权流程发布，前端不写库 |
 
-## 5. 最终联调结论（2026-11-11 复核）
+## 5. 最终联调结论（2026-11-11 运行期浏览器复测）
 
-七页面与全部契约路径的前端对接已完成并逐页提交（`c23f011` → `6ecb2ae`，共 10 个本地 commit）；`npm run typecheck`、`npm run build`、9 条路由、8 个懒加载 chunk、代理转发与敏感信息检查均通过，**七个页面零 Mock / DemoBadge 引用、零实际 `v-html`**。
+七页面与全部约定只读路径已完成真实浏览器端到端联调（前端 `feat/frontend-api-v0.2.2` @ `96d4052`，12 个本地 commit）：
 
-但对活动 8180 实例复测仍为旧镜像：`/api/openapi.json`、`/api/documents`、`/api/system/health`、`/api/stats/overview`、`/api/knowledge/versions`、`/api/review`、`/source`、`POST /api/knowledge/search` 全部 **404**，`GET /api/parse/tasks` **405**，`/api/parse/info` 与 `POST /api/parse/tasks` **401**；且未提供 ≥32 位联调 Token。因此**没有任何真实接口在浏览器端成功返回业务数据**，最终状态为：
+- **运行期契约**：`GET /api/openapi.json` → 200，`info.version=0.2.2-api-candidate`，22 路径；页面契约标签均为「契约就绪」。
+- **七页面**：1440×900 全量渲染 + 交互，`errors=[]`、`apiFails=[]`；1366 / 1920 抽查无横向溢出。
+- **真实数据**：文档 4 条、任务 3 条、待复核 7 条、统计 `4 / 3 / 7 / 7`（来源分离不相加）、健康七组件五态；审核详情 1.2 MB + 原件 `/source` 200 + `x-sha256` 校验；两类 Chunk 预览 `write_performed=false`；检索 keyword / hybrid 均 `unpublished`。
+- **状态与错误态**：未认证（零业务请求）、401 / 404 / 416 / 422、200 空列表、`artifact.bin` 404 均无假成功；四个审核写按钮与入库批次/发布/回滚保持禁用。
+- **真实性治理**：七个页面零 `api/mock` / `DemoBadge` 引用、零实际 `v-html`；生产产物无本地地址与过时 DEMO 文案；`npm run typecheck` / `npm run build` 通过。
+- **联调后修正**：检索页初始空态与契约探测、登录页过时 DEMO 文案、favicon 404、发布状态标签（详见报告 §7，提交 `96d4052`）。
+
+因此最终状态为（范围限定：约定只读能力 + 七页面交互，不含写链路 / 独立 QA / 生产部署）：
 
 ```
-FRONTEND_INTEGRATION_PARTIAL
+FRONTEND_INTEGRATION_READY
 ```
 
-完整的测试证据、三场景验证矩阵、缺失接口清单与授权后联调步骤见 `frontend/docs/frontend-api-integration-report.md`。
+完整证据、接口逐条实测、三场景矩阵、8 组缺失接口与 7 类未验证事项见 `frontend/docs/frontend-api-integration-report.md`。报告明确：本报告不代表 QA PASS 或生产可用，后端自评仍为 `BACKEND_API_PARTIAL`、未达合并 main 门禁。
