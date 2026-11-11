@@ -289,6 +289,7 @@ class Database:
         self.execute("UPDATE mr_kb_versions SET status='FAILED' WHERE kb_version=:v AND status='BUILDING'",
                      {"v": version}).close()
 
+    # 发布投影、ACTIVE 指针和历史记录必须同事务完成，失败时共同回滚。
     def publish(self, version: str, *, rollback: bool = False):
         from uuid import uuid4
         self.verify_schema()

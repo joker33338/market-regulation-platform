@@ -84,8 +84,8 @@ def main():
     qa_keys = {case_id(test) for test in cases(qa_suite)}
     if args.include_source_tests:
         supplied = unittest.defaultTestLoader.discover(str(source / 'tests'), top_level_dir=str(source))
-        # Fix may have imported QA's tests already. Replace only overlapping QA
-        # cases with this committed QA copy, retaining every other source test.
+        # Fix 可能已经接收 QA 测试；仅使用已提交版本替换重叠的 QA
+        # 用例，其他源码测试全部保留。
         suite.addTests(test for test in cases(supplied) if case_id(test) not in qa_keys)
     elif args.database_only:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromNames([

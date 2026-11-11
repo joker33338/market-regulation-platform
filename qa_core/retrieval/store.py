@@ -35,7 +35,7 @@ def vector_search(database: Database, vector: list[float], top_k: int) -> list[d
 
 
 def keyword_search(database: Database, question: str, top_k: int) -> list[dict]:
-    # No zhparser dependency; parameterized matching preserves the legacy fallback.
+    # 不依赖 zhparser，参数化匹配保留原有关键词回退能力。
     escape = lambda value: value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return database.all("SELECT " + SELECT_FIELDS + ",1.0 AS score " + JOINS +
                         r" WHERE l.content LIKE :q ESCAPE '\' OR l.article_no LIKE :q ESCAPE '\'"

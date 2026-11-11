@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def stable_hash(*parts: object) -> str:
-    # JSON framing avoids delimiter collisions between identity components.
+    # 使用 JSON 边界编码，避免身份字段拼接时发生分隔符碰撞。
     raw = json.dumps(parts, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

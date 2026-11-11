@@ -39,7 +39,7 @@ def redact_paths(value):
 
 
 def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None, batch_authorizer=None):
-    # Optional API dependencies do not affect import of CLI/business modules.
+    # API 可选依赖按需导入，不影响 CLI 和业务模块的独立加载。
     from fastapi import Depends, FastAPI, Request
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
@@ -171,7 +171,7 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
                     digest.update(chunk)
             if not size:
                 raise MinerUError("empty_upload", 400)
-            # Check headers against suffix without loading models or writing to a database.
+            # 只比较文件头与扩展名，不加载模型、不写数据库。
             def read_header():
                 with target.open("rb") as stream:
                     return stream.read(8)
@@ -183,7 +183,7 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
             metadata = {"file_name": file_name, "path": str(target.resolve()), "sha256": digest.hexdigest(), "bytes": size}
             await asyncio.to_thread((root / (fid + ".json")).write_text, json.dumps(metadata), encoding="utf-8")
         except BaseException:
-            target.unlink(missing_ok=True)  # only the generated incomplete upload, never a corpus path
+            target.unlink(missing_ok=True)  # 仅清理程序生成的未完成上传文件，绝不使用语料路径
             raise
         return {"file_id": fid, "sha256": digest.hexdigest(), "bytes": size}
 

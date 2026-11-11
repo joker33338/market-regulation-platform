@@ -45,8 +45,8 @@ class PaddleStructureService:
             elif boxes:
                 table.warnings.append("HTML 单元格数与识别框数量不一致，原始框保留在 raw_result。")
             tables.append(table)
-        # Retain table cell text in the searchable text as well as HTML/Markdown.
-        # The engine's table block contains the original recognized HTML.
+        # HTML/Markdown 之外，也保留可检索的单元格文字。
+        # 引擎的表格块包含原始识别 HTML，需保留供核对。
         text_parts = []
         for block in blocks:
             if block.kind == "table":

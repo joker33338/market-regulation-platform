@@ -1,4 +1,4 @@
--- Explicitly executed by init-db only. The existing source tables are never changed.
+-- 仅在显式 init-db 时执行，不修改既有来源表。
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS law_chunks (
     id BIGSERIAL PRIMARY KEY,

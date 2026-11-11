@@ -13,7 +13,7 @@ reports/**
 
 .env.docker
 
-# Local environments and tools
+# 本地环境与工具
 venv/
 env/
 .venv*/
@@ -26,7 +26,7 @@ htmlcov/
 *.swp
 *.tmp
 *.log
-# Credentials (examples remain portable)
+# 凭据与私密配置（保留可移植示例）
 .env.*
 !.env.example
 !.env.*.example
@@ -36,7 +36,7 @@ htmlcov/
 *.pfx
 credentials*.json
 secrets*.json
-# Local datasets, outputs, database dumps and model weights
+# 本地数据、输出、数据库备份及模型权重
 /data/
 /local/
 /outputs/
@@ -55,7 +55,7 @@ secrets*.json
 *.pt
 *.pth
 *.bin
-# Real documents and image caches must not enter the baseline
+# 真实资料和图片缓存不得进入版本基线
 *.pdf
 *.doc
 *.docx
@@ -64,8 +64,8 @@ secrets*.json
 *.jpeg
 *.tif
 *.tiff
-# Original local documentation and demo contain machine paths/case identifiers.
-# Preserve these files on disk pending a separate redaction review.
+# 原有本地文档和演示可能包含机器路径或案例标识，
+# 保留本地文件，另行审阅脱敏后再决定纳入版本。
 /README.md
 /docs/Docker测试步骤.md
 /docs/MVP交付说明.md

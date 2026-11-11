@@ -53,7 +53,7 @@ class LocalBatchRepairEdges(unittest.IsolatedAsyncioTestCase):
         self.config = MinerUConfig(enabled=True, mode="local", result_dir=self.root)
         self.repository = TaskRepository(self.root / "tasks.sqlite3")
         self.a, self.b = self.root / "a.pdf", self.root / "b.pdf"
-        # Parsing is injected below; no OCR, network or model is needed.
+        # 下方注入解析结果，不需要 OCR、网络或模型。
         self.a.write_bytes(b"%PDF-1.7 synthetic a")
         self.b.write_bytes(b"%PDF-1.7 synthetic b")
 

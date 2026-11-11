@@ -60,7 +60,7 @@ def main():
             models[method] = 'files_present'
         except Exception as exc:
             models[method] = type(exc).__name__
-    # Native smoke only: OCR inference is separately bounded.
+    # 此处仅检查原生解析，OCR 推理由独立限额约束。
     from qa_core.document_parsing.document_router import DocumentParser
     smoke, selected = [], Counter()
     with DocumentParser() as parser:

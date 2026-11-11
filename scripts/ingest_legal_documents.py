@@ -136,7 +136,7 @@ def main(argv=None) -> int:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
     except Exception as exc:
-        # Driver and HTTP exceptions may carry credentials; never echo their body/DSN.
+        # 驱动和 HTTP 异常可能含凭据，不回显异常正文或 DSN。
         print(json.dumps({"error": "操作失败，未输出可能包含凭据的异常正文。",
                           "type": type(exc).__name__}, ensure_ascii=False), file=sys.stderr)
         return 1

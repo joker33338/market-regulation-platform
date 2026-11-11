@@ -15,6 +15,7 @@ from qa_core.storage.database import Database
 from qa_core.utils import IngestionError, stable_hash
 
 
+# 文档身份、正文摘要与处理签名共同决定修订号，配置变化不得误用旧向量。
 def prepare_document(document: LegalDocument, *, model_signature: str, max_chars: int,
                      namespace: str = "market_regulation"):
     if not document.law_name or not document.law_name.strip():

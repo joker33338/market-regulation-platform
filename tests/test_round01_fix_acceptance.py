@@ -46,7 +46,7 @@ class Round01FixAcceptance(unittest.IsolatedAsyncioTestCase):
         stored = self.repository.get(task['id'])
         self.assertEqual(stored['status'], 'failed')
         self.assertEqual(stored['files'][0]['error'], {'code': 'RuntimeError'})
-        # Both GET status and GET errors call this exact public serializer.
+        # 状态与错误 GET 接口共用同一个对外序列化函数。
         self.assertEqual(public(stored)['files'][0]['error'], {'code': 'RuntimeError'})
 
     async def test_R01_004_case_variant_archive_cannot_replace_original_artifact(self):
@@ -66,7 +66,7 @@ class Round01FixAcceptance(unittest.IsolatedAsyncioTestCase):
         try:
             store_artifacts(payload, directory, self.config)
         except MinerUError:
-            return  # Controlled rejection is also acceptable.
+            return  # 受控拒绝同样符合预期。
         self.assertEqual((directory / 'artifact.bin').read_bytes(), payload,
                          'reserved raw artifact must retain original download bytes')
 

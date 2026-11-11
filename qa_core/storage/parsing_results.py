@@ -16,7 +16,7 @@ class PostgresResultSink:
         payload = result.to_dict()
         payload["source_location"].update(owner_id=task["owner"], local_task_id=task["id"],
                                           source_file_id=file.get("source_file_id", file["id"]))
-        # Retain exact remote Markdown even when page rendering differs.
+        # 即使页面渲染不同，也保留远端原始 Markdown。
         markdown = result.quality.get("markdown", result.markdown_content)
         digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
         parse_id = stable_hash("parsing-result-v1", task["owner"], task["id"], file["id"])

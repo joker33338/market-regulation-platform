@@ -102,7 +102,7 @@ class DualEngineRouter:
             if not self.remote_config.api_key:
                 return False, 'cloud_token_unconfigured'
             return allowed, reason
-        # A browser flag, authentication token or API key never grants transfer.
+        # 浏览器勾选、登录凭据或 API Key 本身均不能授予文件外传权限。
         owner_grants = self.grants.get(task['owner'], {}) if isinstance(self.grants, dict) else {}
         grant = owner_grants.get(file['sha256'], {}) if isinstance(owner_grants, dict) else {}
         if not isinstance(grant, dict):
@@ -237,7 +237,7 @@ class DualEngineRouter:
                         route['remote_availability'] = {**diagnostic, 'status': 'BLOCKED', 'api_status': 'NOT_TESTED'}
         route['remote_task_id'] = state.get('remote_task_id')
         route['usage'] = {**state, 'estimated_cost': None, 'cost_unavailable_reason': 'Provider billing is not returned by the API.'}
-        # Do not mutate either candidate when adding the final routing decision.
+        # 记录最终路由决策时保留两份候选原始内容，避免污染审计依据。
         result = DocumentResult.from_dict(selected.to_dict())
         result.quality.update(assess_document(result, thresholds=self.config.thresholds))
         result.quality['routing_trace'] = route
@@ -268,7 +268,7 @@ class DualEngineRouter:
                 with fitz.open(file['source_path']) as document:
                     pages = len(document)
             elif Path(file['source_path']).suffix.lower() == '.docx':
-                # No reliable physical page count without rendering. Do not bypass page budgets.
+                # 未排版时无法可靠计算物理页数，禁止借此绕过页数预算。
                 raise MinerUError('cloud_page_count_unknown', 409)
             else:
                 pages = 1
@@ -300,7 +300,7 @@ class DualEngineRouter:
                     raise MinerUError('submission_outcome_unknown', 409)
                 state['submissions'] += 1
             state['calls'] += 1
-            await save(task)  # charge before sending, including uncertain outcomes
+            await save(task)  # 发送前预留计数，结果不确定的请求也不撤销占位
             if task.get('cancel_requested'):
                 raise MinerUError('task_canceled', 409)
             async with self._rate_lock:

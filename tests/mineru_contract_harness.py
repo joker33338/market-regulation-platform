@@ -31,7 +31,7 @@ class ContractDriver:
         raise ValueError('redirect limit')
 
     def create(self, files):
-        # Deliberately no POST retry: timeout leaves server outcome unknown.
+        # POST 不自动重试：超时时无法确定服务端是否已提交。
         return self.request('POST', self.base+'/v1/tasks', json={
             'files': files, 'tier':'standard', 'output_formats':['default']}).json()
 

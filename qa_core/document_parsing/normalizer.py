@@ -66,7 +66,7 @@ def table_from_html(value: str, table_id: str, bbox=None, source=None) -> TableR
     rows = [[""] * width for _ in range(height)]
     for cell in parser.cells:
         rows[cell["row"]][cell["column"]] = cell["text"]
-    # HTML is the authoritative representation when there are merged cells.
+    # 存在合并单元格时以 HTML 为结构依据，避免 Markdown 丢失跨度。
     merged = any(cell["rowspan"] != 1 or cell["colspan"] != 1 for cell in parser.cells)
     if rows and not merged:
         safe = lambda text: text.replace("|", r"\|").replace("\n", "<br>")

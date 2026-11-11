@@ -23,6 +23,7 @@ class RoutingThresholds:
             raise ValueError("Invalid routing thresholds")
 
 
+# 质量规则只是风险信号，不是法律原文正确率，也不能代替人工标准答案。
 def assess_document(result: DocumentResult, low_confidence: float = 0.8, *, thresholds=None) -> dict:
     thresholds = thresholds or RoutingThresholds(low_confidence=low_confidence)
     low_confidence = thresholds.low_confidence

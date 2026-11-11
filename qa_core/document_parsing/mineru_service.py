@@ -31,7 +31,7 @@ class MinerUService:
             raise MinerUError('dual_engine_requires_local_task_mode', 400)
         self.root = config.result_dir.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
-        self._locks = {}  # removed after execution; bounded by active workers
+        self._locks = {}  # 执行结束后移除，仅随活动任务数量增长
 
     async def submit(self, owner, request_key, inputs, *, parse_options=None):
         if not self.config.enabled:
@@ -104,7 +104,7 @@ class MinerUService:
             local["status"] = remote["status"]
             local["parse"] = remote.get("parse", {})
         task["remote_status"] = snapshot["status"]
-        # Remote completion is not local completion until artifacts are durable.
+        # 远端完成不等于本地完成，产物持久保存后才能确认成功。
         task["status"] = ("running" if snapshot["status"] in TERMINAL else
                           "uploading" if snapshot["status"] == "waiting-file" else snapshot["status"])
 
@@ -128,7 +128,7 @@ class MinerUService:
                     await self._save(task)
                 return
             except (httpx.TransportError, MinerUError):
-                # Always query after interrupted PUT before deciding whether another PUT is safe.
+                # PUT 中断后先查询远端状态，再判断能否安全继续上传。
                 self._snapshot(task, await self.client.detail(task["remote_id"]))
                 await self._save(task)
                 remote = file["remote"]
@@ -159,7 +159,7 @@ class MinerUService:
             except (httpx.TransportError, MinerUError) as exc:
                 if attempt == self.config.max_download_retries or isinstance(exc, MinerUError) and exc.status not in {403, 429, 502, 503, 504}:
                     raise
-                # Signed result URLs may be refreshed only through a task snapshot.
+                # 只通过任务状态查询刷新结果签名 URL。
                 self._snapshot(task, await self.client.detail(task["remote_id"]))
                 await self._save(task)
 
@@ -192,7 +192,7 @@ class MinerUService:
                 if task["submission_started"]:
                     raise MinerUError("submission_outcome_unknown", 409)
                 task["submission_started"] = True
-                await self._save(task)  # crash after POST never causes automatic resubmission
+                await self._save(task)  # 先落盘提交占位，防止 POST 后崩溃引起自动重发
                 manifest = [{"file_name": f["file_name"], "bytes": f["bytes"], "sha256sum": f["sha256"]} for f in task["files"]]
                 created = await self.client.create(manifest)
                 task["remote_id"] = created.get("task_id")
@@ -204,7 +204,7 @@ class MinerUService:
                         raise MinerUError("file_association_mismatch")
                     local["remote_id"] = remote["file_id"]
                 self._snapshot(task, created)
-                await self._save(task)  # bind IDs before any PUT
+                await self._save(task)  # 上传前先持久绑定远端任务和文件 ID
             self.client.bind(task)
             for poll in range(self.config.max_polls):
                 current = await asyncio.to_thread(self.repository.get, task_id)
@@ -228,7 +228,7 @@ class MinerUService:
                 for file in task["files"]:
                     if file["status"] == "waiting-file" and not current.get("cancel_requested"):
                         await self._upload(task, file)
-                # A queried upload recovery may already expose terminal results.
+                # 恢复上传时的状态查询可能已经取得最终结果。
                 for file in task["files"]:
                     if file["status"] == "completed":
                         try:
@@ -251,7 +251,7 @@ class MinerUService:
             task["status"] = "timed_out"
             task["error"] = {"code": "poll_limit"}
         except asyncio.CancelledError:
-            # Persist remote IDs and leave task recoverable on next application startup.
+            # 保留远端 ID，使应用下次启动时仍能恢复任务。
             raise
         except Exception as exc:
             task["status"] = "timed_out" if task["remote_id"] else "failed"
@@ -289,8 +289,8 @@ class MinerUService:
                         await asyncio.to_thread(validate_input_safety, Path(file['source_path']), ParsingConfig.from_env())
                     except ParsingSafetyError as exc:
                         raise MinerUError(exc.code, 413) from exc
-                    # Reuse the exact pre-DB result on retry: parsing timestamps
-                    # must not change an already committed result's digest.
+                    # 数据库重试复用原始解析结果；解析时间戳
+                    # 不能导致已提交结果的摘要发生变化。
                     payload = await asyncio.to_thread(result_path.read_text, encoding="utf-8")
                     result = DocumentResult.from_dict(json.loads(payload))
                     if result.document_id != file["sha256"]:
@@ -343,7 +343,7 @@ class MinerUService:
             except Exception as exc:
                 file["status"] = "failed"
                 file["error"] = {"code": exc.code if isinstance(exc, MinerUError) else type(exc).__name__}
-            # A bad parser/file/database result cannot discard sibling progress.
+            # 单个解析、文件或数据库失败不能丢弃同批其他文件的进度。
             await self._save(task)
         success = sum(f["status"] == "completed" for f in task["files"])
         task["status"] = "completed" if success == len(task["files"]) else "partial" if success else "failed"

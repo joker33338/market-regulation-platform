@@ -169,8 +169,8 @@ class PaddleRuntime:
 
     def abort(self):
         if self._executor is not None:
-            # Python 3.12 has no public terminate_workers API. Keep this small,
-            # version-specific cleanup here so a timed-out predictor cannot leak.
+            # Python 3.12 没有公开的 terminate_workers API；将少量
+            # 版本相关清理集中在此，避免超时预测进程泄漏。
             processes = list(getattr(self._executor, "_processes", {}).values())
             for process in processes:
                 if process.is_alive():

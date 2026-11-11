@@ -1,5 +1,5 @@
-# Unified Python 3.12 runtime: native parsing, API, OCR and local embeddings.
-# Existing validated versions retained; no model weights are installed here.
+# 统一 Python 3.12 运行环境：原生解析、API、OCR 与本地向量模型。
+# 保留既有已验证版本，此处不安装模型权重。
 psycopg2-binary==2.9.13
 PyMuPDF==1.26.7
 httpx==0.28.1
@@ -7,8 +7,8 @@ fastapi==0.115.12
 uvicorn==0.34.2
 sentence-transformers==4.1.0
 transformers==4.57.6
-# Docker installs the CPU wheel from the official CPU index first.
-# An existing torch 2.7.1+cpu satisfies this version constraint.
+# Docker 先从官方 CPU 索引安装 CPU 版本。
+# 既有 torch 2.7.1+cpu 满足此版本约束。
 torch==2.7.1
 paddlepaddle==3.2.2
 paddleocr[doc-parser]==3.3.2
@@ -17,8 +17,8 @@ PyYAML==6.0.2
 psutil==7.2.2
 pandas==2.2.3
 
-# Retained validated embedding environment pins (formerly requirements-lock.txt).
-# PyYAML follows the actual OCR runtime (6.0.2), resolving the stale 6.0.3 snapshot.
+# 保留已验证的向量环境固定版本（原 requirements-lock.txt）。
+# PyYAML 沿用实际 OCR 环境的 6.0.2，取代旧快照 6.0.3。
 certifi==2026.10.23
 charset-normalizer==3.5.2
 cloudpickle==3.1.2

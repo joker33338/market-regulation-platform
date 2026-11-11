@@ -30,8 +30,8 @@ def _document(rows: list[dict], source_system: str) -> LegalDocument:
         number = re.sub(r"\s+", "", row["article_no"])
         heading = HEADING.fullmatch(number)
         if number in {"前言", "序言"} or heading:
-            # These are genuine source records, but are not numbered articles.
-            # Keep their text and IDs for review and use explicit headings as hierarchy.
+            # 这些是有效来源记录，但不是编号法条。
+            # 保留正文和 ID 供复核，并使用明确标题建立层级。
             content = row["content"].strip()
             non_article_records.append({"source_record_id": str(row["detail_id"]),
                                         "label": number, "content": content})

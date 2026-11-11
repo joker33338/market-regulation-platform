@@ -25,6 +25,7 @@ def source_lines(result: DocumentResult):
     return lines, evidence
 
 
+# 解析结果必须经过明确复核后才进入法规处理，识别完成不代表法律审核通过。
 def to_legal_document(result: DocumentResult, *, reviewer: str, law_name: str, law_id: str | None = None) -> LegalDocument:
     if result.parsing_status not in {"success", "needs_review"} or not result.pages:
         raise IngestionError("失败或部分失败的解析结果不能交给正式入库。")

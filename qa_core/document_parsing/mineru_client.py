@@ -52,7 +52,7 @@ class MinerUClient:
     async def request(self, method, url, *, headers=None, content=None, body=None, max_bytes=1024 * 1024):
         import httpx
         headers = dict(headers or {})
-        # Never accept credential-bearing server-supplied transfer headers.
+        # 不接收服务端提供的携带身份凭据的传输请求头。
         headers = {k: v for k, v in headers.items() if k.lower() not in {"authorization", "cookie", "host"}}
         if origin(url) == self.api_origin and self.config.api_key:
             headers["Authorization"] = "Bearer " + self.config.api_key
@@ -64,11 +64,11 @@ class MinerUClient:
                     if method != "GET" or "location" not in response.headers:
                         raise MinerUError("unsafe_redirect")
                     url = str(response.url.join(response.headers["location"]))
-                    headers = {}  # do not forward API keys or signed headers on redirects
+                    headers = {}  # 重定向时不转发 API Key 或签名请求头
                     continue
                 if response.status_code >= 400:
-                    # Retain only the contract's bounded machine-readable code;
-                    # messages may echo confidential input or connection details.
+                    # 仅保留契约允许的有界错误码；
+                    # 错误消息可能回显敏感输入或连接信息，不能直接输出。
                     error_bytes = bytearray()
                     async for block in response.aiter_bytes():
                         error_bytes.extend(block)

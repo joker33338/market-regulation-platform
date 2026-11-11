@@ -30,7 +30,7 @@ def export_images(result, directory: Path) -> list[str]:
                 raise IngestionError("图片导出的源文件不存在或内容已变化，请使用同一原件重测。")
             verified = True
         for index, item in enumerate(references, 1):
-            # Output paths are generated; model text never becomes a filesystem path.
+            # 输出路径由程序生成，禁止把模型文本直接用作文件路径。
             relative = f"images/page-{page.page_number:04d}-{index:02d}.png"
             target = directory / relative
             target.parent.mkdir(exist_ok=True)

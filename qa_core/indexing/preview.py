@@ -20,6 +20,7 @@ def compact(text):
     return re.sub(r"\s+", "", text)
 
 
+# 预览只检查切分与正文完整性，不授予审核、向量入库或发布权限。
 def preview_chunks(result, document_type: str, *, max_chars=800):
     if document_type not in {"law", "case"}:
         raise IngestionError("请明确选择法规或处罚案例。")

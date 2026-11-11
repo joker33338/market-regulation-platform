@@ -15,6 +15,7 @@ from qa_core.indexing.preview import preview_chunks
 from qa_core.utils import IngestionError, file_sha256
 
 
+# 优先复用既有解析结果或只读数据库记录，避免为了预览重复调用模型。
 def load_result(args):
     if args.input:
         before = file_sha256(args.input)

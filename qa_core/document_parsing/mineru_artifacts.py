@@ -21,8 +21,8 @@ def unpack(payload: bytes, config) -> dict[str, bytes]:
                 raise MinerUError("archive_too_large", 413)
             result, names = {}, set()
             for item in members:
-                # ZipInfo.filename is already normalized/truncated on some
-                # platforms; validate the original archive entry as well.
+                # 部分平台已对 ZipInfo.filename 做规范化或截断，
+                # 所以还必须校验压缩包条目的原始名称。
                 name = item.orig_filename
                 path = PurePosixPath(name)
                 canonical = path.as_posix().casefold()
@@ -36,7 +36,7 @@ def unpack(payload: bytes, config) -> dict[str, bytes]:
                     raise MinerUError("duplicate_archive_path")
                 names.add(canonical)
                 if not item.is_dir():
-                    result[path.as_posix()] = archive.read(item)  # CRC verified by ZipFile
+                    result[path.as_posix()] = archive.read(item)  # 由 ZipFile 校验 CRC
             required = set()
             if config.provider == "official":
                 required.add("full.md")
@@ -57,7 +57,7 @@ def unpack(payload: bytes, config) -> dict[str, bytes]:
 
 def store_artifacts(payload, directory: Path, config):
     if config.output_formats in {("docx",), ("html",)}:
-        # These are single-file downloads in the Tasks contract.
+        # Tasks 契约规定这些产物以独立文件下载。
         result = {"document." + config.output_formats[0]: payload}
         if config.output_formats == ("docx",):
             try:
@@ -76,8 +76,8 @@ def store_artifacts(payload, directory: Path, config):
         target.parent.mkdir(parents=True, exist_ok=True)
         if not target.resolve().is_relative_to(directory.resolve()) or target.is_symlink():
             raise MinerUError("unsafe_result_path")
-        # A ZIP member can itself be called e.g. markdown.md.part. An exclusive
-        # temporary file avoids clobbering it during another member's write.
+        # 压缩包成员本身也可能叫 markdown.md.part，因此使用独占的
+        # 临时文件，避免写入其他成员时覆盖它。
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".mineru-", suffix=".part", delete=False) as stream:
             temporary = Path(stream.name)
             try:
@@ -116,7 +116,7 @@ def normalize_artifacts(task, file, artifacts, *, mock=False):
             markdown = artifacts["markdown.md"].decode("utf-8")
     except (KeyError, ValueError, UnicodeError):
         raise MinerUError("invalid_default_artifacts") from None
-    # Preserve arbitrary/version-specific structure; unknown shapes require review.
+    # 保留供应商版本相关的原始结构，未知格式必须人工复核。
     source = {"file_path": file["source_path"], "file_sha256": file["sha256"],
               "mineru_task_id": task["remote_id"], "mineru_file_id": file["remote_id"],
               "source_file_id": file.get("source_file_id", file["id"]),
@@ -142,7 +142,7 @@ def normalize_artifacts(task, file, artifacts, *, mock=False):
         kind = entry.get("type")
         if kind == "table":
             markup = entry.get("content", "")
-            # Preserve remote HTML without expanding untrusted rowspan/colspan grids.
+            # 保留远端 HTML，不展开不可信的 rowspan/colspan 网格。
             page.tables.append(TableResult(str(len(page.tables)), html=markup if isinstance(markup, str) else "",
                                            bbox=entry.get("bbox"), source_location=source,
                                            warnings=["Remote table structure retained for review; legal ingestion is blocked."]))

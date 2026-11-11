@@ -76,7 +76,7 @@ def has_grid(image_path: Path) -> bool:
     try:
         import cv2
         import numpy as np
-        # OpenCV's Windows file reader does not reliably accept Unicode paths.
+        # Windows 下 OpenCV 直接读取中文路径不可靠，使用字节解码。
         payload = image_path.read_bytes()
         image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_GRAYSCALE) if payload else None
         if image is None:
@@ -230,7 +230,7 @@ class DocumentParser:
                     image_fraction = max(((box[2] - box[0]) * (box[3] - box[1]) / area for box in image_rects), default=0)
                     if mode == "auto":
                         page_source["complex_layout"] = looks_multicolumn(page) or has_vector_grid(page)
-                        # A header on a scanned page must not suppress OCR of its image body.
+                        # 扫描页的少量页眉文字不能阻止对图片正文执行 OCR。
                         text_length = len("".join(raw.split()))
                         scanned = text_length == 0 or (bool(image_rects) and (
                             text_length < self.config.min_pdf_text_chars or (image_fraction > 0.65 and (

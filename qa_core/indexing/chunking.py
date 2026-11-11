@@ -60,6 +60,7 @@ def pack_units(units: list[LegalUnit], limit: int) -> list[tuple[str, list[Legal
     return pieces
 
 
+# 以法条层级作为父块，按预算拆子块并保留原始来源，不能用截断掩盖超长条文。
 def split_articles(articles: list[Article], *, law_name: str, doc_version_id: str,
                    model_signature: str, max_chars: int = 800) -> list[Chunk]:
     chunks = []

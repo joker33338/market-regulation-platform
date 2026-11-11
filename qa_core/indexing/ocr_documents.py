@@ -56,7 +56,7 @@ def recognize_file(path: Path, output_dir: Path, engine) -> dict:
     if not any(page["lines"] for page in pages):
         raise IngestionError("OCR 未识别出文本。")
     candidate = directory / (path.stem + "_ocr.md")
-    # No tool-generated headings in the legal body. Sidecar retains pages/bboxes.
+    # 法律正文不插入工具生成的标题，页码及坐标另存复核记录。
     candidate.write_text("\n\f\n".join("\n".join(line["text"] for line in page["lines"]) for page in pages),
                          encoding="utf-8")
     sidecar = {"status": "pending", "source_sha256": digest, "source_path": str(path.resolve()),

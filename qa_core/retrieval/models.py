@@ -49,7 +49,7 @@ class LocalEmbeddings:
 
     def _load(self):
         if self._model is None:
-            # Set before importing model libraries; no network fallback is allowed.
+            # 在模型库导入前设置离线限制，不允许自动联网回退。
             os.environ["HF_HUB_OFFLINE"] = "1"
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
             os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
@@ -131,6 +131,7 @@ class DemoEmbeddings:
         return validate_vectors(values, len(texts), self.dimension)
 
 
+# 后端选择与维度校验由统一工厂处理，演示向量不能用于正式 PostgreSQL 入库。
 def create_embeddings(settings: Settings):
     if settings.embedding_backend == "local":
         return LocalEmbeddings(settings)

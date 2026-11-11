@@ -48,7 +48,7 @@ def download(name: str, model_root: Path) -> dict:
     if target.exists():
         raise IngestionError("模型目标已存在但不完整，请人工核查后重试。")
     shutil.move(str(source), str(target))
-    # Paths are resolved under the dedicated download directory before cleanup.
+    # 清理前先解析路径，并确认位于专用下载目录内。
     if staging.resolve().is_relative_to(downloads.resolve()):
         shutil.rmtree(staging)
     archive_path.unlink()

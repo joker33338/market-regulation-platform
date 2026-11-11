@@ -12,14 +12,14 @@ New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
 $env:TMP = $env:TEMP
 $env:PYTHONUTF8 = '1'
 $env:PYTHONDONTWRITEBYTECODE = '1'
-# Independent QA checkouts need to reuse an existing API environment instead
-# of silently skipping every API case when no source-local venv exists.
+# 独立 QA 工作区应复用既有 API 环境，避免
+# 因源码目录缺少虚拟环境而静默跳过全部 API 用例。
 $apiCandidates = @($ApiPackages, (Join-Path $workspaceRoot '.venv-api/Lib/site-packages'))
 if ($env:PYTHONPATH) { $apiCandidates += $env:PYTHONPATH -split [IO.Path]::PathSeparator }
 $apiPath = $apiCandidates | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'fastapi') -PathType Container) } | Select-Object -First 1
 if (-not $apiPath) { throw 'Existing API dependencies required; pass -ApiPackages. No environment was installed or changed.' }
 $env:PYTHONPATH = $apiPath
-# Full regression is synthetic by default. Live DB testing is a separate opt-in.
+# 完整回归默认只使用合成资料，真实数据库测试须另行显式启用。
 $env:MVP_TEST_PG_DSN = ''
 $env:PARSING_TEST_PG_DSN = ''
 $env:PARSING_RESULT_PG_DSN = ''

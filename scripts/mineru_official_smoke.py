@@ -62,7 +62,7 @@ def main():
                 raise ValueError("Unapproved upload origin")
             pdf = synthetic_pdf()
             (args.output / "synthetic.pdf").write_bytes(pdf)
-            response = client.put(url, content=pdf)  # deliberately no API credentials
+            response = client.put(url, content=pdf)  # 此处刻意不附带 API 凭据
             response.raise_for_status()
             print(json.dumps({"stage": "upload", "http_status": response.status_code, "bytes": len(pdf)}), flush=True)
         for attempt in range(60):

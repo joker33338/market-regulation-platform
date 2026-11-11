@@ -18,7 +18,7 @@ from qa_core.utils import stable_hash
 class PostgreSQLIntegration(unittest.TestCase):
     def test_isolated_schema_build_publish_query_rollback(self):
         class TestVectors:
-            # Contract fixture, not exposed by the production CLI.
+            # 契约测试夹具，不通过生产 CLI 暴露。
             dimension = 1024
             signature = "test-only-1024"
             def embed_documents(self, texts):
@@ -26,7 +26,7 @@ class PostgreSQLIntegration(unittest.TestCase):
 
         schema = "mvp_test_" + uuid4().hex
         database = Database(pg_dsn=os.environ["MVP_TEST_PG_DSN"], kb_schema=schema)
-        # Generated identifier consists of a fixed prefix and hex, not user SQL.
+        # 生成的标识符仅含固定前缀及十六进制内容，不拼接用户 SQL。
         database.execute("CREATE SCHEMA " + schema).close()
         database.execute("SET search_path TO " + schema + ", public").close()
         try:

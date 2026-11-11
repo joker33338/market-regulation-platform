@@ -27,8 +27,8 @@ def bundle(extra=None, text="第一条 合成法规用于测试。", table=False
     with zipfile.ZipFile(out, "w") as archive:
         for name, value in values.items():
             member = zipfile.ZipInfo(name)
-            # Windows ZipInfo normalizes separators during construction; preserve
-            # the malicious raw name to exercise the production validator.
+            # Windows 构造 ZipInfo 时会规范化分隔符；保留
+            # 恶意原始名称，确保实际覆盖生产校验器。
             member.filename = name
             archive.writestr(member, value)
     return out.getvalue()
