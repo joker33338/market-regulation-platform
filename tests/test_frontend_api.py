@@ -108,8 +108,30 @@ class FrontendAPITests(unittest.TestCase):
         for query in ("page=0", "page_size=101", "page=bad"):
             self.assertEqual(self.get("/api/documents?" + query).status_code, 422)
         for target in ("/api/documents", "/api/parse/tasks",
-                       "/api/openapi.json"):
+                       "/api/review", "/api/knowledge/versions", "/api/openapi.json"):
             self.assertEqual(self.client.get(target).status_code, 401, target)
+
+    def test_preview_reuses_structure_without_writes(self):
+        fid, task = self.upload_task()
+        tid, file_id = task["task_id"], task["files"][0]["file_id"]
+        stored = self.service.repository.get(tid)
+        directory = self.root / tid / file_id
+        directory.mkdir(parents=True)
+        result = DocumentResult("synthetic-document", "合成法规.pdf", "pdf", {}, pages=[
+            PageResult(1, "native_pdf", raw_text="第一条 合成规范。", layout_blocks=[
+                LayoutBlock("block-1", "text", "第一条 合成规范。")])])
+        (directory / "normalized.json").write_text(result.to_json(), encoding="utf-8")
+        stored["files"][0]["result_path"] = str(directory)
+        self.service.repository.save(stored)
+        url = f"/api/parse/tasks/{tid}/files/{file_id}/preview"
+        before = self.service.repository.get(tid)
+        response = self.client.post(url, headers=self.auth, json={"document_type": "law"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertFalse(response.json()["write_performed"])
+        self.assertTrue(response.json()["preview"]["chunks"])
+        self.assertEqual(self.service.repository.get(tid), before)
+        self.assertEqual(self.client.post(url, headers=self.other, json={"document_type": "law"}).status_code, 404)
+
 
     def test_review_reader_ownership_no_finding_view_and_no_write_api(self):
         review = MagicMock()
@@ -139,3 +161,15 @@ class FrontendAPITests(unittest.TestCase):
         self.assertTrue(all("owner_id" in sql and "alice" in args for sql, args in queries[1:]))
         self.assertNotIn("v_review_queue", str(queries))
         connection.close.assert_called_once()
+
+
+    def test_empty_kb_does_not_load_embeddings_and_is_read_only(self):
+        kb = self.root / "isolated.sqlite3"
+        with nullcontext(Database(sqlite_path=kb)) as database:
+            database.initialize()
+            database.close()
+        self.reader.kb_factory = lambda: Database(sqlite_path=kb)
+        before = kb.read_bytes()
+        self.assertEqual(self.get("/api/knowledge/versions").json()["total"], 0)
+        self.assertEqual(self.get("/api/knowledge/versions/none").status_code, 404)
+        self.assertEqual(kb.read_bytes(), before)

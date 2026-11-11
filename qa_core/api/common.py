@@ -58,6 +58,8 @@ class FrontendReader:
         self.service, self.config = service, config
         dsn = getattr(service.result_sink, "dsn", None)
         self.review = review or (ReviewReader(dsn) if dsn else None)
+        self.kb_dsn = os.getenv("PG_DSN") or getattr(service.result_sink, "dsn", None)
+        self.kb_factory = kb_factory or self._database
 
     def root(self, owner):
         # GET 不创建目录；上传接口才拥有生成文件的职责。
@@ -163,3 +165,10 @@ class FrontendReader:
         return safe({**row, "task_id": task_id, "source_file_id": source_id,
                      "local_candidate": candidate, "local_candidate_available": candidate is not None,
                      "review_write_supported": False})
+
+    def _database(self):
+        from qa_core.storage.database import Database
+        if not self.kb_dsn:
+            raise MinerUError("knowledge_database_not_configured", 503)
+        # HTTP 仅服务正式 public；绝不读取 mvp_test_* 的 ACTIVE 作为正式知识库。
+        return Database(pg_dsn=self.kb_dsn, kb_schema="public")
