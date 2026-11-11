@@ -1,0 +1,229 @@
+/* ============================================================
+   设计 Token —— 市场监管政务科技风
+   配色：深海军蓝导航 + 科技蓝主操作 + 浅灰白背景
+   ============================================================ */
+:root {
+  /* 品牌与结构色 */
+  --mr-navy: #0f2b52;          /* 侧边导航深蓝 */
+  --mr-navy-active: #1a3f6e;   /* 导航选中 */
+  --mr-primary: #1d6fe0;       /* 主操作科技蓝 */
+  --mr-primary-deep: #155ab8;  /* hover/active */
+  --mr-bg: #f4f6fa;            /* 浅灰白页面背景 */
+  --mr-surface: #ffffff;
+  --mr-line: #e3e9f2;          /* 分隔线/卡片边 */
+  --mr-text-1: #1f2d3d;        /* 主文本 */
+  --mr-text-2: #5e6d82;        /* 次要文本 */
+  --mr-text-3: #8c9bb0;        /* 辅助文本 */
+
+  /* 文档生命周期状态色（语义与颜色一一绑定） */
+  --mr-st-pending: #64748b;    /* 待解析/待处理 灰蓝 */
+  --mr-st-running: #1d6fe0;    /* 解析中/执行中 科技蓝 */
+  --mr-st-success: #2fa06b;    /* 成功/已入库 青绿 */
+  --mr-st-danger: #d64545;     /* 失败/退回 红 */
+  --mr-st-warning: #d97706;    /* 待审核/降级 琥珀 */
+  --mr-st-review: #7c5cd6;     /* 已审核 紫 */
+
+  /* 字体与版式 */
+  --mr-font: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', 'Segoe UI', sans-serif;
+  --mr-radius: 8px;
+  --mr-shadow: 0 1px 3px rgba(15, 43, 82, 0.06);
+  --mr-header-h: 56px;
+  --mr-sidebar-w: 232px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--mr-font);
+  font-size: 14px;
+  color: var(--mr-text-1);
+  background: var(--mr-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 数字统一等宽，避免统计跳动 */
+.num, .stat-value, td .num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Element Plus 主题微调：贴合政务蓝 ---------- */
+.el-button--primary {
+  --el-button-bg-color: var(--mr-primary);
+  --el-button-border-color: var(--mr-primary);
+  --el-button-hover-bg-color: var(--mr-primary-deep);
+  --el-button-hover-border-color: var(--mr-primary-deep);
+  --el-button-active-bg-color: var(--mr-primary-deep);
+}
+.el-table th.el-table__cell {
+  background: #f8fafd;
+  color: var(--mr-text-2);
+  font-weight: 600;
+}
+.el-card {
+  border-radius: var(--mr-radius);
+  border-color: var(--mr-line);
+  box-shadow: var(--mr-shadow);
+}
+
+/* ---------- 通用页面骨架 ---------- */
+.page {
+  padding: 20px;
+}
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+.page-desc {
+  color: var(--mr-text-2);
+  font-size: 13px;
+  margin-top: 4px;
+}
+.card-grid {
+  display: grid;
+  gap: 16px;
+}
+
+/* DEMO 标记：凡后端尚无真实接口的数据一律挂此徽章，绝不伪造生产状态 */
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  vertical-align: middle;
+}
+
+/* 状态点 */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* 响应式：普通笔记本（1280-1440）收缩间距 */
+@media (max-width: 1440px) {
+  .page { padding: 16px; }
+  .card-grid { gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ============================================================
+   第四轮补充：组件五态、来源标记、未接入提示、多分辨率断点
+   ============================================================ */
+:root {
+  --mr-state-online: #2fa06b;
+  --mr-state-offline: #d64545;
+  --mr-state-not-configured: #64748b;
+  --mr-state-unknown: #94a3b8;
+  --mr-state-error: #b91c1c;
+}
+
+/* 真实数据标记（与 DEMO 徽章成对出现，贴近数值） */
+.real-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #1d6fe0;
+  background: #e8f1ff;
+  border: 1px solid #c7ddff;
+}
+.stat-scope {
+  color: var(--mr-text-3);
+  margin-right: 6px;
+}
+
+/* 接口未接入提示与禁用态统一说明 */
+.mr-disabled-hint {
+  font-size: 12px;
+  color: var(--mr-text-3);
+  line-height: 1.6;
+}
+.mr-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: var(--mr-radius);
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.mr-notice code {
+  font-size: 12px;
+  background: rgba(180, 83, 9, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.mr-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.mr-state-ONLINE { color: var(--mr-state-online); }
+.mr-state-OFFLINE { color: var(--mr-state-offline); }
+.mr-state-NOT_CONFIGURED { color: var(--mr-state-not-configured); }
+.mr-state-UNKNOWN { color: var(--mr-state-unknown); }
+.mr-state-ERROR { color: var(--mr-state-error); }
+
+/* 统一表格（配合 MrProTable） */
+.mr-pro-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.mr-pro-tools { margin-left: auto; }
+.mr-pro-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.mr-pro-empty {
+  color: var(--mr-text-3);
+  font-size: 13px;
+}
+
+/* 1920 大屏限宽 / 1366 笔记本收缩 */
+@media (min-width: 1800px) {
+  .page { max-width: 1760px; margin: 0 auto; }
+}
+@media (max-width: 1366px) {
+  .page { padding: 14px; }
+  .card-grid { gap: 12px; }
+  .mr-pro-search { gap: 8px; }
+}

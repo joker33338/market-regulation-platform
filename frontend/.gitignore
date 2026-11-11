@@ -1,0 +1,23 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# —— v0.2.2 安全边界：任何凭证、私有配置、数据库与业务文件不得入库 ——
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+*token*.json
+*secret*
+*.db
+*.sqlite
+*.sqlite3
+*.log
+local/
+uploads/
+sources/
+artifact.bin
