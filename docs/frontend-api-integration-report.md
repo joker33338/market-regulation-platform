@@ -19,6 +19,8 @@ FRONTEND_INTEGRATION_READY
 
 > 2026-11-11 14:46 补充：按「全体 Agent 统一规则」新增 §1.3 **统一后端运行镜像身份**（后端源码 SHA / 镜像 ID / 标签 / OCI revision / 运行容器 / 8180 实际服务身份），供 Agent C、Fix、QA 与前端共用同一被测版本基线。本次补充只涉及文档，未改动业务源码、运行镜像或共享服务。
 
+> **2026-11-11 最新补记（V022-F01 修复交接）**：QA 将「原文分页状态变化但 PDF 画面未切换」判为 P1 / RELEASE_BLOCKER / FAIL 并交 WorkBuddy 最小修复。已完成 `frontend/src/components/document/DocumentPreview.vue` 的受控重建修复，业务源码提交 `63bbcc07a6b6d12a6be56fa7b0e81731c3917a45`；`npm run typecheck`、`npm run build` 均通过（入口 `dist/assets/index-e6009def.js`）；有头 Edge 真实画面回归覆盖 1→2→1、缩略项、直接页码、100%→150%→100%、页签切换、按页对照、原件 SHA 与 Blob 释放，13 张截图及逐张 SHA256 索引见 **`docs/frontend-v022-f01-fix-handoff.md`**。后端源码、镜像 ID、容器与 8180 服务身份已重新只读复核且未变；未改 8180、未部署、未写业务数据。**本补记不把 QA 的 FAIL 改判为 PASS**，V022-F01 是否关闭由 QA 独立复测决定；V022-E01 剩余写闭环仍由 QA 在隔离状态验收；「8180 静态页面部署」已由用户交 Agent C，本轮未实施。§1.1 中 `5d83b13f4132464ddb764501967bc50992778062` 是本次修复前的联调代码基线（历史值），当前业务源码以上述 `63bbcc0…` 为准；本报告其余章节保留各时点原记录，不代表对修复后状态的重新判定。
+
 ---
 
 ## 1. 基线与身份（完整 SHA）

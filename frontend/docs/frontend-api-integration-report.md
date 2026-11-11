@@ -9,6 +9,7 @@
 > 契约版本：`frontend-api-v0.2.2-1`
 > 统一后端运行镜像身份（全体 Agent 共用）：镜像 ID `sha256:8f169cd82cc1bf55807eb48a9f75e0b5206ac4cb10ca27c38fe206a85e93d7a4`，标签 `market-regulation-workbench:candidate-v022-4fc4cf124a12`，OCI revision 同运行 revision，运行容器 `market-regulation-app-1`；六项完整记录与证据见正式报告 §1.3。
 > 上一版结论：`FRONTEND_INTEGRATION_PARTIAL`（见提交 `d60f657`）
+> 2026-11-11 最新补记：QA V022-F01（PDF 分页状态变而画面不变）已由 WorkBuddy 做组件级最小修复，业务源码提交 `63bbcc07a6b6d12a6be56fa7b0e81731c3917a45`，有头浏览器真实画面回归 13 张证据见仓库根 `docs/frontend-v022-f01-fix-handoff.md`。本卷下文为修复前的逐页联调原始证据，不改写；QA 的 FAIL 判定是否关闭由 QA 独立复测决定。
 
 ---
 
