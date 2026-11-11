@@ -3,14 +3,14 @@
   "gate_status": "BLOCKED",
   "source_branch": "codex/fix-v0.2.1",
   "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359",
-  "fix_handoff_commit": "6aedddf057a68c0a7e08abb78add97c407292f07",
+  "fix_handoff_commit": "4fea3064de4c699ab9de65c79f23a07b8c9e4a22",
   "qa_branch": "codex/qa-v0.2.1",
   "qa_test_commit": "40014200e15e6abb1b811a99eb66b8fa55b009ed",
-  "execution_qa_base_commit": "28aece1ececdd02768cb327951b55e7be631e8fb",
-  "checked_at": "2026-11-11T01:04:25.734456+00:00",
+  "execution_qa_base_commit": "59574c0f16dd960fe034f9f4d0aca8f75fb116a4",
+  "checked_at": "2026-11-11T01:39:07.267273+00:00",
   "test_execution_at": "2026-11-11T01:01:23.679389+00:00",
-  "report_path": "docs/qa/v0.2.1/schema-and-security-qa-report.md",
-  "handoff_path": "docs/qa/v0.2.1/schema-and-security-qa-report.md",
+  "report_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
+  "handoff_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
   "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
   "policy": {
     "name": "功能安全门禁 + 识别质量分级 + 人工复核",
@@ -37,14 +37,22 @@
   "failure_subcases": 0,
   "method_count_policy": "292唯一方法：285PASS/7SKIP；PG6同ID补跑后291PASS/1SKIP；额外Schema探针不加进方法数",
   "candidate_regression": {
-    "status": "NOT_TESTED_CURRENT_SOURCE",
-    "previous_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
-    "previous_total": 158,
-    "note": "旧镜像不含本轮修复；不得替代新候选验收"
+    "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359",
+    "image_id": "sha256:92bc163c15210ec0ea9f0373db4d020f0be792dea2e2be4dc3f089727d202c0e",
+    "total": 177,
+    "passed": 172,
+    "errors": 4,
+    "skipped": 1,
+    "error_classification": "宿主部署源文件不在运行镜像路径；保留ERROR，不冒充通过",
+    "business_code_import": "/app/qa_core",
+    "identity_files_matched": 57,
+    "qrc001": "PASS",
+    "compose_entrypoint": "PASS",
+    "real_http_postgres_restart": "PASS"
   },
-  "real_http_status": "NOT_TESTED_CURRENT_SOURCE_PREVIOUS_EVIDENCE_RETAINED",
-  "real_local_models_status": "NOT_TESTED_CURRENT_SOURCE_PREVIOUS_EVIDENCE_RETAINED",
-  "real_official_auto_status": "NOT_TESTED_CURRENT_SOURCE_PREVIOUS_EVIDENCE_RETAINED",
+  "real_http_status": "PASS",
+  "real_local_models_status": "PASS_REAL_OCR",
+  "real_official_auto_status": "BLOCKED_INCOMPLETE_VALID_DUAL_ENGINE_EVIDENCE",
   "old_official_task_recovery_status": "BLOCKED_HTTP_403",
   "windows_whole_reboot_status": "NOT_TESTED",
   "database": {
@@ -52,7 +60,13 @@
     "schema_extra_probes_passed": 6,
     "existing_business_rows_and_real_active_unchanged": true,
     "test_data_and_schemas_retained": true,
-    "adversarial_integration_complete": false
+    "adversarial_integration_complete": true,
+    "remaining_adversarial_probes": {
+      "temporary_shadow": "PASS",
+      "vector_shadow": "PASS",
+      "cross_schema_fk": "PASS",
+      "non_current_role_owner": "PASS"
+    }
   },
   "known_p0_p1": [],
   "historical_qfa_001_to_004": "已回归闭环；旧a860abf闸门失败不作为当前未修复缺陷",
@@ -75,7 +89,7 @@
     },
     "R-05": {
       "status": "BLOCKED",
-      "reason": "bf66真实auto已通过；新安全helper变动后当前源码未重新做真实模型/回退集成，历史证据保留"
+      "reason": "当前候选真实本地OCR已通过；首轮云回退时本地模型挂载错误，不冒充完整双引擎通过，8次预算未重置"
     },
     "R-06": {
       "status": "PENDING_USER_CONFIRMATION",
@@ -131,8 +145,8 @@
       "matching_cells": 48
     }
   },
-  "evidence_root": "local/v021-security-retest",
-  "deployment_status": "未切换活动旧镜像；候选验收不等于生产部署验收",
+  "evidence_root": "local/v021-c915-final",
+  "deployment_status": "独立Compose候选实际入口及restart通过，测试app已停止；活动旧应用未切换",
   "automatic_release_allowed": false,
   "automatic_next_version_ready": false,
   "closed_issues": [
@@ -145,10 +159,9 @@
   ],
   "recognition_evidence_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
   "blocked_reasons": [
-    "当前修复无对应候选镜像实际入口回归",
-    "Schema对抗场景未全部完成真实PG验证",
+    "当前镜像真实本地成功后到官方回退完整验证未闭环；首轮合成8次预算已耗尽且保留",
     "旧官方任务GET403未闭环",
-    "Windows整机恢复未验证",
-    "新输入安全helper实际模型/auto集成未复测"
-  ]
+    "Windows整机恢复未验证"
+  ],
+  "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00"
 }
