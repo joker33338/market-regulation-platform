@@ -1,8 +1,11 @@
 # v0.2.2 前端真实 API 对接与联调交接报告
 
-> 生成日期：2026-11-11（运行期联调完成后重写）
-> 前端分支：`feat/frontend-api-v0.2.2` @ `96d4052`
-> 后端契约 / 运行源码：`feat/backend-api-v0.2.2` @ `4fc4cf124a120762593064676ea5f8dbe2394119`
+> 生成日期：2026-11-11（运行期联调完成后重写；同日收口修正身份标注并脱敏）
+> 性质：**逐页详细证据卷**。任务书指定的正式交付入口为仓库根 `docs/frontend-api-integration-report.md`，本文件保留作为浏览器联调与状态矩阵的原始证据。
+> 前端分支：`feat/frontend-api-v0.2.2` @ `5d83b13f4132464ddb764501967bc50992778062`
+> 8180 运行 revision：`4fc4cf124a120762593064676ea5f8dbe2394119`（镜像 tag 与运行交接文档双重确认）
+> 后端契约分支当前 HEAD：`20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`（仅比运行 revision 多一个文档交接提交，无契约变化）
+> Agent C 接口实现分支 HEAD：`712521429bb39e10b00730e139ccb4889dd2e555`（`codex/backend-api-v0.2.2`，独立 worktree 阶段记录）
 > 契约版本：`frontend-api-v0.2.2-1`
 > 上一版结论：`FRONTEND_INTEGRATION_PARTIAL`（见提交 `d60f657`）
 
@@ -31,10 +34,12 @@ FRONTEND_INTEGRATION_READY
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| 前端工作区 | `F:\刘凯工作\market-regulation-platform-frontend` | 独立 Worktree，附带后端副本只读 |
-| 前端分支 / HEAD | `feat/frontend-api-v0.2.2` / `96d4052` | 12 个本地 commit，工作区干净，未 Push / 未 Merge |
+| 前端工作区 | 本 worktree 的 `frontend/` 目录 | 与后端共享同一 Git 仓库的独立 worktree |
+| 前端分支 / HEAD | `feat/frontend-api-v0.2.2` / `5d83b13f4132464ddb764501967bc50992778062` | 13 个本地 commit，工作区干净，未 Push / 未 Merge |
 | 前端维护基线 | `5dd44b97710db0d3bdb84bcec6e1624dd70205dc` | 未使用过时 `main` 开发 |
-| 后端仓库 / HEAD | `F:\刘凯工作\market-regulation-platform` / `4fc4cf124a120762593064676ea5f8dbe2394119` | 与 `release.ts` 记录一致 |
+| 后端契约分支 HEAD | `feat/backend-api-v0.2.2` / `20bfeef57e101f08a2f37bd4a73b6ed4237dcba5` | 仅比运行 revision 多一个文档交接提交 |
+| 8180 运行源码 HEAD | `4fc4cf124a120762593064676ea5f8dbe2394119` | 与运行交接文档、镜像 tag 一致 |
+| Agent C 接口分支 HEAD | `codex/backend-api-v0.2.2` / `712521429bb39e10b00730e139ccb4889dd2e555` | 独立 worktree，阶段记录 |
 | 后端工作区状态 | 5 个 `M` 文件 | 已复核 `git diff --numstat` / `--ignore-cr-at-eol` 为空 → 仅 CRLF 归一化，无契约变化 |
 | 活动容器 / 镜像 | `market-regulation-app-1` (healthy) / `market-regulation-workbench:candidate-v022-4fc4cf124a12` | 来自本地运行交接文档，本轮未改动 |
 | 联调入口 | `http://127.0.0.1:8180` | 前端经 4173 同源 `/api` 代理转发 |
@@ -94,7 +99,7 @@ FRONTEND_INTEGRATION_READY
 | 缓存 | `Network.setCacheDisabled(true)`，确保加载最新构建产物 |
 | 视口 | 1440×900 七页面全量；1366×768（dashboard/review）、1920×1080（system）响应式抽查；三者 `scrollWidth === clientWidth`，无横向溢出 |
 | 采集 | CDP `Network.responseReceived` / `loadingFailed`、`Runtime.exceptionThrown`、`Log.entryAdded`、DOM `innerText`、按钮禁用态、`Page.captureScreenshot` |
-| 截图 | `C:\Users\aa\AppData\Local\Temp\mrp-screenshots\final\`（七页面 + 初始/结果检索 + 1366/1920 抽查），仅本机证据，不入库 |
+| 截图 | 本机临时目录（七页面 + 初始/结果检索 + 1366/1920 抽查），仅本机证据，不入库、不记录绝对路径 |
 
 **最终七页面扫描结果（1440×900）**：全部 `label=v0.2.2 运行期联调通过 · 只读`、旧标签 `待运行期联调` 已消失、`契约就绪` = true、`errors=[]`、`apiFails=[]`。
 
@@ -229,7 +234,7 @@ FRONTEND_INTEGRATION_READY
 
 ---
 
-## 13. 提交清单（`5dd44b9..96d4052`，12 个本地 commit）
+## 13. 提交清单（`5dd44b9..5d83b13`，13 个本地 commit）
 
 | Commit | 内容 |
 |---|---|
@@ -245,6 +250,7 @@ FRONTEND_INTEGRATION_READY
 | `6ecb2ae` | 补齐 `preview.proxy`、校准发布状态文案 |
 | `d60f657` | 上一版 `FRONTEND_INTEGRATION_PARTIAL` 报告 |
 | `96d4052` | **运行期联调后更新发布状态、修正检索初始态与过时 DEMO 文案** |
+| `5d83b13` | **运行期浏览器联调通过，本证据卷更新为 READY** |
 
 ---
 
@@ -268,7 +274,7 @@ FRONTEND_INTEGRATION_READY
 
 **建议的后续顺序（均需用户/QA 另行授权，本轮未执行）**：
 
-1. 独立 QA 绑定后端 `4fc4cf1` 与前端 `96d4052`，按交接文档 §QA 重点验证认证/跨 owner、原件 Hash/Range、任务恢复、源文件身份映射、PG `requires_review`、候选对照、Chunk 门禁、public 空知识库与真实统计。
+1. 独立 QA 绑定 8180 运行 revision `4fc4cf124a120762593064676ea5f8dbe2394119` 与前端 `5d83b13f4132464ddb764501967bc50992778062`，按交接文档 §QA 重点验证认证/跨 owner、原件 Hash/Range、任务恢复、源文件身份映射、PG `requires_review`、候选对照、Chunk 门禁、public 空知识库与真实统计。
 2. 在隔离合成对象上补做写链路（上传 → 创建任务 → 结果 → 审核写入候选）与 409/413/415/429/503 触发测试；不触碰正式 ACTIVE 与历史任务。
 3. public 知识库按既有授权流程发布 ACTIVE 版本后，复验检索命中态与版本详情成功态。
 4. 后端补齐 §10 的 8 组接口并通过契约验收后，再逐项解除前端禁用；每解除一项需单独提交与验收。

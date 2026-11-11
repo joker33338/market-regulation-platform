@@ -1,7 +1,7 @@
 # v0.2.1 QA PASS 后 · 接口接入与更新报告
 
 > 日期：2026-11-11（GMT+8）
-> 前端：`F:\刘凯工作\market-regulation-platform-frontend\frontend`，分支 `feat/frontend-v0.2.1` @ `f4a0af8`
+> 前端：本 worktree 的 `frontend/` 目录，分支 `feat/frontend-v0.2.1` @ `f4a0af8`
 > 触发：用户告知「v0.2.1 审查已经通过，对接口进行整体的接入和更新」
 > 边界：仅修改 `frontend/`；后端 `qa_core/**`、QA 工作区、原始目录均未触碰；无 commit / merge / push / 部署
 
@@ -162,4 +162,4 @@ GET  /api/parse/tasks/{task_id}/files/{file_id}/artifact
 
 ## 7. 需要用户确认的一件事
 
-若新接口其实在**本仓库之外的另一个服务/分支/文档**里（例如用户另行提供的新 API 规格），请给出路径或文件；当前 `F:\刘凯工作\market-regulation-platform*` 下的全部分支与运行中的 8180 实例均只包含那 9 个 API。拿到新契约后即可立即进入真实接入，不需要重做页面。
+若新接口其实在**本仓库之外的另一个服务/分支/文档**里（例如用户另行提供的新 API 规格），请给出路径或文件；当前本仓库全部 worktree 分支与运行中的 8180 实例均只包含那 9 个 API。拿到新契约后即可立即进入真实接入，不需要重做页面。

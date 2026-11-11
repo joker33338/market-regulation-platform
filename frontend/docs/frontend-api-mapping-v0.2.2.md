@@ -2,14 +2,15 @@
 
 > 建立时间：2026-11-11
 > 前端分支：`feat/frontend-api-v0.2.2`，基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc`
-> 后端契约分支：`feat/backend-api-v0.2.2` @ `4fc4cf124a120762593064676ea5f8dbe2394119`
+> 8180 运行 revision：`4fc4cf124a120762593064676ea5f8dbe2394119`；后端契约分支当前 HEAD：`20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`
 > 契约版本：`frontend-api-v0.2.2-1`
+> 状态说明：§0 的运行态探测记录为旧镜像时期（11:58）事实；后续前置阻塞已解除，最终状态见 §4、§5 与仓库根 `docs/frontend-api-integration-report.md`。
 
 ## 0. 事实来源与运行态核实（不得假设接口已实现）
 
 | 事实来源 | 位置 | 状态 |
 |---|---|---|
-| 正式契约 | `F:\刘凯工作\market-regulation-platform\docs\integration\frontend-api-contract.md` | 已读，11.4 KB |
+| 正式契约 | 原始工程 worktree 的 `docs/integration/frontend-api-contract.md` | 已读，11.4 KB |
 | 缺口报告 | `docs/integration/frontend-api-gap-report.md` | 已读，后端自评 `BACKEND_API_PARTIAL` |
 | OpenAPI 快照 | `docs/integration/frontend-openapi.json` | 已读，OpenAPI 3.1.0，`info.version=0.2.2-api-candidate`，**22 条路径 / 16 个 schema** |
 | 提交计划 | `docs/integration/v0.2.2-git-commit-plan.md` | 已读，8 个模块提交 + 28 项测试通过 |
