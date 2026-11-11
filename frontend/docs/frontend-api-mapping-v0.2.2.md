@@ -4,6 +4,7 @@
 > 前端分支：`feat/frontend-api-v0.2.2`，基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc`
 > 8180 运行 revision：`4fc4cf124a120762593064676ea5f8dbe2394119`；后端契约分支当前 HEAD：`20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`
 > 契约版本：`frontend-api-v0.2.2-1`
+> 统一后端运行镜像身份（全体 Agent 共用）：后端源码 `4fc4cf124a120762593064676ea5f8dbe2394119`，镜像 ID `sha256:8f169cd82cc1bf55807eb48a9f75e0b5206ac4cb10ca27c38fe206a85e93d7a4`，标签 `market-regulation-workbench:candidate-v022-4fc4cf124a12`，OCI revision 同源码 SHA，运行容器 `market-regulation-app-1`；六项完整记录与证据见正式报告 §1.3。
 > 状态说明：§0 的运行态探测记录为旧镜像时期（11:58）事实；后续前置阻塞已解除，最终状态见 §4、§5 与仓库根 `docs/frontend-api-integration-report.md`。
 
 ## 0. 事实来源与运行态核实（不得假设接口已实现）

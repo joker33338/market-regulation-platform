@@ -17,6 +17,8 @@ FRONTEND_INTEGRATION_READY
 
 此结论**不覆盖**：写链路端到端执行（上传 / 创建任务 / 恢复 / 取消）、正式审核写入、入库构建与正式发布 / 回滚、独立 QA 验收、生产部署、MinerU 云端推理与大规模性能验证。这些均按 §8、§9、§10 如实列出，不以 READY 名义掩盖。后端自评仍为 `BACKEND_API_PARTIAL`，本报告不代表 QA PASS 或生产可用。
 
+> 2026-11-11 14:46 补充：按「全体 Agent 统一规则」新增 §1.3 **统一后端运行镜像身份**（后端源码 SHA / 镜像 ID / 标签 / OCI revision / 运行容器 / 8180 实际服务身份），供 Agent C、Fix、QA 与前端共用同一被测版本基线。本次补充只涉及文档，未改动业务源码、运行镜像或共享服务。
+
 ---
 
 ## 1. 基线与身份（完整 SHA）
@@ -29,13 +31,14 @@ FRONTEND_INTEGRATION_READY
 |---|---|
 | 前端分支 | `feat/frontend-api-v0.2.2` |
 | **前端完整 SHA（联调代码最终态）** | `5d83b13f4132464ddb764501967bc50992778062` |
+| **前端完整 SHA（报告收口提交 / 本次镜像身份补记前 HEAD）** | `688b824213a4489e2f1ce1577677b341f2c10792` |
 | 前端维护基线 | `5dd44b97710db0d3bdb84bcec6e1624dd70205dc` |
-| 本轮前端提交数 | 13 个本地提交（未 Push / 未 Merge / 未部署） |
+| 本轮前端提交数 | 14 个本地提交（13 个联调 + 1 个报告收口；本次镜像身份补记另计，均未 Push / 未 Merge / 未部署） |
 | 前端工作区状态 | 干净；`node_modules`、`dist`、`.env`、备份均不入库 |
 | **后端契约分支完整 SHA** | `20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`（`feat/backend-api-v0.2.2`，原始工程 worktree） |
 | **Agent C 接口实现分支完整 SHA** | `712521429bb39e10b00730e139ccb4889dd2e555`（`codex/backend-api-v0.2.2`，独立 worktree，作为阶段记录保留） |
 | **8180 运行 revision（完整 SHA）** | `4fc4cf124a120762593064676ea5f8dbe2394119` |
-| 运行镜像 / 容器 | `market-regulation-workbench:candidate-v022-4fc4cf124a12` / `market-regulation-app-1`（healthy，`127.0.0.1:8180->8180/tcp`） |
+| 运行镜像 / 容器 | `market-regulation-workbench:candidate-v022-4fc4cf124a12` / `market-regulation-app-1`（healthy，`127.0.0.1:8180->8180/tcp`）；**完整镜像身份见 §1.3** |
 | 正式契约 | `docs/integration/frontend-api-contract.md`，契约版本 `frontend-api-v0.2.2-1` |
 | 后端缺口自评 | `docs/integration/frontend-api-gap-report.md` → `BACKEND_API_PARTIAL` |
 | 运行交接 | `docs/integration/v0.2.2-local-runtime-handoff.md`（28 项定向测试 + 9 项真实认证只读冒烟通过） |
@@ -56,6 +59,27 @@ FRONTEND_INTEGRATION_READY
 | `GET /api/*`（无凭证） | 12 条关键路径一律 401，无一条 404，证明 v0.2.2 新路由已在运行实例加载 |
 
 联调凭证复用本机 ignored 私有运行配置中的已有会话凭证，**仅在容器内使用于本地只读请求**，未写入源码、报告、截图或 Git；浏览器侧凭证只存内存 + sessionStorage。
+
+### 1.3 统一后端运行镜像身份（全体 Agent 共享，2026-11-11 14:46 只读复核）
+
+按「全体 Agent 统一规则」，本前端交付报告记录与 Agent C / Fix / QA **同一套 8180 运行后端**的完整身份。判定依据是**容器实际引用的镜像 ID** 与**该镜像的 OCI revision label**，不使用 `latest` 标签（本仓库无 `latest` 标签）。
+
+| 必记项 | 值 | 证据 |
+|---|---|---|
+| **当前后端源码完整 SHA** | `4fc4cf124a120762593064676ea5f8dbe2394119` | 镜像 `org.opencontainers.image.revision` label，与运行交接文档一致 |
+| **Docker 镜像 ID** | `sha256:8f169cd82cc1bf55807eb48a9f75e0b5206ac4cb10ca27c38fe206a85e93d7a4`（短 `8f169cd82cc1`） | 容器 `.Image` 与 `docker image inspect .Id` 完全一致；`RepoDigests` 同值（本地构建，无远端 registry digest） |
+| **镜像标签** | `market-regulation-workbench:candidate-v022-4fc4cf124a12` | `RepoTags` 唯一标签；镜像创建于 `2026-11-11T03:55:28Z` |
+| **OCI revision** | `org.opencontainers.image.revision=4fc4cf124a120762593064676ea5f8dbe2394119` | 镜像 label；**与运行源码 SHA 完全一致 → 镜像 ID ↔ 源码 SHA 对应关系成立**，非凭标签推断 |
+| **当前运行容器** | `market-regulation-app-1`，容器 ID `de1c0271a55eb579ef43073ad3f7109732bd409bb49259087451b6f32fe401af` | `running` / `healthy` / `RestartCount=0`；启动于 `2026-11-11T05:49:06Z`；端口 `127.0.0.1:8180->8180/tcp` |
+| **8180 实际服务身份** | uvicorn；`GET /api/openapi.json` → **200**，`openapi=3.1.0`、`info.version=0.2.2-api-candidate`、title `Document parsing`、**22 paths**；`GET /api/parse/info` → `provider=self_hosted, mode=local`，`enabled/database_enabled/dual_engine_enabled=true`；`GET /api/system/health` → `status=ok`、7 组件 | 容器内带凭证只读探测（凭证未输出、未落盘） |
+
+**唯一活跃后端**：8180 端口仅一个 LISTENING；`docker ps` 中仅 `market-regulation-app-1` 提供 FastAPI，无第二套并行后端。另有已停止的历史 QA 容器 `qa-c915-2b6bfb37-app-1`（`Exited (143)`，v0.2.1 QA PASS 镜像），不占用 8180，按规则保留不动。
+
+**依赖与数据保护现状（只读复核，未改动）**：共享 `market-regulation-db-1`（pgvector/pg16）、`market-regulation-redis-1`（redis:7.4-alpine）、`market-regulation-mysql-1`（mysql:8.4，历史保留容器，本轮业务未使用，既不引入也不删除）；模型只读挂载 `/models`、私有运行配置只读挂载 `/private/runtime.json`、可写状态 `/state` 与 `/app/reports` 均保持原样。历史镜像与 v0.2.1 QA PASS 镜像 `market-regulation-workbench:candidate-v021-c91547d393ca`（`92bc163c1521`，OCI revision `c91547d393ca6b049e216c0051e25271d06d7359`）均保留；另有未运行且无 OCI revision 的遗留镜像 `market-regulation-app:local`（`b4010953b65e`），不作为被测版本依据。
+
+**WorkBuddy 权限边界（本轮）**：仅通过 `http://127.0.0.1:8180` 只读接入；**未**构建镜像、**未**重启或替换共享容器、**未**覆盖运行镜像、**未**删除数据卷或历史镜像、**未**清空 SQLite、**未**修改正式数据库、**未**更改 MinerU Token / 授权账本、**未**中断活动任务、**未** Push / Merge main / 部署。镜像统一构建与安全切换由 Agent C 负责；QA 执行期间镜像版本保持冻结，本角色不替换 8180 被测镜像。
+
+> 供 QA 引用：本报告对应的被测组合为「后端源码 `4fc4cf124a120762593064676ea5f8dbe2394119` + 镜像 ID `sha256:8f169cd8…` + 前端源码 `688b824213a4489e2f1ce1577677b341f2c10792` 及其后的文档补记提交」。版本不一致时不得按本报告签发 PASS。
 
 ---
 
@@ -178,7 +202,7 @@ FRONTEND_INTEGRATION_READY
 
 ## 7. 前端提交记录
 
-基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc`，本轮 13 个本地提交（按时间正序，均为本地提交，未 Push / 未 Merge / 未打 Tag）：
+基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc`，本轮 14 个本地提交（按时间正序，均为本地提交，未 Push / 未 Merge / 未打 Tag）：
 
 | # | 短 SHA | 完整 SHA | 内容 |
 |---|---|---|---|
@@ -195,10 +219,11 @@ FRONTEND_INTEGRATION_READY
 | 11 | `d60f657` | `d60f657244259be8950422c668730a2df9b35246` | 上一版 `FRONTEND_INTEGRATION_PARTIAL` 报告（旧镜像阻塞期） |
 | 12 | `96d4052` | `96d40521c49ee9e88a171cafd8541bd321f21827` | 运行期联调后修正检索初始态、过时 DEMO 文案、favicon、发布标签 |
 | 13 | `5d83b13` | `5d83b13f4132464ddb764501967bc50992778062` | 运行期浏览器联调通过，详细证据卷更新为 READY |
+| 14 | `688b824` | `688b824213a4489e2f1ce1577677b341f2c10792` | 按任务书收口：新增正式交付报告、修正历史标注与脱敏 |
 
-**对应后端 SHA 记录**：联调全程绑定 8180 运行 revision `4fc4cf124a120762593064676ea5f8dbe2394119`；契约分支 `20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`；Agent C 接口分支 `712521429bb39e10b00730e139ccb4889dd2e555`。
+**对应后端 SHA 记录**：联调全程绑定 8180 运行 revision `4fc4cf124a120762593064676ea5f8dbe2394119`（镜像 ID `sha256:8f169cd8…`、OCI revision 同值，见 §1.3）；契约分支 `20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`；Agent C 接口分支 `712521429bb39e10b00730e139ccb4889dd2e555`。
 
-> 本收口轮（正式报告 + 历史标注修正）在上述 13 个提交之后另有一个本地 `docs(frontend)` 提交，最终 HEAD 见交付说明；该提交不改动任何业务源码。
+> 第 15 个提交为「统一后端运行镜像身份补记」，仅改文档、不改动任何业务源码或运行服务；该提交不内嵌自身 SHA，最终 HEAD 由 `git log -1` 给出并在交付说明中回报。
 
 ---
 

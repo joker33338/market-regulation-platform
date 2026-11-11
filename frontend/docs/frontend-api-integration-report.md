@@ -2,11 +2,12 @@
 
 > 生成日期：2026-11-11（运行期联调完成后重写；同日收口修正身份标注并脱敏）
 > 性质：**逐页详细证据卷**。任务书指定的正式交付入口为仓库根 `docs/frontend-api-integration-report.md`，本文件保留作为浏览器联调与状态矩阵的原始证据。
-> 前端分支：`feat/frontend-api-v0.2.2` @ `5d83b13f4132464ddb764501967bc50992778062`
-> 8180 运行 revision：`4fc4cf124a120762593064676ea5f8dbe2394119`（镜像 tag 与运行交接文档双重确认）
+> 前端分支：`feat/frontend-api-v0.2.2` @ `5d83b13f4132464ddb764501967bc50992778062`（联调代码最终态；交付 HEAD 见正式报告 §1.1 / §7）
+> 8180 运行 revision：`4fc4cf124a120762593064676ea5f8dbe2394119`（镜像 tag、OCI revision label 与运行交接文档三重确认）
 > 后端契约分支当前 HEAD：`20bfeef57e101f08a2f37bd4a73b6ed4237dcba5`（仅比运行 revision 多一个文档交接提交，无契约变化）
 > Agent C 接口实现分支 HEAD：`712521429bb39e10b00730e139ccb4889dd2e555`（`codex/backend-api-v0.2.2`，独立 worktree 阶段记录）
 > 契约版本：`frontend-api-v0.2.2-1`
+> 统一后端运行镜像身份（全体 Agent 共用）：镜像 ID `sha256:8f169cd82cc1bf55807eb48a9f75e0b5206ac4cb10ca27c38fe206a85e93d7a4`，标签 `market-regulation-workbench:candidate-v022-4fc4cf124a12`，OCI revision 同运行 revision，运行容器 `market-regulation-app-1`；六项完整记录与证据见正式报告 §1.3。
 > 上一版结论：`FRONTEND_INTEGRATION_PARTIAL`（见提交 `d60f657`）
 
 ---
@@ -41,7 +42,11 @@ FRONTEND_INTEGRATION_READY
 | 8180 运行源码 HEAD | `4fc4cf124a120762593064676ea5f8dbe2394119` | 与运行交接文档、镜像 tag 一致 |
 | Agent C 接口分支 HEAD | `codex/backend-api-v0.2.2` / `712521429bb39e10b00730e139ccb4889dd2e555` | 独立 worktree，阶段记录 |
 | 后端工作区状态 | 5 个 `M` 文件 | 已复核 `git diff --numstat` / `--ignore-cr-at-eol` 为空 → 仅 CRLF 归一化，无契约变化 |
-| 活动容器 / 镜像 | `market-regulation-app-1` (healthy) / `market-regulation-workbench:candidate-v022-4fc4cf124a12` | 来自本地运行交接文档，本轮未改动 |
+| 活动容器 / 镜像 | `market-regulation-app-1` (healthy) / `market-regulation-workbench:candidate-v022-4fc4cf124a12` | 唯一活跃 8180 后端，本轮未改动 |
+| 运行镜像 ID | `sha256:8f169cd82cc1bf55807eb48a9f75e0b5206ac4cb10ca27c38fe206a85e93d7a4` | 容器 `.Image` 与 `docker image inspect .Id` 一致 |
+| OCI revision | `org.opencontainers.image.revision=4fc4cf124a120762593064676ea5f8dbe2394119` | 与运行源码 SHA 完全一致，镜像 ID ↔ 源码 SHA 对应成立 |
+| 运行容器 ID | `de1c0271a55eb579ef43073ad3f7109732bd409bb49259087451b6f32fe401af` | running / healthy / RestartCount=0 |
+| 8180 实际服务身份 | uvicorn；`openapi 3.1.0` / `0.2.2-api-candidate` / 22 paths；`self_hosted, local`；health `ok` / 7 组件 | 容器内带凭证只读探测 |
 | 联调入口 | `http://127.0.0.1:8180` | 前端经 4173 同源 `/api` 代理转发 |
 | 正式契约 | `docs/integration/frontend-api-contract.md` | 契约版本 `frontend-api-v0.2.2-1` |
 | 缺口报告 | `docs/integration/frontend-api-gap-report.md` | 后端自评 `BACKEND_API_PARTIAL` |
