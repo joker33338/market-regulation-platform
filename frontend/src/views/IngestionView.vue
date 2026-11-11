@@ -3,276 +3,307 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">知识库入库管理</h1>
-        <p class="page-desc">离线入库流水线：从解析完成到 PostgreSQL 落库的全过程可视化</p>
+        <p class="page-desc">Chunk 结构预览与 public 知识库版本只读查询 —— 本页不创建版本、不嵌入、不发布、不写库</p>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center">
+      <div class="header-tags">
+        <el-tag type="success" effect="plain">真实接口 /api/knowledge/versions</el-tag>
+        <el-tag :type="contractState === 'ready' ? 'success' : 'warning'" effect="plain">{{ contractLabel[contractState] }}</el-tag>
         <el-tooltip :content="disabledHint" placement="top">
           <span><el-button type="primary" disabled>发起入库批次</el-button></span>
         </el-tooltip>
-        <DemoBadge />
       </div>
     </div>
 
-    <!-- kb_version 不一致 → 整批阻断 -->
+    <!-- 只读边界：正式入库链路后端明确不支持 -->
     <el-alert
-      v-if="versionCheck && !versionCheck.consistent"
-      type="error"
+      type="warning"
       :closable="false"
-      class="block-banner"
-      show-icon
-    >
-      <template #title>
-        <b>入库已阻断：kb_version 版本不一致</b>
-      </template>
-      <template #default>
-        期望版本 <b class="num">{{ versionCheck.expectedVersion }}</b>，
-        实际检出 <b class="num">{{ versionCheck.actualVersion }}</b>；
-        受阻批次：<b>{{ versionCheck.blockedBatchIds.join('、') || '—' }}</b>。
-        检查时间 {{ versionCheck.checkedAt }}（DEMO）。
-        版本一致性未通过前，禁止发起任何入库或数据库写入动作。
-      </template>
-    </el-alert>
+      class="readonly-notice"
+      title="本页只读：正式入库批次 / 发布 / 回滚接口均未实现"
+      description="可调用的真实能力仅 4 个：POST /api/parse/tasks/{task_id}/files/{file_id}/preview、POST /api/review/{parse_id}/preview、GET /api/knowledge/versions、GET /api/knowledge/versions/{version}。预览返回 write_performed=false，门禁失败为 409 且不是空成功；版本列表只读 public schema，绝不读取 mvp_test_*。页面不生成任何批次、阶段进度、入库记录或法条数据。" />
     <div class="mr-disabled-hint" style="margin-bottom: 12px">{{ disabledHint }}</div>
 
-    <!-- 入库前检查 -->
+    <!-- ① Chunk / 结构预览：两个真实 POST 接口 -->
     <el-card shadow="never">
       <template #header>
         <div class="card-head">
-          <span>入库前检查 <DemoBadge /></span>
-          <span class="card-sub">{{ blockingCount }} 项阻断 · 接口未接入，结果仅供界面演示</span>
+          <span>Chunk 结构预览 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">复用原有预览器 · 只输出 parents / chunks / tables / quality / warnings</span>
         </div>
       </template>
-      <div class="check-grid">
-        <div v-for="c in precheck" :key="c.key" class="check-item" :class="{ 'check-bad': !c.passed }">
-          <el-icon :color="c.passed ? 'var(--mr-st-success)' : 'var(--mr-state-error)'">
-            <CircleCheckFilled v-if="c.passed" /><CircleCloseFilled v-else />
-          </el-icon>
-          <div class="check-text">
-            <div class="check-name">
-              {{ c.name }}
-              <el-tag v-if="c.blocking" size="small" type="danger" effect="plain">阻断项</el-tag>
-            </div>
-            <div class="check-detail">{{ c.detail }}</div>
+
+      <div class="preview-form">
+        <el-radio-group v-model="previewSource" size="small">
+          <el-radio-button label="task">任务文件预览</el-radio-button>
+          <el-radio-button label="review">已持久化结果预览</el-radio-button>
+        </el-radio-group>
+
+        <template v-if="previewSource === 'task'">
+          <el-input v-model="taskId" placeholder="task_id（来自解析中心任务列表）" clearable style="width: 260px" />
+          <el-input v-model="taskFileId" placeholder="任务文件 ID（files[].file_id，≠ 上传 file_id）" clearable style="width: 300px" />
+          <span class="route-hint">支持从解析中心「Chunk 预览」跳转自动回填</span>
+        </template>
+        <template v-else>
+          <el-input v-model="parseId" placeholder="parse_id（database_parse_id，来自解析历史 / 审核队列）" clearable style="width: 420px" />
+          <span class="route-hint">使用 document_review.documents 中已持久化的解析结果</span>
+        </template>
+
+        <el-select v-model="documentType" size="small" style="width: 130px">
+          <el-option label="法规 law" value="law" />
+          <el-option label="案例 case" value="case" />
+        </el-select>
+        <el-input-number v-model="maxChars" :min="100" :max="20000" :step="100" size="small" controls-position="right" style="width: 130px" />
+        <el-button type="primary" size="small" :disabled="!canPreview" :loading="preview.loading.value" @click="runPreview">生成结构预览</el-button>
+        <el-button size="small" :disabled="!hasRouteParams" @click="fillFromRoute">回填路由参数</el-button>
+      </div>
+
+      <div class="mr-disabled-hint" style="margin: 10px 0 12px">
+        请求体仅含 <code>document_type</code> 与 <code>max_chars</code>（额外字段会 422）；法规表格等门禁失败返回 409，
+        页面会显示错误态而非空结构。身份 ID 一律取自后端返回的 <code>file_mappings</code> / 解析历史，前端不拼接推导。
+      </div>
+
+      <AsyncPanel :state="preview.state.value" :error="preview.error.value" @retry="runPreview">
+        <template #empty>
+          <el-empty :image-size="60" description="尚未生成预览：填写后端返回的真实 ID 后点击「生成结构预览」" />
+        </template>
+        <div class="preview-result">
+          <el-alert
+            :type="preview.data.value?.write_performed ? 'error' : 'info'"
+            :closable="false"
+            :title="preview.data.value?.write_performed
+              ? '异常：后端返回 write_performed=true，与契约不符，请停止联调并反馈后端'
+              : `预览完成 · write_performed=${preview.data.value?.write_performed}（未发生任何写入）`"
+            description="预览不创建版本、不嵌入向量、不发布、不自动认定法效。结构内容按不可信纯文本展示，不执行 HTML / 脚本。" />
+          <el-tabs v-model="previewTab" class="preview-tabs">
+            <el-tab-pane :label="`chunks（${chunkItems.length}）`" name="chunks" />
+            <el-tab-pane :label="`parents（${parentItems.length}）`" name="parents" />
+            <el-tab-pane :label="`tables（${tableItems.length}）`" name="tables" />
+            <el-tab-pane label="quality" name="quality" />
+            <el-tab-pane :label="`warnings（${warningItems.length}）`" name="warnings" />
+            <el-tab-pane label="原始 JSON" name="raw" />
+          </el-tabs>
+          <div class="preview-body">
+            <pre v-if="previewTab === 'chunks'" class="result-pre">{{ asJson(chunkItems) }}</pre>
+            <pre v-else-if="previewTab === 'parents'" class="result-pre">{{ asJson(parentItems) }}</pre>
+            <pre v-else-if="previewTab === 'tables'" class="result-pre">{{ asJson(tableItems) }}</pre>
+            <pre v-else-if="previewTab === 'quality'" class="result-pre">{{ asJson(previewRaw.quality ?? {}) }}</pre>
+            <pre v-else-if="previewTab === 'warnings'" class="result-pre">{{ asJson(warningItems) }}</pre>
+            <pre v-else class="result-pre">{{ asJson(previewRaw) }}</pre>
           </div>
         </div>
-      </div>
-      <div class="mr-disabled-hint" style="margin-top: 12px">
-        批次授权、重复批次检查、版本一致性校验的真实结果需后端
-        <code>POST /api/ingestion/precheck</code> 与 <code>GET /api/ingestion/version-check</code>；
-        当前前端不执行任何数据库写入。
-      </div>
+      </AsyncPanel>
     </el-card>
 
-    <!-- 七阶段流水线 -->
-    <el-card shadow="never" style="margin-top: 16px">
-      <template #header>
-        <div class="card-head">
-          <span>入库流水线（当前批次 B20261109-02）<DemoBadge /></span>
-          <el-tag size="small" type="primary" effect="plain">执行中（DEMO）</el-tag>
-        </div>
-      </template>
-      <div class="pipeline">
-        <div v-for="(stage, i) in pipeline" :key="stage.key" class="stage-wrap">
-          <div class="stage" :class="stageClass(stage)">
-            <div class="stage-name">{{ stage.name }}</div>
-            <div class="stage-nums">
-              <span class="num ok">{{ stage.success }} 成功</span>
-              <span class="num" :class="{ bad: stage.failed > 0 }">{{ stage.failed }} 失败</span>
-            </div>
-            <el-progress
-              :percentage="stage.total ? Math.round((stage.success + stage.failed) / stage.total * 100) : 0"
-              :stroke-width="6"
-              :status="stage.failed > 0 ? 'exception' : undefined"
-              :color="stage.failed > 0 ? '#d64545' : '#2fa06b'"
-            />
-            <div class="stage-meta num">{{ stage.total }} 任务 · 均耗时 {{ stage.avgSeconds }}s</div>
-            <div v-if="stage.running" class="stage-running">
-              <el-icon class="is-loading" size="12"><Loading /></el-icon>{{ stage.running }}
-            </div>
-            <div v-if="stage.lastError" class="stage-error" @click="showError(stage)">{{ stage.lastError }}</div>
-          </div>
-          <div v-if="i < pipeline.length - 1" class="stage-arrow">→</div>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 批次 + 法规数据 -->
-    <div class="card-grid" style="grid-template-columns: 1fr 2fr; margin-top: 16px">
+    <!-- ② public 知识库版本列表 + 详情 -->
+    <div class="card-grid version-grid">
       <el-card shadow="never">
-        <template #header><div class="card-head"><span>入库批次 <DemoBadge /></span><span class="card-sub">四态</span></div></template>
-        <el-table :data="batches" size="small" highlight-current-row @current-change="onBatchSelect">
-          <el-table-column prop="batchId" label="批次号" width="130" />
-          <el-table-column prop="startedAt" label="开始时间" width="130" />
-          <el-table-column label="成功/失败" width="90">
-            <template #default="{ row }">
-              <span class="num">
-                <span style="color: var(--mr-st-success)">{{ row.successCount }}</span>
-                <span style="color: var(--mr-text-3)"> / </span>
-                <span :style="{ color: row.failedCount ? 'var(--mr-st-danger)' : 'var(--mr-text-3)' }">{{ row.failedCount }}</span>
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag size="small" :type="batchTagType(row.status)" effect="plain">{{ row.status }}</el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div v-if="blockedBatch" class="block-detail">
-          <b>阻断原因：</b>{{ blockedBatch.blockedReason }}
-        </div>
+        <template #header>
+          <div class="card-head">
+            <span>知识库版本 <span class="real-badge">REAL</span></span>
+            <span class="card-sub">GET /api/knowledge/versions · public 只读</span>
+          </div>
+        </template>
+        <AsyncPanel :state="versions.state.value" :error="versions.error.value" empty-text="public 知识库暂无版本记录（后端返回空列表）" @retry="versions.load()">
+          <el-table :data="versions.data.value?.list || []" size="small" highlight-current-row @current-change="onSelectVersion">
+            <el-table-column prop="kb_version" label="kb_version" min-width="170" show-overflow-tooltip />
+            <el-table-column prop="status" label="状态" width="110" />
+            <el-table-column label="ACTIVE" width="80">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.active ? 'success' : 'info'" effect="plain">{{ row.active ? '是' : '否' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="dimension" label="维度" width="80" align="right" />
+            <el-table-column prop="created_at" label="创建时间" width="170">
+              <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+            </el-table-column>
+          </el-table>
+          <div class="queue-pager">
+            <el-pagination v-model:current-page="versionPage" :page-size="versionPageSize" :total="versions.data.value?.total || 0"
+              layout="total, prev, pager, next" small background @current-change="versions.load()" />
+          </div>
+        </AsyncPanel>
       </el-card>
 
       <el-card shadow="never">
         <template #header>
           <div class="card-head">
-            <span>法规数据 <DemoBadge /></span>
-            <el-input v-model="regKeyword" placeholder="搜索法规名称 / 文号" clearable size="small" style="width: 220px" />
+            <span>版本详情 <span class="real-badge">REAL</span></span>
+            <span class="card-sub">GET /api/knowledge/versions/{version}</span>
           </div>
         </template>
-        <el-table :data="filteredRegulations" size="small">
-          <el-table-column prop="name" label="法规名称" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="authority" label="发布机关" width="170" show-overflow-tooltip />
-          <el-table-column prop="docNumber" label="文号" width="130" />
-          <el-table-column prop="effectiveDate" label="生效日期" width="100" />
-          <el-table-column label="失效日期" width="100">
-            <template #default="{ row }">{{ row.expiryDate || '现行有效' }}</template>
-          </el-table-column>
-          <el-table-column prop="articleCount" label="法条数" width="80" align="right">
-            <template #default="{ row }"><span class="num">{{ row.articleCount }}</span></template>
-          </el-table-column>
-          <el-table-column prop="kbVersion" label="版本" width="95" />
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag size="small" effect="plain" :type="regTagType(row.status)">{{ row.status }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="80" fixed="right">
-            <template #default="{ row }"><el-button text size="small" type="primary" @click="openRecord(row)">记录</el-button></template>
-          </el-table-column>
-        </el-table>
+        <AsyncPanel :state="versionDetail.state.value" :error="versionDetail.error.value" @retry="versionDetail.load()">
+          <template #empty>
+            <el-empty :image-size="60" description="请在左侧版本列表选择一行，查看后端返回的真实版本详情" />
+          </template>
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="kb_version"><code class="mono">{{ versionDetail.data.value?.kb_version || '—' }}</code></el-descriptions-item>
+            <el-descriptions-item label="status">{{ versionDetail.data.value?.status || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="active">{{ versionDetail.data.value?.active ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="dimension">{{ versionDetail.data.value?.dimension ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item label="created_at">{{ formatTime(versionDetail.data.value?.created_at || '') }}</el-descriptions-item>
+            <el-descriptions-item label="数据源">public schema（只读）</el-descriptions-item>
+          </el-descriptions>
+          <el-divider content-position="left">stats（后端原始字段，不做推算）</el-divider>
+          <pre class="result-pre">{{ asJson(versionDetail.data.value?.stats ?? {}) }}</pre>
+        </AsyncPanel>
       </el-card>
     </div>
 
-    <el-drawer v-model="drawer" title="入库记录（DEMO）" size="480px">
-      <template v-if="currentReg">
-        <el-alert type="warning" :closable="false" style="margin-bottom: 14px"
-          title="演示数据" description="入库记录查询接口未接入，以下字段用于展示追溯信息结构，不代表真实落库结果。" />
-        <el-descriptions :column="1" border>
-          <el-descriptions-item label="法规名称">{{ currentReg.name }}</el-descriptions-item>
-          <el-descriptions-item label="发布机关">{{ currentReg.authority }}</el-descriptions-item>
-          <el-descriptions-item label="文号">{{ currentReg.docNumber }}</el-descriptions-item>
-          <el-descriptions-item label="发布时间">{{ currentReg.publishDate }}</el-descriptions-item>
-          <el-descriptions-item label="生效日期">{{ currentReg.effectiveDate }}</el-descriptions-item>
-          <el-descriptions-item label="失效日期">{{ currentReg.expiryDate || '现行有效' }}</el-descriptions-item>
-          <el-descriptions-item label="法条数量">{{ currentReg.articleCount }}</el-descriptions-item>
-          <el-descriptions-item label="入库版本">{{ currentReg.kbVersion }}</el-descriptions-item>
-          <el-descriptions-item label="所属批次">{{ currentReg.batchId }}</el-descriptions-item>
-          <el-descriptions-item label="数据状态">{{ currentReg.status }}</el-descriptions-item>
-        </el-descriptions>
+    <!-- ③ 明确不支持的能力：不伪造批次 / 流水线 / 法规表 -->
+    <el-card shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>正式入库能力状态（后端明确不支持）</span>
+          <span class="card-sub">缺口清单来自 v0.2.2 契约，前端一律禁用或空态</span>
+        </div>
       </template>
-    </el-drawer>
+      <el-table :data="ingestionGaps" size="small">
+        <el-table-column label="优先级" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.priority === 'P0' ? 'danger' : 'info'" size="small" effect="plain">{{ row.priority }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="api" label="缺失接口" min-width="300" show-overflow-tooltip />
+        <el-table-column prop="usage" label="对应业务" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="impact" label="本页处理" min-width="260" show-overflow-tooltip />
+      </el-table>
+      <div class="mr-disabled-hint" style="margin-top: 10px">
+        七阶段流水线、批次四态、法规数据表与入库记录均没有真实 HTTP 数据源，v0.2.2 起不再以 DEMO 形式呈现；
+        后端补齐批次授权 / 版本一致性 / 发布回滚接口并通过契约验收后，方可解除禁用。
+      </div>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
-import DemoBadge from '@/components/DemoBadge.vue'
-import { unimplementedHint } from '@/api/dataSource'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import AsyncPanel from '@/components/AsyncPanel.vue'
+import { useAsyncData } from '@/composables/useAsyncData'
 import {
-  fetchPipeline, fetchRegulations, fetchBatches, fetchVersionCheck, fetchPrecheck,
-  type PipelineStage, type RegulationRecord, type IngestionBatch, type VersionCheck, type PrecheckItem
-} from '@/api/mock/ingestion'
+  previewTaskFile, previewReviewResult, listKbVersions, getKbVersion
+} from '@/api/frontend'
+import {
+  contractState, contractLabel, unimplementedHint, MISSING_CAPABILITIES
+} from '@/api/dataSource'
+import type {
+  PreviewResponse, PreviewRequest, KbVersionList, VersionInfo, KbVersionItem
+} from '@/api/types'
 
-const disabledHint = unimplementedHint('POST /api/ingestion/precheck + /api/ingestion/batches（含批次授权）')
+/**
+ * v0.2.2 入库管理（只读）
+ * - 预览 = 两个真实 POST，write_performed 恒 false；409 门禁失败按错误态呈现，不渲染空结构
+ * - 版本 = GET /api/knowledge/versions + /{version}，只读 public，绝不读 mvp_test_*
+ * - 正式入库批次 / 发布 / 回滚 / precheck / version-check 后端明确不支持 → 全部禁用，零 DEMO 业务数据
+ * - 身份 ID 从后端 file_mappings / 解析历史 / 审核队列取得；解析中心通过 ?task=&file= 跳转回填
+ */
+const route = useRoute()
 
-const pipeline = ref<PipelineStage[]>([])
-const regulations = ref<RegulationRecord[]>([])
-const batches = ref<IngestionBatch[]>([])
-const precheck = ref<PrecheckItem[]>([])
-const versionCheck = ref<VersionCheck | null>(null)
-const regKeyword = ref('')
-const drawer = ref(false)
-const currentReg = ref<RegulationRecord | null>(null)
+const disabledHint = unimplementedHint(
+  'POST /api/ingestion/batches（批次授权）+ POST /api/ingestion/publish、/rollback + POST /api/ingestion/precheck + GET /api/ingestion/version-check'
+) + '；预览成功不等于正式入库成功，前端不执行任何数据库写入'
 
-const blockingCount = computed(() => precheck.value.filter((c) => c.blocking && !c.passed).length)
-const blockedBatch = computed(() => batches.value.find((b) => b.status === '阻塞') || null)
-const filteredRegulations = computed(() => {
-  if (!regKeyword.value) return regulations.value
-  const k = regKeyword.value
-  return regulations.value.filter((r) => r.name.includes(k) || r.docNumber.includes(k))
+const ingestionGaps = MISSING_CAPABILITIES.filter((m) => m.api.includes('/api/ingestion/'))
+
+/* ───────── Chunk 结构预览 ───────── */
+const previewSource = ref<'task' | 'review'>('task')
+const taskId = ref(String(route.query.task || ''))
+const taskFileId = ref(String(route.query.file || ''))
+const parseId = ref(String(route.query.parse || ''))
+const documentType = ref<PreviewRequest['document_type']>('law')
+const maxChars = ref(800)
+const previewTab = ref('chunks')
+
+const hasRouteParams = computed(() =>
+  !!(route.query.task || route.query.file || route.query.parse)
+)
+
+const canPreview = computed(() => {
+  if (preview.loading.value) return false
+  if (maxChars.value < 100 || maxChars.value > 20000) return false
+  return previewSource.value === 'task'
+    ? !!(taskId.value.trim() && taskFileId.value.trim())
+    : !!parseId.value.trim()
 })
 
-function stageClass(stage: PipelineStage) {
-  return {
-    'stage-failed': stage.failed > 0 && !stage.running,
-    'stage-running': !!stage.running,
-    'stage-done': stage.failed === 0 && stage.success === stage.total && stage.total > 0
+function previewBody(): PreviewRequest {
+  return { document_type: documentType.value, max_chars: maxChars.value }
+}
+
+const preview = useAsyncData<PreviewResponse>(
+  (signal) => previewSource.value === 'task'
+    ? previewTaskFile(taskId.value.trim(), taskFileId.value.trim(), previewBody(), signal)
+    : previewReviewResult(parseId.value.trim(), previewBody(), signal),
+  { immediate: false, isEmpty: () => false }
+)
+preview.state.value = 'empty'
+
+function runPreview() {
+  if (!canPreview.value) return
+  previewTab.value = 'chunks'
+  void preview.load()
+}
+
+function fillFromRoute() {
+  taskId.value = String(route.query.task || '')
+  taskFileId.value = String(route.query.file || '')
+  parseId.value = String(route.query.parse || '')
+}
+
+type AnyRecord = Record<string, unknown>
+const previewRaw = computed<AnyRecord>(() => preview.data.value?.preview || {})
+function asList(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+const chunkItems = computed(() => asList(previewRaw.value.chunks))
+const parentItems = computed(() => asList(previewRaw.value.parents))
+const tableItems = computed(() => asList(previewRaw.value.tables))
+const warningItems = computed(() => asList(previewRaw.value.warnings))
+function asJson(value: unknown): string {
+  if (value == null || (Array.isArray(value) && value.length === 0) ||
+      (typeof value === 'object' && !Array.isArray(value) && Object.keys(value as object).length === 0)) {
+    return '〔后端未返回该结构字段，不伪造占位数据〕'
   }
+  return JSON.stringify(value, null, 2)
 }
 
-function batchTagType(s: string): string {
-  return s === '已完成' ? 'success' : s === '执行中' ? 'primary' : s === '阻塞' ? 'danger' : 'danger'
+/* ───────── public 知识库版本 ───────── */
+const versionPage = ref(1)
+const versionPageSize = 10
+const selectedVersion = ref('')
+
+const versions = useAsyncData<KbVersionList>(
+  (signal) => listKbVersions({ page: versionPage.value, pageSize: versionPageSize }, signal)
+)
+const versionDetail = useAsyncData<VersionInfo>(
+  (signal) => getKbVersion(selectedVersion.value, signal),
+  { immediate: false, isEmpty: () => false }
+)
+versionDetail.state.value = 'empty'
+
+function onSelectVersion(row: KbVersionItem | null) {
+  if (!row?.kb_version) return
+  selectedVersion.value = row.kb_version
+  void versionDetail.load()
 }
 
-function regTagType(s: string): string {
-  return s === '已入库' ? 'success' : s === '入库中' ? 'primary' : s === '阻塞' ? 'danger' : s === '入库失败' ? 'danger' : 'info'
-}
-
-function showError(stage: PipelineStage) {
-  ElMessageBox.alert(stage.lastError || '无错误详情', `${stage.name} · 错误日志（DEMO）`, { confirmButtonText: '知道了' })
-}
-
-function onBatchSelect(row: IngestionBatch) {
-  if (!row) return
-  ElMessage.info(`已查看批次 ${row.batchId}（DEMO 数据不联动刷新，也不触发任何写入）`)
-}
-
-function openRecord(row: RegulationRecord) {
-  currentReg.value = row
-  drawer.value = true
-}
-
-onMounted(async () => {
-  const [p, r, b, v, c] = await Promise.all([
-    fetchPipeline(), fetchRegulations(), fetchBatches(), fetchVersionCheck(), fetchPrecheck()
-  ])
-  pipeline.value = p.data
-  regulations.value = r.data
-  batches.value = b.data
-  versionCheck.value = v.data
-  precheck.value = c.data
-})
+function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0, 19) : '—' }
 </script>
 
 <style scoped>
-.card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.header-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.readonly-notice { margin-bottom: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; gap: 12px; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
-.block-banner { margin-bottom: 12px; }
-.check-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.check-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--mr-line); border-radius: 6px; background: #fafbfe; }
-.check-bad { border-color: #fecaca; background: #fef2f2; }
-.check-text { min-width: 0; }
-.check-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.check-detail { font-size: 12px; color: var(--mr-text-2); margin-top: 3px; }
-.block-detail { margin-top: 12px; padding: 8px 10px; font-size: 12px; color: var(--mr-state-error); background: #fef2f2; border-radius: 4px; }
-.pipeline { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 4px 0; }
-.stage-wrap { display: flex; align-items: center; flex: 1; min-width: 150px; }
-.stage { flex: 1; border: 1px solid var(--mr-line); border-radius: var(--mr-radius); padding: 12px; background: #fafbfe; display: flex; flex-direction: column; gap: 6px; }
-.stage-done { border-color: #bbf7d0; background: #f0fdf4; }
-.stage-failed { border-color: #fecaca; background: #fef2f2; }
-.stage-running { border-color: var(--mr-primary); background: #eff6ff; }
-.stage-name { font-weight: 600; font-size: 13px; }
-.stage-nums { display: flex; gap: 10px; font-size: 12px; }
-.stage-nums .ok { color: var(--mr-st-success); }
-.stage-nums .bad { color: var(--mr-st-danger); }
-.stage-meta { font-size: 11px; color: var(--mr-text-3); }
-.stage-running-text { font-size: 11px; color: var(--mr-primary); display: flex; align-items: center; gap: 4px; }
-.stage-error { font-size: 11px; color: var(--mr-st-danger); cursor: pointer; text-decoration: underline; }
-.stage-arrow { padding: 0 6px; color: var(--mr-text-3); flex-shrink: 0; }
+.preview-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.route-hint { font-size: 12px; color: var(--mr-text-3); }
+.preview-tabs :deep(.el-tabs__header) { margin: 0 0 8px; }
+.preview-body { max-height: 340px; overflow-y: auto; padding: 10px; border: 1px solid var(--mr-line); border-radius: 6px; background: #fafbfe; }
+.result-pre { font-family: var(--mr-font); font-size: 12px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; margin: 0; max-width: 100%; }
+.version-grid { grid-template-columns: 1.5fr 1fr; margin-top: 16px; }
+.queue-pager { display: flex; justify-content: flex-end; margin-top: 10px; }
+.mono { font-family: monospace; font-size: 12px; }
 @media (max-width: 1366px) {
-  .check-grid { grid-template-columns: 1fr; }
+  .version-grid { grid-template-columns: 1fr; }
 }
 </style>
