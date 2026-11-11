@@ -6,10 +6,10 @@
   "fix_handoff_commit": "4fea3064de4c699ab9de65c79f23a07b8c9e4a22",
   "qa_branch": "codex/qa-v0.2.1",
   "qa_test_commit": "40014200e15e6abb1b811a99eb66b8fa55b009ed",
-  "execution_qa_base_commit": "59574c0f16dd960fe034f9f4d0aca8f75fb116a4",
-  "checked_at": "2026-11-11T01:55:58.867358+00:00",
+  "execution_qa_base_commit": "f381da61c0f7652227bfc1f8a229b93398679652",
+  "checked_at": "2026-11-11T02:03:32.224469+00:00",
   "test_execution_at": "2026-11-11T01:01:23.679389+00:00",
-  "report_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
+  "report_path": "docs/qa/v0.2.1/finite-auto-final-report.md",
   "handoff_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
   "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
   "policy": {
@@ -54,7 +54,7 @@
   },
   "real_http_status": "PASS",
   "real_local_models_status": "PASS_REAL_OCR",
-  "real_official_auto_status": "BLOCKED_INCOMPLETE_VALID_DUAL_ENGINE_EVIDENCE",
+  "real_official_auto_status": "BLOCKED",
   "old_official_task_recovery_status": "BLOCKED_HTTP_403",
   "windows_whole_reboot_status": "NOT_TESTED",
   "database": {
@@ -83,7 +83,8 @@
     },
     "R-03": {
       "status": "BLOCKED",
-      "reason": "旧任务GET恢复HTTP403；未重新POST或上传，原因待查"
+      "release_blocking": false,
+      "reason": "旧具体任务403未解决，用户批准移出版本硬门禁，未重试"
     },
     "R-04": {
       "status": "PASS",
@@ -91,11 +92,13 @@
     },
     "R-05": {
       "status": "BLOCKED",
-      "reason": "当前候选真实本地OCR已通过；首轮云回退时本地模型挂载错误，不冒充完整双引擎通过，8次预算未重置"
+      "release_blocking": true,
+      "reason": "当前完整真实执行已完成；官方原始空输出，未取得有效双候选；风险处理PASS"
     },
     "R-06": {
-      "status": "PENDING_USER_CONFIRMATION",
-      "reason": "容器重启通过；Windows整机重启尚未安排与验证"
+      "status": "NOT_TESTED",
+      "release_blocking": false,
+      "reason": "用户批准仅承诺已测容器恢复；整机另列上线前运维验收"
     },
     "R-07": {
       "status": "PASS",
@@ -147,7 +150,7 @@
       "matching_cells": 48
     }
   },
-  "evidence_root": "local/v021-c915-final",
+  "evidence_root": "local/v021-finite-close",
   "deployment_status": "独立Compose候选实际入口及restart通过，测试app已停止；活动旧应用未切换",
   "automatic_release_allowed": false,
   "automatic_next_version_ready": false,
@@ -161,9 +164,7 @@
   ],
   "recognition_evidence_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
   "blocked_reasons": [
-    "EV-AUTO-01补证：公开合成原8次预算耗尽，新增6次尚待授权",
-    "旧具体任务是否属于必恢复承诺待用户确认，仍403",
-    "整机恢复是否改列上线前运维验收待用户确认，仍NOT_TESTED"
+    "EV-AUTO-01：真实本地成功与官方5次200已取得，但供应商原始内容为空，未满足有效双候选补证；本批停止"
   ],
   "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00",
   "scope_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
@@ -172,29 +173,59 @@
   "review_gate_scope": "代表性审核桥自动化证据；不声称全局历史待审清单已交付",
   "evidence_reuse_status": "EVIDENCE_REUSED",
   "new_test_methods_this_round": 0,
-  "new_api_calls_this_round": 0,
+  "new_api_calls_this_round": 5,
   "confirmed_release_blockers": [],
   "evidence_gaps": [
     {
       "id": "EV-AUTO-01",
       "category": "EVIDENCE_GAP",
       "status": "BLOCKED",
-      "reason": "一条有效当前镜像真实本地推理→质量判断→获准官方回退→有效双候选链待最小补证"
+      "reason": "EV-AUTO-01：真实本地成功与官方5次200已取得，但供应商原始内容为空，未满足有效双候选补证；本批停止"
     }
   ],
   "pending_decisions": {
     "synthetic_api_budget": {
+      "status": "APPROVED",
       "requested_additional_http": 6,
       "max_post": 1,
       "max_put": 1,
       "max_get": 4,
+      "used": 5,
       "old_consumed": 8,
-      "old_ledger_reset": false,
-      "sample_sha256": "4722ea9314889ce3e0607b1818e326f0531ee92e75e9ec38d7b42c8aa849370e",
-      "status": "PENDING"
+      "old_ledger_unchanged": true,
+      "remaining": 1
     },
-    "historical_task_release_scope": "PENDING",
-    "windows_reboot_release_scope": "PENDING"
+    "historical_task_release_scope": "APPROVED_EXCLUDE_SPECIFIC_OLD_TASK",
+    "windows_reboot_release_scope": "APPROVED_SEPARATE_OPERATIONAL_ACCEPTANCE"
   },
-  "scope_reduction_approved": false
+  "scope_reduction_approved": true,
+  "scope_reduction_details": [
+    "旧具体任务403不保证恢复，移出本版本硬门禁但保留未解决",
+    "Windows整机恢复列上线前独立运维，仍NOT_TESTED",
+    "未缩减真实auto交付承诺"
+  ],
+  "finite_auto_result": {
+    "status": "BLOCKED",
+    "checks": {
+      "real_local_success": true,
+      "task_completed": true,
+      "real_local_candidate": true,
+      "real_remote_candidate": false,
+      "current_quality_trigger": true,
+      "official_selected": false,
+      "requires_review": true,
+      "source_unchanged": true,
+      "local_source_link": true,
+      "page_provenance": true,
+      "idempotent": true
+    },
+    "real_official_http": "PASS",
+    "risk_handling": "PASS",
+    "remote_recognition_quality": "INADEQUATE_EMPTY_PROVIDER_OUTPUT",
+    "actual_http": 5,
+    "provider_content_list_entries": 0,
+    "provider_markdown_bytes": 0,
+    "reason": "要求的有效非空云候选未形成，保留本地并复核；不构成已确认代码缺陷",
+    "no_database_used": true
+  }
 }
