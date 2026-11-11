@@ -1,5 +1,9 @@
 <template>
-  <div class="mr-pro-table">
+  <AsyncPanel :state="state" :error="error" @retry="emit('retry')">
+    <template #empty>
+      <slot name="empty"><el-empty :image-size="70" description="暂无符合条件的数据" /></slot>
+    </template>
+
     <!-- 搜索区由 columns[].search 自动生成（借鉴 Geeker Admin ProTable「列配置即契约」） -->
     <div v-if="searchColumns.length" class="mr-pro-search">
       <template v-for="col in searchColumns" :key="col.prop">
@@ -40,6 +44,7 @@
       </template>
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="reset">重置</el-button>
+      <el-button @click="emitQuery">刷新</el-button>
       <div v-if="$slots.toolbar" class="mr-pro-tools"><slot name="toolbar" /></div>
     </div>
 
@@ -68,35 +73,35 @@
         </template>
       </el-table-column>
       <slot name="extra-columns" />
-      <template #empty>
-        <slot name="empty"><span class="mr-pro-empty">暂无符合条件的数据</span></slot>
-      </template>
+      <template #empty><span class="mr-pro-empty">暂无符合条件的数据</span></template>
     </el-table>
 
     <div class="mr-pro-pager">
       <el-pagination
         v-model:current-page="page"
-        v-model:page-size="pageSize"
+        v-model:page-size="pageSizeModel"
         :total="total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next, jumper"
         background
-        @current-change="load"
+        @current-change="emitQuery"
         @size-change="onSizeChange"
       />
     </div>
-  </div>
+  </AsyncPanel>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import AsyncPanel from './AsyncPanel.vue'
+import type { LoadState } from '@/api/types'
 
 /**
- * 轻量 MrProTable —— 借鉴 Geeker Admin ProTable 的交互骨架：
- *   columns 配置 → 自动生成搜索表单；fetcher 契约 { page, pageSize, ...params } → { list, total }
- * 保留 search() 重置到第一页、reset() 恢复默认、sizeChange 回到第一页、工具区与空态插槽。
- * 砍掉拖拽排序（sortablejs）、列设置持久化、多级表头、i18n，避免无意义依赖与整套模板替换。
+ * 轻量 MrProTable（v0.2.2 受控模式）
+ * 借鉴 Geeker Admin ProTable 的 columns→搜索表单契约，但数据获取完全交给页面 useAsyncData：
+ *   emit('query', {page,pageSize,search,sortBy,order}) → 页面调用真实 API → 回传 rows/total/state
+ * Loading / Empty / Error / Retry / NoPermission / ServiceUnavailable 六态由 AsyncPanel 统一呈现；
+ * 组件内部不吞错误、不回退 DEMO、不自行发起请求。
  */
 interface SearchOption { label: string; value: string | number }
 interface ColumnSearch {
@@ -105,7 +110,7 @@ interface ColumnSearch {
   options?: SearchOption[]
   defaultValue?: unknown
 }
-interface MrColumn {
+export interface MrColumn {
   prop: string
   label: string
   width?: number | string
@@ -116,66 +121,59 @@ interface MrColumn {
   showOverflowTooltip?: boolean
   search?: ColumnSearch
 }
-interface FetchParams {
+export interface MrQuery {
   page: number
   pageSize: number
-  sortBy?: string
-  order?: string
-  [key: string]: unknown
+  search: Record<string, unknown>
+  sortBy: string
+  order: string
 }
-type Row = Record<string, unknown>
-type MrFetcher = (params: FetchParams) => Promise<{ list: Row[]; total: number }>
 
-const props = defineProps<{
-  columns: MrColumn[]
-  fetcher: MrFetcher
-  pageSize?: number
+const props = withDefaults(
+  defineProps<{
+    columns: MrColumn[]
+    rows: Record<string, unknown>[]
+    total: number
+    loading?: boolean
+    state?: LoadState
+    error?: string
+    pageSize?: number
+  }>(),
+  { loading: false, state: 'ready', error: '', pageSize: 20 }
+)
+
+const emit = defineEmits<{
+  (e: 'query', payload: MrQuery): void
+  (e: 'retry'): void
 }>()
 
-const rows = ref<Row[]>([])
-const total = ref(0)
-const loading = ref(false)
 const page = ref(1)
-const pageSize = ref(props.pageSize ?? 10)
+const pageSizeModel = ref(props.pageSize)
 const sortBy = ref('')
 const order = ref('')
 const searchModel = reactive<Record<string, unknown>>({})
-
 const searchColumns = computed(() => props.columns.filter((c) => !!c.search))
 
 function initModel() {
   for (const c of props.columns) {
-    if (c.search) {
-      searchModel[c.prop] = c.search.defaultValue ?? (c.search.el === 'dateRange' ? null : '')
-    }
+    if (c.search) searchModel[c.prop] = c.search.defaultValue ?? (c.search.el === 'dateRange' ? null : '')
   }
 }
 initModel()
 
-async function load() {
-  loading.value = true
-  try {
-    const res = await props.fetcher({
-      ...searchModel,
-      page: page.value,
-      pageSize: pageSize.value,
-      sortBy: sortBy.value || undefined,
-      order: order.value || undefined
-    })
-    rows.value = res.list || []
-    total.value = res.total || 0
-  } catch {
-    rows.value = []
-    total.value = 0
-    ElMessage.warning('数据加载失败，请检查后端服务与筛选条件')
-  } finally {
-    loading.value = false
-  }
+function emitQuery() {
+  emit('query', {
+    page: page.value,
+    pageSize: pageSizeModel.value,
+    search: { ...searchModel },
+    sortBy: sortBy.value,
+    order: order.value
+  })
 }
 
 function search() {
   page.value = 1
-  load()
+  emitQuery()
 }
 
 function reset() {
@@ -187,20 +185,20 @@ function reset() {
 
 function onSizeChange() {
   page.value = 1
-  load()
+  emitQuery()
 }
 
 function onSortChange(payload: { prop?: string; order?: string | null }) {
   sortBy.value = payload.prop || ''
   order.value = payload.order === 'ascending' ? 'asc' : payload.order === 'descending' ? 'desc' : ''
-  load()
+  emitQuery()
 }
 
 function refresh() {
-  load()
+  emitQuery()
 }
 
-defineExpose({ refresh, search, reset, rows })
+defineExpose({ refresh, search, reset })
 
-onMounted(load)
+onMounted(emitQuery)
 </script>
