@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 import tempfile
 import unittest
+import fitz
 from unittest.mock import patch
 
 from qa_core.document_parsing.document_router import DocumentParser
@@ -54,8 +55,10 @@ class LocalBatchRepairEdges(unittest.IsolatedAsyncioTestCase):
         self.repository = TaskRepository(self.root / "tasks.sqlite3")
         self.a, self.b = self.root / "a.pdf", self.root / "b.pdf"
         # Parsing is injected below; no OCR, network or model is needed.
-        self.a.write_bytes(b"%PDF-1.7 synthetic a")
-        self.b.write_bytes(b"%PDF-1.7 synthetic b")
+        for path in (self.a, self.b):
+            with fitz.open() as pdf:
+                pdf.new_page().insert_text((30, 30), "synthetic")
+                pdf.save(path)
 
     def result(self, path):
         from qa_core.utils import file_sha256

@@ -23,6 +23,8 @@ def main():
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--qa-tests',type=Path,required=True)
     parser.add_argument('--scope',type=Path,required=True)
+    parser.add_argument('--source-sha',default='8ecff8866232ca33d0e350e6ead311fe8570aa89',
+                        choices=['8ecff8866232ca33d0e350e6ead311fe8570aa89','c91547d393ca6b049e216c0051e25271d06d7359'])
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--run-user-authorized-business-tests',action='store_true')
     args=parser.parse_args()
@@ -30,7 +32,7 @@ def main():
         parser.error('必须明确启用用户授权的业务库测试；默认不连接、不写入')
     scope=json.loads(args.scope.read_text('utf-8'))
     if (scope.get('authorization')!='user-confirmed-current-chat-2026-11-10' or
-        scope.get('database')!='market_regulation' or scope.get('source_commit')!='8ecff8866232ca33d0e350e6ead311fe8570aa89'):
+        scope.get('database')!='market_regulation' or scope.get('source_commit')!=args.source_sha):
         parser.error('授权目标或冻结版本不匹配')
     source=args.source.resolve();output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
     manifest=json.loads((source/'snapshot-identity.json').read_text('utf-8'))

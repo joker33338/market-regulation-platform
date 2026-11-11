@@ -21,6 +21,10 @@ def git(root, *args):
 
 def valid_png_fixture_override(name, original, updated):
     """仅允许两处无效PNG夹具改为真PNG，逐字符约束其余代码及断言不变。"""
+    if name == 'test_round01_repair_edges.py':
+        old = '        self.a.write_bytes(b"%PDF-1.7 synthetic a")\n        self.b.write_bytes(b"%PDF-1.7 synthetic b")'
+        new = '        for path in (self.a, self.b):\n            with fitz.open() as pdf:\n                pdf.new_page().insert_text((30, 30), "synthetic")\n                pdf.save(path)'
+        return original.count(old) == 1 and updated == original.replace('import unittest\n', 'import unittest\nimport fitz\n', 1).replace(old, new, 1)
     payloads = {
         'test_v021_diagnostic_edges.py': "source.write_bytes(b'synthetic-only')",
         'test_v021_engine_diagnostics.py': "source.write_bytes(b'synthetic non-confidential fixture')",
@@ -40,7 +44,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--api-packages', type=Path)
     parser.add_argument('--qa-fixture-overrides', nargs='*', default=[],
-                        choices=['test_v021_diagnostic_edges.py', 'test_v021_engine_diagnostics.py'])
+                        choices=['test_v021_diagnostic_edges.py', 'test_v021_engine_diagnostics.py', 'test_round01_repair_edges.py'])
     args = parser.parse_args()
     source = args.source.resolve()
     qa = Path(__file__).resolve().parents[1]
@@ -89,7 +93,7 @@ def main():
                 if file.name not in args.qa_fixture_overrides or not valid_png_fixture_override(file.name, original, updated):
                     raise RuntimeError('同名测试存在不同断言，需单独审阅：' + file.name)
                 fixture_overrides[file.name] = dict(
-                    reason='无效PNG占位字节改为10x10真PNG；其余代码及断言逐字符保持',
+                    reason='无效图片/PDF占位字节改为合法合成文件；其余代码及断言逐字符保持',
                     source_raw_sha256=hashlib.sha256(files[file.name].read_bytes()).hexdigest(),
                     qa_raw_sha256=hashlib.sha256(file.read_bytes()).hexdigest())
                 files[file.name] = file

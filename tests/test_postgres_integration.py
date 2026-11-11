@@ -24,8 +24,8 @@ class PostgreSQLIntegration(unittest.TestCase):
             def embed_documents(self, texts):
                 return DemoEmbeddings(1024).embed_documents(texts)
 
-        database = Database(pg_dsn=os.environ["MVP_TEST_PG_DSN"])
         schema = "mvp_test_" + uuid4().hex
+        database = Database(pg_dsn=os.environ["MVP_TEST_PG_DSN"], kb_schema=schema)
         # Generated identifier consists of a fixed prefix and hex, not user SQL.
         database.execute("CREATE SCHEMA " + schema).close()
         database.execute("SET search_path TO " + schema + ", public").close()
