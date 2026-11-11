@@ -51,16 +51,25 @@ CREATE TABLE IF NOT EXISTS mr_release_history (
 );
 """
 
+KB_TABLES = ('law_chunks', 'mr_kb_versions', 'mr_document_versions', 'mr_chunks',
+             'mr_kb_documents', 'mr_active', 'mr_active_chunk_map', 'mr_release_history')
+KB_RELATION = re.compile(r'\b(?:' + '|'.join(KB_TABLES) + r')\b', re.I)
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 class Database:
-    def __init__(self, *, sqlite_path: str | Path | None = None, pg_dsn: str | None = None):
+    def __init__(self, *, sqlite_path: str | Path | None = None, pg_dsn: str | None = None,
+                 kb_schema: str = 'public'):
         if bool(sqlite_path) == bool(pg_dsn):
             raise IngestionError("必须且只能选择 SQLite 文件或显式 PG_DSN。")
         self.postgres = pg_dsn is not None
+        if not isinstance(kb_schema, str) or not re.fullmatch(r'public|mvp_test_[0-9a-f]{32}', kb_schema):
+            raise IngestionError('知识库目标必须是 public 或显式的自有 mvp_test_<32hex> Schema。')
+        self.kb_schema = kb_schema
+        self._initializing = False
         if self.postgres:
             try:
                 import psycopg2
@@ -79,8 +88,49 @@ class Database:
             self.connection.execute("PRAGMA foreign_keys=ON")
         self._in_transaction = False
 
+    def verify_schema(self, *, allow_missing: bool = False):
+        """发送业务 SQL 前重新核验，不能借 public 回退或临时同名表跨域。"""
+        if not self.postgres:
+            return
+        with self.connection.cursor() as cursor:
+            cursor.execute("""SELECT current_schema() AS current_schema,
+                to_regnamespace(%s)::oid AS namespace_oid,
+                to_regtype('vector')::oid AS visible_vector,
+                to_regtype('public.vector')::oid AS public_vector,
+                (SELECT pg_get_userbyid(nspowner)=current_user FROM pg_namespace
+                 WHERE oid=to_regnamespace(%s)) AS owns_schema""", (self.kb_schema, self.kb_schema))
+            identity = cursor.fetchone()
+            if not identity['namespace_oid'] or identity['current_schema'] != self.kb_schema:
+                raise IngestionError('知识库 Schema 身份不匹配，已拒绝操作。')
+            if self.kb_schema != 'public' and not identity['owns_schema']:
+                raise IngestionError('只能使用当前角色拥有的 QA Schema。')
+            if (identity['visible_vector'] != identity['public_vector'] or
+                    not identity['public_vector'] and not (allow_missing and self.kb_schema == 'public')):
+                raise IngestionError('知识库必须使用既有 public.vector 类型。')
+            cursor.execute("""SELECT x.name,c.oid AS expected_oid,c.relnamespace AS namespace_oid,
+                c.relkind,to_regclass(x.name)::oid AS visible_oid,
+                EXISTS(SELECT 1 FROM pg_constraint f JOIN pg_class t ON t.oid=f.confrelid
+                       WHERE f.conrelid=c.oid AND f.contype='f'
+                       AND t.relnamespace<>c.relnamespace) AS foreign_domain
+                FROM unnest(%s::text[]) AS x(name)
+                LEFT JOIN pg_class c ON c.oid=to_regclass(format('%%I.%%I',%s,x.name))""",
+                (list(KB_TABLES), self.kb_schema))
+            relations = cursor.fetchall()
+        if len(relations) != len(KB_TABLES):
+            raise IngestionError('知识库关系核验不完整。')
+        for relation in relations:
+            if not relation['expected_oid'] and allow_missing:
+                continue
+            if (not relation['expected_oid'] or relation['expected_oid'] != relation['visible_oid']
+                    or relation['namespace_oid'] != identity['namespace_oid']
+                    or relation['relkind'] not in {'r', 'p'} or relation['foreign_domain']):
+                raise IngestionError('知识库关系缺失或跨 Schema，已拒绝操作。')
+        return sum(bool(relation['expected_oid']) for relation in relations)
+
     def execute(self, sql: str, params: dict | None = None):
         if self.postgres:
+            if KB_RELATION.search(sql):
+                self.verify_schema(allow_missing=self._initializing)
             sql = re.sub(r"(?<!:):([a-zA-Z_]\w*)", r"%(\1)s", sql)
             cursor = self.connection.cursor()
             cursor.execute(sql, params or {})
@@ -121,6 +171,18 @@ class Database:
             self._in_transaction = False
 
     def initialize(self):
+        if self.postgres:
+            present = self.verify_schema(allow_missing=True)
+            if present not in {0, len(KB_TABLES)}:
+                raise IngestionError('目标知识库只有部分表，禁止自动补建；须先核验完整性。')
+        self._initializing = True
+        try:
+            self._initialize()
+            self.verify_schema()
+        finally:
+            self._initializing = False
+
+    def _initialize(self):
         with self.transaction():
             if self.postgres:
                 statements = Path(__file__).with_name("postgres_schema.sql").read_text(encoding="utf-8")
@@ -229,6 +291,7 @@ class Database:
 
     def publish(self, version: str, *, rollback: bool = False):
         from uuid import uuid4
+        self.verify_schema()
         with self.transaction():
             if self.postgres:
                 self.execute("SELECT pg_advisory_xact_lock(737113)").close()
