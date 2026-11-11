@@ -58,7 +58,6 @@ services:
         condition: service_healthy
     environment:
       PG_DSN: postgresql://market_app:${DOCKER_DB_PASSWORD}@db:5432/market_regulation
-      MVP_TEST_PG_DSN: postgresql://market_app:${DOCKER_DB_PASSWORD}@db:5432/market_regulation
       EMBEDDING_BACKEND: local
       EMBEDDING_MODEL_PATH: /app/models/bge-m3
       EMBEDDING_DIMENSION: "1024"

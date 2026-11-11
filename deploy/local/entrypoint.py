@@ -21,7 +21,7 @@ def configuration(path):
 def main():
     # 不继承任何测试连接或旧批次授权；外传仍由现有服务端权限控制，默认关闭。
     for key in ("MVP_TEST_PG_DSN", "PARSING_TEST_PG_DSN", "QA_ISOLATED_PG_DSN",
-                "PG_DSN", "SOURCE_PG_DSN", "DUAL_OCR_GRANTS_FILE", "DUAL_OCR_TEST_BATCH_MANIFEST",
+                "OFFLINE_APPROVED_PG_DSN", "PG_DSN", "SOURCE_PG_DSN", "DUAL_OCR_GRANTS_FILE", "DUAL_OCR_TEST_BATCH_MANIFEST",
                 "DUAL_OCR_TEST_BATCH_OWNER", "DUAL_OCR_TEST_BATCH_ID"):
         os.environ.pop(key, None)
     os.environ.update(configuration("/private/runtime.json"))

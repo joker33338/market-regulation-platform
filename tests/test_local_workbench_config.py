@@ -19,6 +19,38 @@ def module(name):
 
 
 class LocalWorkbenchConfigTests(unittest.TestCase):
+    def test_docker_entrypoint_clears_inherited_test_connections(self):
+        import os
+        from unittest.mock import patch
+        entry=module('entrypoint')
+        keys=('MVP_TEST_PG_DSN','PARSING_TEST_PG_DSN','QA_ISOLATED_PG_DSN','OFFLINE_APPROVED_PG_DSN')
+        with patch.dict(os.environ,{key:'synthetic-only' for key in keys}), \
+                patch.object(entry,'configuration',return_value={}), \
+                patch.object(entry.os,'execvp') as launch, patch.object(Path,'mkdir'):
+            entry.main()
+            launch.assert_called_once()
+            for key in keys:self.assertNotIn(key,os.environ)
+
+    def test_normal_compose_does_not_inject_test_dsn(self):
+        import yaml
+        compose=yaml.safe_load((ROOT/'compose.yaml').read_text(encoding='utf-8'))
+        environment=compose['services']['app']['environment']
+        self.assertIn('PG_DSN',environment)
+        for key in ('MVP_TEST_PG_DSN','PARSING_TEST_PG_DSN','QA_ISOLATED_PG_DSN'):
+            self.assertNotIn(key,environment)
+
+    def test_windows_launcher_rejects_test_config_before_start(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as folder:
+            config=Path(folder)/'runtime.json'
+            config.write_text(json.dumps({'MVP_TEST_PG_DSN':'synthetic-only'}),encoding='utf-8')
+            import os
+            if os.name != 'nt':self.skipTest('Windows 启动配置保护测试')
+            completed=subprocess.run(['powershell','-NoProfile','-File',str(ROOT/'scripts/start_parsing_app.ps1'),
+                '-ConfigFile',str(config)],capture_output=True)
+            self.assertNotEqual(completed.returncode,0)
+            self.assertIn(b'QA_TEST_DSN_NOT_ALLOWED', completed.stderr)
+
     def test_database_rebinding_preserves_credentials_and_drops_old_authorization(self):
         runtime = module("prepare").runtime_values({
             "PARSING_RESULT_PG_DSN": "host=127.0.0.1 port=15432 dbname=synthetic user=synthetic password='synthetic :/@ value'",

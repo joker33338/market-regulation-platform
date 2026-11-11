@@ -5,12 +5,18 @@ $workspaceRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $workspaceRoot
 $configuration = Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
 foreach ($property in $configuration.PSObject.Properties) {
+    if ($property.Name -in @('MVP_TEST_PG_DSN','PARSING_TEST_PG_DSN','QA_ISOLATED_PG_DSN','OFFLINE_APPROVED_PG_DSN')) {
+        throw 'QA_TEST_DSN_NOT_ALLOWED: Use the dedicated QA entry for test database configuration.'
+    }
     [Environment]::SetEnvironmentVariable($property.Name, [string]$property.Value, 'Process')
 }
+foreach ($testConnection in @('MVP_TEST_PG_DSN','PARSING_TEST_PG_DSN','QA_ISOLATED_PG_DSN','OFFLINE_APPROVED_PG_DSN')) {
+    [Environment]::SetEnvironmentVariable($testConnection, $null, 'Process')
+}
 $pythonPath = if ($Python) { $Python } else { Join-Path $workspaceRoot '.venv-api/Scripts/python.exe' }
-if (-not (Test-Path -LiteralPath $pythonPath)) { throw '请指定已验证的现有 Python 环境；此脚本不会安装依赖。' }
+if (-not (Test-Path -LiteralPath $pythonPath)) { throw 'Specify an existing validated Python environment; this launcher never installs dependencies.' }
 if ($ApiPackages) {
-    if (-not (Test-Path -LiteralPath (Join-Path $ApiPackages 'fastapi'))) { throw '指定目录缺少现有 API 依赖。' }
+    if (-not (Test-Path -LiteralPath (Join-Path $ApiPackages 'fastapi'))) { throw 'The API packages directory must contain fastapi.' }
     $env:PYTHONPATH = (@($ApiPackages, $env:PYTHONPATH) | Where-Object { $_ }) -join [IO.Path]::PathSeparator
 }
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'Requested port is already in use; no service was stopped.' }
