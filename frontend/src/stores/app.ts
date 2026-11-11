@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { getToken, setToken, clearToken } from '@/api/client'
 import { getParseInfo } from '@/api/parse'
+import { probeContract, resetContractState } from '@/api/dataSource'
 import { releaseStatus } from '@/config/release'
 import type { ComponentState, ParseServiceInfo } from '@/api/types'
 
@@ -9,11 +10,7 @@ export const useAppStore = defineStore('app', () => {
   const token = ref(getToken())
   const apiOnline = ref<'unknown' | 'online' | 'offline'>('unknown')
   const serviceInfo = ref<ParseServiceInfo | null>(null)
-  /**
-   * 后端 MVP 有限范围 QA 结论（2026-11-11 PASS）。
-   * 裁决明确不含「独立前端全部联调」，因此前端整体不可用此值宣称正式可用；
-   * 保留该字段仅作状态追踪，页面文案统一取自 config/release.ts。
-   */
+  /** v0.2.1 后端 MVP 有限范围 QA PASS；不代表 v0.2.2 前端已联调或生产可用 */
   const qaAccepted = ref(releaseStatus.backendQa === 'PASS')
 
   /** 组件五态：只有真实探活成功才允许 ONLINE；未探测一律 UNKNOWN */
@@ -26,7 +23,7 @@ export const useAppStore = defineStore('app', () => {
   async function saveToken(value: string) {
     setToken(value)
     token.value = value
-    await probeBackend()
+    await probeAll()
   }
 
   function logout() {
@@ -34,9 +31,10 @@ export const useAppStore = defineStore('app', () => {
     token.value = ''
     apiOnline.value = 'unknown'
     serviceInfo.value = null
+    resetContractState()
   }
 
-  /** 唯一真实的后端探活：GET /api/parse/info */
+  /** 旧解析接口唯一真实探活：GET /api/parse/info */
   async function probeBackend() {
     try {
       serviceInfo.value = await getParseInfo()
@@ -47,8 +45,13 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  /** 同时探测旧服务探活与 v0.2.2 运行期契约；两者结论独立，不互相推断 */
+  async function probeAll() {
+    await Promise.all([probeBackend(), probeContract(true)])
+  }
+
   return {
     token, apiOnline, apiState, serviceInfo, qaAccepted,
-    saveToken, logout, probeBackend
+    saveToken, logout, probeBackend, probeAll
   }
 })

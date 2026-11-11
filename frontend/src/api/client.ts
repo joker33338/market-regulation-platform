@@ -1,13 +1,15 @@
-import axios, { AxiosError } from 'axios'
-import { ElMessage } from 'element-plus'
+import axios, { type AxiosError } from 'axios'
+import { toApiError } from './errors'
 
 /**
- * 统一 Axios 实例
- * - 仅请求 FastAPI 后端 /api（开发期经 Vite 代理到 127.0.0.1:8180）
- * - 鉴权：Authorization: Bearer <token>（对齐 mineru_api.py 的 owner 依赖）
- * - Token 安全：内存优先 + sessionStorage 会话级；不写 localStorage、不打印到控制台或日志
- * - 生产环境应由服务端安全会话（HttpOnly Cookie / BFF）下发凭证，前端不长期持有 Token
- * - 浏览器绝不接触 MinerU 官方 API Key 与数据库口令
+ * v0.2.2 统一请求层 —— 全站唯一 Axios 实例（不创建第二套）
+ *
+ * - Base URL 固定同源 `/`；开发期由 Vite 代理转发到后端 8180，生产构建不含任何本地地址
+ * - 鉴权：Authorization: Bearer <会话凭证>，复用后端 Token→owner 映射
+ * - Token 安全：内存优先 + sessionStorage 会话级；不写 localStorage、不打印到控制台/日志
+ * - 浏览器绝不接触 MinerU 官方 API Key 与数据库凭据
+ * - 错误统一归一化为 ApiError（见 errors.ts），被动查询由 AsyncPanel 呈现，主动操作显式提示
+ * - 请求取消：各调用方传入 AbortSignal；幂等：创建任务带 Idempotency-Key
  */
 const LEGACY_TOKEN_KEY = 'mrp_api_token'
 const SESSION_TOKEN_KEY = 'mrp_session_token'
@@ -60,9 +62,12 @@ export function hasToken(): boolean {
 /** 供系统监控页展示的存储方式说明（不含任何凭证内容） */
 export const tokenStorageMode = '内存 + sessionStorage（会话级）· 仅开发期'
 
+/** 请求超时：普通查询 30s；文件下载由调用方按需覆盖 */
+export const DEFAULT_TIMEOUT_MS = 30_000
+
 const client = axios.create({
   baseURL: '/',
-  timeout: 30000
+  timeout: DEFAULT_TIMEOUT_MS
 })
 
 client.interceptors.request.use((config) => {
@@ -73,28 +78,7 @@ client.interceptors.request.use((config) => {
 
 client.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<{ detail?: string }>) => {
-    if (!error.response) {
-      ElMessage.error('无法连接后端解析服务（127.0.0.1:8180），请确认服务已启动')
-      return Promise.reject(error)
-    }
-    const status = error.response.status
-    const raw = String(error.response.data?.detail || '')
-    // 后端错误文案若意外包含凭证相关信息，一律降级为通用提示，不外泄
-    const detail = /token|api[_-]?key|password|secret|bearer/i.test(raw) ? '' : raw
-    if (status === 401 || status === 403) {
-      ElMessage.error('API Token 无效或已过期，请在系统监控页重新配置')
-    } else if (status === 413) {
-      ElMessage.error(detail || '文件超过后端 100MB 上限，或单次任务文件数超过 20')
-    } else if (status === 415) {
-      ElMessage.error(detail || '文件类型或文件头校验未通过，请检查格式与内容')
-    } else if (status === 503) {
-      ElMessage.error(detail || '后端服务暂不可用，请确认解析服务已启动')
-    } else {
-      ElMessage.error(detail || `请求失败（HTTP ${status}）`)
-    }
-    return Promise.reject(error)
-  }
+  (error: AxiosError) => Promise.reject(toApiError(error))
 )
 
 export default client
