@@ -26,7 +26,8 @@ def safe(value):
     if isinstance(value, dict):
         return {key: safe(item) for key, item in value.items()
                 if key.lower() not in {"path", "dsn", "token", "api_key", "password", "authorization",
-                                       "raw_result_location", "error_message", "traceback", "authorization_context"}
+                                       "raw_result_location", "error_message", "traceback", "authorization_context",
+                                       "url", "headers", "credentials", "upload"}
                 and not key.lower().endswith(("_path", "_dir", "_root", "_token", "_secret"))}
     if isinstance(value, (list, tuple)):
         return [safe(item) for item in value]
@@ -86,10 +87,10 @@ class FrontendReader:
                 or Path(value["path"]).resolve() != expected.resolve()):
             raise MinerUError("source_not_found", 404)
         value["file_id"] = file_id
+        has_timestamp = "uploaded_at" in value
         value["uploaded_at"] = value.get("uploaded_at") or datetime.fromtimestamp(
             path.stat().st_mtime, timezone.utc).isoformat()
-        value["uploaded_at_source"] = "upload_metadata" if "uploaded_at" in json.loads(
-            path.read_text(encoding="utf-8")) else "metadata_mtime"
+        value["uploaded_at_source"] = "upload_metadata" if has_timestamp else "metadata_mtime"
         return value, expected
 
     def history(self, owner, file_id, tasks=None):

@@ -1,6 +1,6 @@
 # v0.2.2 前后端 API 契约
 
-契约版本：`frontend-api-v0.2.2-draft-1`。本文件随模块提交更新实现状态。
+契约版本：`frontend-api-v0.2.2-1`。下列新增接口已实现；合成测试通过，独立前端及 QA 待验收。
 
 开发基线：`5dd44b97710db0d3bdb84bcec6e1624dd70205dc`，包含维护提交及 v0.2.1 已验收业务源码 `c91547d393ca6b049e216c0051e25271d06d7359`。历史 QA PASS 不代表本轮接口或独立前端联调已通过。
 
@@ -16,31 +16,31 @@
 
 ## 七页面接口矩阵
 
-“复用”表示维护基线已有；“新增目标”仅在相应模块提交和测试记录齐全后视为实现。下列是选定契约路径，非前端建议路径的全部承诺。
+“复用”表示维护基线已有；“新增”表示本轮已实现并完成针对性自动化验证。下列是选定契约路径，非前端建议路径的全部承诺。
 
 | 页面 | 功能 | 方法 | 路径 | 请求参数 | 响应 | 基线状态/缺口 | 权限 |
 |---|---|---|---|---|---|---|---|
 | 文档管理 | 上传 | POST | `/api/parse/files` | query file_name，body 原始文件字节 | 201 file_id,sha256,bytes | 复用 | owner |
-| 文档管理 | 文档列表 | GET | `/api/documents` | page,page_size,keyword,status,doc_type | DocumentList | 新增目标 | owner |
-| 文档管理 | 详情 | GET | `/api/documents/{file_id}` | 上传 ID | DocumentInfo | 新增目标 | owner |
-| 文档管理 | 解析历史 | GET | `/api/documents/{file_id}/parse-history` | 上传 ID，分页 | task、任务文件 ID、parse_id 映射 | 新增目标 | owner |
-| 文档管理/审核 | 原文件 | GET/HEAD | `/api/parse/files/{file_id}/source` | 上传 ID；可选 Range | 原始二进制、X-SHA256；206/416 | 新增目标 | owner |
+| 文档管理 | 文档列表 | GET | `/api/documents` | page,page_size,keyword,status,doc_type | DocumentList | 新增 | owner |
+| 文档管理 | 详情 | GET | `/api/documents/{file_id}` | 上传 ID | DocumentInfo | 新增 | owner |
+| 文档管理 | 解析历史 | GET | `/api/documents/{file_id}/parse-history` | 上传 ID，分页 | task、任务文件 ID、parse_id 映射 | 新增 | owner |
+| 文档管理/审核 | 原文件 | GET/HEAD | `/api/parse/files/{file_id}/source` | 上传 ID；可选 Range | 原始二进制、X-SHA256；206/416 | 新增 | owner |
 | 智能解析 | 服务信息 | GET | `/api/parse/info` | 无 | mode,provider,enabled,database_enabled,dual_engine_enabled | 复用 | 登录 |
 | 智能解析 | 创建任务 | POST | `/api/parse/tasks` | file_ids；可选 strategy,allow_cloud_fallback,sensitive；Idempotency-Key | 202 ParseTask | 复用 | owner；云权限由服务器判定 |
-| 智能解析 | 任务列表 | GET | `/api/parse/tasks` | page,page_size,status,engine | ParseTask 列表及 file_mappings | 新增目标 | owner |
+| 智能解析 | 任务列表 | GET | `/api/parse/tasks` | page,page_size,status,engine | ParseTask 列表及 file_mappings | 新增 | owner |
 | 智能解析 | 任务详情/失败 | GET | `/api/parse/tasks/{task_id}`、`/api/parse/tasks/{task_id}/errors` | 任务 ID | 同一 ParseTask 结构 | 复用 | owner |
 | 智能解析 | 恢复/取消 | POST | `/api/parse/tasks/{task_id}/resume`、`/api/parse/tasks/{task_id}/cancel` | 任务 ID | ParseTask | 复用，不扩大恢复权限 | owner |
 | 智能解析 | 结果 | GET | `/api/parse/tasks/{task_id}/results` | 任务 ID | task_id,status,results[{file_id,document}] | 复用 | owner |
 | 智能解析 | 产物归档 | GET | `/api/parse/tasks/{task_id}/files/{file_id}/artifact` | 任务 ID、任务文件 ID | artifact.bin，绝非原始文件 | 复用 | owner |
-| 文档审核 | 待审核列表 | GET | `/api/review` | page,page_size,requires_review=true | document_review.documents 列表 | 新增目标；不只读 v_review_queue | owner |
-| 文档审核 | 详情与候选对照 | GET | `/api/review/{parse_id}` | PostgreSQL parse_id | ReviewDetail | 新增目标；无正式写入 | owner |
-| 入库管理 | Chunk/结构预览 | POST | `/api/parse/tasks/{task_id}/files/{file_id}/preview` | document_type=law/case,max_chars | preview,write_performed=false | 新增目标；不入库 | owner |
-| 入库管理/审核 | 已持久化结果预览 | POST | `/api/review/{parse_id}/preview` | 同上 | 同上 | 新增目标；不审核 | owner |
-| 入库管理 | 版本列表/详情 | GET | `/api/knowledge/versions`、`/api/knowledge/versions/{version}` | 列表分页；版本字符串 | 版本状态、active、维度、创建时间、stats | 新增目标；public 只读 | 登录 |
-| 法规检索 | 查询 | POST | `/api/knowledge/search` | query,mode=keyword/hybrid,limit | SearchResponse | 新增目标；仅 ACTIVE public | 登录 |
-| 首页 | 统计及趋势 | GET | `/api/stats/overview` | days=14，1–366 | StatsResponse | 新增目标；标明来源、范围 | owner |
-| 系统监控 | 健康 | GET | `/api/system/health` | 无 | HealthResponse | 新增目标；不推理、不调用云 | 登录 |
-| 开发联调 | OpenAPI | GET | `/api/openapi.json` | 无 | 实际 app.openapi() | 新增目标；仍关闭匿名 /openapi.json | 登录 |
+| 文档审核 | 待审核列表 | GET | `/api/review` | page,page_size,requires_review=true | document_review.documents 列表 | 新增；不只读 v_review_queue | owner |
+| 文档审核 | 详情与候选对照 | GET | `/api/review/{parse_id}` | PostgreSQL parse_id | ReviewDetail | 新增；无正式写入 | owner |
+| 入库管理 | Chunk/结构预览 | POST | `/api/parse/tasks/{task_id}/files/{file_id}/preview` | document_type=law/case,max_chars | preview,write_performed=false | 新增；不入库 | owner |
+| 入库管理/审核 | 已持久化结果预览 | POST | `/api/review/{parse_id}/preview` | 同上 | 同上 | 新增；不审核 | owner |
+| 入库管理 | 版本列表/详情 | GET | `/api/knowledge/versions`、`/api/knowledge/versions/{version}` | 列表分页；版本字符串 | 版本状态、active、维度、创建时间、stats | 新增；public 只读 | 登录 |
+| 法规检索 | 查询 | POST | `/api/knowledge/search` | query,mode=keyword/hybrid,limit | SearchResponse | 新增；仅 ACTIVE public | 登录 |
+| 首页 | 统计及趋势 | GET | `/api/stats/overview` | days=14，1–366 | StatsResponse | 新增；标明来源、范围 | owner |
+| 系统监控 | 健康 | GET | `/api/system/health` | 无 | HealthResponse | 新增；不推理、不调用云 | 登录 |
+| 开发联调 | OpenAPI | GET | `/api/openapi.json` | 无 | 实际 app.openapi() | 新增；仍关闭匿名 /openapi.json | 登录 |
 
 ## 文件与任务身份
 
@@ -105,3 +105,9 @@ uploaded_at_source=metadata_mtime 表示历史上传缺乏显式时间戳，仅�
 正式审核通过/驳回/编辑及审核日志写入；任意路径脚本执行；自动入库批次、发布、回滚；虚构引擎日志；操作系统敏感日志；生产资源监控；自动填充 public；匿名 OpenAPI；新登录系统。本轮前端只读，页面切换能力开关须 WorkBuddy 按本契约独立提交并经 QA。
 
 真实响应 Schema 以本分支实际 `/api/openapi.json` 及同目录导出文件为准。模块提交 SHA 和验证结果见 `v0.2.2-git-commit-plan.md`。
+
+## 当前交付与运行入口
+
+后端开发已转到原始工程的 `feat/backend-api-v0.2.2`，不再在独立后端工作树继续开发。Python、模型、任务 SQLite、PostgreSQL 与 MinerU 配置均复用原环境。正式联调入口仍为 `http://127.0.0.1:8180`；是否切换到候选镜像以及完整 revision 以本轮部署交接记录为准。
+
+运行时读取认证 OpenAPI：`GET /api/openapi.json`。离线文件：`frontend-openapi.json`。重新导出命令：在现有 API Python 环境执行 `python scripts/export_frontend_openapi.py docs/integration/frontend-openapi.json`。

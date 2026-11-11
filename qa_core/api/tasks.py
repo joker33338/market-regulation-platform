@@ -10,6 +10,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 from qa_core.document_parsing.mineru_api import public
 from qa_core.utils import IngestionError
 from .common import guarded, page_of, safe
+from .schemas import TaskList
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
@@ -18,7 +19,7 @@ def register_tasks(app, service, config, owner, reader):
     pagination = Query(default=1, ge=1)
     size = Query(default=20, ge=1, le=100)
 
-    @router.get("/api/parse/tasks", response_model=ListResponse)
+    @router.get("/api/parse/tasks", response_model=TaskList)
     @guarded
     def tasks(page: int = pagination, page_size: int = size, status: str | None = Query(None, max_length=40),
               engine: str | None = Query(None, max_length=80), identity=Depends(owner)):

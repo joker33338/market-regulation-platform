@@ -217,3 +217,72 @@ class FrontendAPITests(unittest.TestCase):
             method = "post" if target.endswith("search") else "get"
             self.assertTrue(paths[target][method]["security"])
             self.assertTrue(paths[target][method]["responses"]["200"]["content"]["application/json"]["schema"])
+
+    def test_published_keyword_and_hybrid_reuse_real_sqlite_retrieval(self):
+        from qa_core.indexing.models import Chunk
+        kb = self.root / "synthetic-published.sqlite3"
+        database = Database(sqlite_path=kb)
+        database.initialize()
+        database.create_version("synthetic-v1", "processing", "synthetic-vector-space", 8)
+        chunk = Chunk("chunk-synthetic", "合成法规", "第一章", "第一条", 1, "第一条 合成规范。",
+                      "合成规范", "input-hash", {"source_path": "private-location", "paragraph_nos": [1]},
+                      [1.0] + [0.0] * 7)
+        database.save_revision(version="synthetic-v1", doc_id="doc-synthetic", doc_version_id="revision-synthetic",
+            source_hash="synthetic-hash", law_name="合成法规", source_path="private-location", metadata={}, chunks=[chunk])
+        database.finish_version("synthetic-v1", {})
+        database.publish("synthetic-v1")
+        database.close()
+        self.reader.kb_factory = lambda: Database(sqlite_path=kb)
+        embeddings = MagicMock(signature="synthetic-vector-space")
+        embeddings.embed_documents.return_value = [[1.0] + [0.0] * 7]
+        self.reader.embeddings_factory = MagicMock(return_value=embeddings)
+        before = kb.read_bytes()
+        for mode in ("keyword", "hybrid"):
+            response = self.client.post("/api/knowledge/search", headers=self.auth,
+                                        json={"query": "合成规范", "mode": mode})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["list"][0]["chunk_id"], "chunk-synthetic")
+            self.assertEqual(response.json()["kb_version"], "synthetic-v1")
+            self.assertNotIn("private-location", response.text)
+        self.reader.embeddings_factory.assert_called_once()
+        self.assertTrue(self.get("/api/knowledge/versions/synthetic-v1").json()["active"])
+        self.reader._search_lock.acquire()
+        try:
+            self.assertEqual(self.client.post("/api/knowledge/search", headers=self.auth,
+                json={"query": "合成规范", "mode": "hybrid"}).status_code, 429)
+        finally:
+            self.reader._search_lock.release()
+        self.assertEqual(kb.read_bytes(), before)
+
+    def test_review_cross_owner_sql_and_connection_failure_close(self):
+        connection, cursor = MagicMock(), MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = None
+        with patch("psycopg2.connect", return_value=connection):
+            from qa_core.document_parsing.mineru_client import MinerUError
+            with self.assertRaises(MinerUError) as error:
+                ReviewReader("not-a-real-dsn").detail("bob", "alice-parse")
+        self.assertEqual(error.exception.status, 404)
+        statement, params = cursor.execute.call_args.args
+        self.assertIn("owner_id", statement)
+        self.assertEqual(params, ("alice-parse", "bob"))
+        connection.close.assert_called_once()
+
+    def test_complete_openapi_references_and_legacy_contract(self):
+        schema = self.get("/api/openapi.json").json()
+        def verify(value):
+            if isinstance(value, dict):
+                if "$ref" in value:
+                    node = schema
+                    for key in value["$ref"].split("/")[1:]:
+                        node = node[key]
+                for item in value.values(): verify(item)
+            elif isinstance(value, list):
+                for item in value: verify(item)
+        verify(schema)
+        paths = schema["paths"]
+        self.assertEqual(paths["/api/parse/tasks"]["post"]["requestBody"]["content"]["application/json"]
+                         ["schema"]["properties"]["file_ids"]["items"]["pattern"], "^[0-9a-f]{32}$")
+        self.assertIn("files", paths["/api/parse/tasks/{task_id}"]["get"]["responses"]["200"]
+                      ["content"]["application/json"]["schema"]["properties"])
+        self.assertEqual(self.client.get("/openapi.json").status_code, 404)

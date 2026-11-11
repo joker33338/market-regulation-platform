@@ -94,3 +94,57 @@ class VersionInfo(BaseModel):
     dimension: int
     created_at: str
     stats: dict[str, Any] | str
+
+
+class ParseFile(BaseModel):
+    file_id: str
+    file_name: str
+    sha256: str
+    database_parse_id: str | None = None
+    selected_engine: list[str] | str | None = None
+    requires_review: bool | None = None
+    fallback_reason: Any = None
+    status: str
+    error: Any = None
+
+
+class ParseTask(BaseModel):
+    task_id: str
+    status: str
+    mode: str
+    cancel_requested: bool
+    cancel_scope: str | None = None
+    provider: str
+    created_at: str
+    completed_at: str | None
+    error: Any
+    files: list[ParseFile]
+
+
+class TaskSummary(ParseTask):
+    elapsed_seconds: float | None = None
+    file_mappings: list[dict[str, str | None]]
+
+
+class TaskList(ListResponse):
+    list: list[TaskSummary]
+
+
+class UploadReceipt(BaseModel):
+    file_id: str
+    sha256: str
+    bytes: int
+
+
+class ParseInfo(BaseModel):
+    mode: str
+    provider: str
+    enabled: bool
+    database_enabled: bool
+    dual_engine_enabled: bool
+
+
+class TaskResults(BaseModel):
+    task_id: str
+    status: str
+    results: list[dict[str, Any]]

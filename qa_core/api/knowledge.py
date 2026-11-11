@@ -2,6 +2,7 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 from pathlib import Path
 from typing import Literal
 from fastapi import APIRouter, Depends, Query
@@ -55,6 +56,9 @@ def register_knowledge(app, service, config, owner, reader):
             database.close()
 
     def version_value(row, active):
+        row = dict(row)
+        stats = row["stats"]
+        row["stats"] = safe(json.loads(stats) if isinstance(stats, str) else stats)
         return {key: row[key] for key in ("kb_version", "status", "dimension", "created_at", "stats")} | {
             "active": row["kb_version"] == active}
 

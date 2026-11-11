@@ -20,4 +20,6 @@ def register_frontend(app, service, config, owner, reader=None):
     register_search(app, service, config, owner, reader)
     from .monitoring import register_monitoring
     register_monitoring(app, service, config, owner, reader)
+    from .contracts import annotate_legacy
+    annotate_legacy(app)
     app.state.frontend_reader = reader
