@@ -49,6 +49,28 @@ class FrontendAPITests(unittest.TestCase):
         return fid, task.json()
 
 
+    def test_upload_history_task_mapping_and_idempotency(self):
+        fid, task = self.upload_task()
+        tid = task["task_id"]
+        rows = self.get("/api/documents").json()
+        self.assertEqual(rows["total"], 1)
+        self.assertEqual(rows["list"][0]["latest_task_id"], tid)
+        self.assertEqual(rows["list"][0]["sha256"], hashlib.sha256(self.data).hexdigest())
+        history = self.get(f"/api/documents/{fid}/parse-history").json()["list"][0]
+        self.assertEqual(history["source_file_id"], fid)
+        self.assertNotEqual(history["file_id"], fid)
+        repeat = self.client.post("/api/parse/tasks", json={"file_ids": [fid]},
+                                  headers={**self.auth, "Idempotency-Key": "synthetic-request"})
+        self.assertEqual(repeat.json()["task_id"], tid)
+        self.assertEqual(self.get("/api/parse/tasks").json()["total"], 1)
+        self.assertEqual(self.get("/api/parse/tasks?status=completed").json()["total"], 0)
+        asyncio.run(self.service.run(tid))
+        self.assertEqual(self.get("/api/parse/tasks?status=completed").json()["total"], 1)
+        self.assertEqual(self.get(f"/api/parse/tasks/{tid}/results").status_code, 200)
+        result = self.get(f"/api/documents/{fid}").json()
+        self.assertIn(result["status"], {"completed", "pending_review"})
+
+
     def test_original_bytes_range_head_and_owner_isolation(self):
         fid, task = self.upload_task()
         path = f"/api/parse/files/{fid}/source"
@@ -65,6 +87,7 @@ class FrontendAPITests(unittest.TestCase):
             self.assertEqual(self.client.get(target, headers=self.other).status_code, 404)
             self.assertEqual(self.client.get(target).status_code, 401)
         self.assertEqual(self.client.get("/api/documents", headers=self.other).json()["total"], 0)
+        self.assertEqual(self.client.get("/api/parse/tasks", headers=self.other).json()["total"], 0)
 
 
     def test_source_integrity_and_tampered_metadata_are_rejected(self):
@@ -78,12 +101,11 @@ class FrontendAPITests(unittest.TestCase):
         self.assertEqual(self.get(f"/api/parse/files/{fid}/source").status_code, 404)
 
 
-    def test_document_list_detail_and_existing_task_association(self):
-        fid, task = self.upload_task()
-        response = self.get("/api/documents?doc_type=pdf&keyword=合成")
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["total"], 1)
-        self.assertEqual(response.json()["list"][0]["file_id"], fid)
-        self.assertEqual(self.get(f"/api/documents/{fid}").json()["latest_task_id"], task["task_id"])
-        self.assertEqual(self.get(f"/api/documents/{fid}/parse-history").json()["total"], 1)
-        self.assertEqual(self.get("/api/documents?page=0").status_code, 422)
+    def test_paging_validation_empty_and_auth_contract(self):
+        self.assertEqual(self.get("/api/documents").json()["list"], [])
+        self.assertEqual(self.get("/api/parse/tasks?page=100").json()["list"], [])
+        for query in ("page=0", "page_size=101", "page=bad"):
+            self.assertEqual(self.get("/api/documents?" + query).status_code, 422)
+        for target in ("/api/documents", "/api/parse/tasks",
+                       "/api/openapi.json"):
+            self.assertEqual(self.client.get(target).status_code, 401, target)

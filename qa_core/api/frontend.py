@@ -10,4 +10,6 @@ def register_frontend(app, service, config, owner, reader=None):
         return app.openapi()
     from .documents import register_documents
     register_documents(app, service, config, owner, reader)
+    from .tasks import register_tasks
+    register_tasks(app, service, config, owner, reader)
     app.state.frontend_reader = reader
