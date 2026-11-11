@@ -97,3 +97,15 @@
 | 未提供 ≥32 位联调 Token（`PARSING_API_TOKENS_JSON`） | 所有 `/api/*` 返回 401，无法验证 owner 隔离 | 用户提供测试 Token |
 | 审核写入、正式入库批次/发布/回滚、结构化日志、资源监控接口 | 相关按钮与页面能力保持禁用/空态 | 后端后续迭代（缺口清单见 `docs/frontend-api-integration-report.md`） |
 | 正式 public 知识库 ACTIVE 版本 | 检索页按后端真实 `status=unpublished` 显示「知识库尚未发布」 | 后端/QA 按既有授权流程发布，前端不写库 |
+
+## 5. 最终联调结论（2026-11-11 复核）
+
+七页面与全部契约路径的前端对接已完成并逐页提交（`c23f011` → `6ecb2ae`，共 10 个本地 commit）；`npm run typecheck`、`npm run build`、9 条路由、8 个懒加载 chunk、代理转发与敏感信息检查均通过，**七个页面零 Mock / DemoBadge 引用、零实际 `v-html`**。
+
+但对活动 8180 实例复测仍为旧镜像：`/api/openapi.json`、`/api/documents`、`/api/system/health`、`/api/stats/overview`、`/api/knowledge/versions`、`/api/review`、`/source`、`POST /api/knowledge/search` 全部 **404**，`GET /api/parse/tasks` **405**，`/api/parse/info` 与 `POST /api/parse/tasks` **401**；且未提供 ≥32 位联调 Token。因此**没有任何真实接口在浏览器端成功返回业务数据**，最终状态为：
+
+```
+FRONTEND_INTEGRATION_PARTIAL
+```
+
+完整的测试证据、三场景验证矩阵、缺失接口清单与授权后联调步骤见 `frontend/docs/frontend-api-integration-report.md`。
