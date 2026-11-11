@@ -51,9 +51,13 @@ def page_of(rows, page, page_size, source):
             "page": page, "page_size": page_size, "source": source}
 
 
+from .read_store import ReviewReader
+
 class FrontendReader:
     def __init__(self, service, config, *, review=None, kb_factory=None, embeddings_factory=None):
         self.service, self.config = service, config
+        dsn = getattr(service.result_sink, "dsn", None)
+        self.review = review or (ReviewReader(dsn) if dsn else None)
 
     def root(self, owner):
         # GET 不创建目录；上传接口才拥有生成文件的职责。
@@ -110,3 +114,52 @@ class FrontendReader:
                          "status": status, "latest_task_id": task["id"] if task else None,
                          "parse_count": len(history)})
         return sorted(rows, key=lambda row: (row["uploaded_at"], row["file_id"]), reverse=True)
+
+    def review_store(self):
+        if self.review is None:
+            raise MinerUError("review_database_not_configured", 503)
+        return self.review
+
+    def task_file(self, owner, task_id, file_id):
+        task = self.service.repository.get(task_id, owner)
+        for file in task["files"]:
+            if file["id"] == file_id:
+                return task, file
+        raise MinerUError("file_not_found", 404)
+
+    def candidate(self, task, file, *, local=False):
+        if local:
+            if not task.get("routing_protocol"):
+                return None
+            path = self.config.result_dir / task["id"] / file["id"] / "local-candidate.json"
+        else:
+            directory = file.get("result_path") or (file.get("local_result_path") if task.get("routing_protocol") else None)
+            if not directory:
+                return None
+            path = Path(directory) / "normalized.json"
+        root = self.config.result_dir.resolve()
+        if not path.resolve().is_relative_to(root) or not path.is_file():
+            return None
+        if path.stat().st_size > self.config.max_expanded_bytes:
+            raise MinerUError("result_too_large", 503)
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def review_detail(self, owner, parse_id):
+        row = self.review_store().detail(owner, parse_id)
+        location = row["source_location"]
+        task_id, source_id = location.get("local_task_id"), location.get("source_file_id")
+        candidate = None
+        if task_id and source_id:
+            try:
+                task = self.service.repository.get(task_id, owner)
+            except MinerUError as exc:
+                if exc.status != 404:
+                    raise
+            else:
+                for file in task["files"]:
+                    # 使用已持久映射交叉核验；绝不从 parse_id 推导文件 ID。
+                    if file.get("database_parse_id") == parse_id and file.get("source_file_id") == source_id:
+                        candidate = self.candidate(task, file, local=True)
+        return safe({**row, "task_id": task_id, "source_file_id": source_id,
+                     "local_candidate": candidate, "local_candidate_available": candidate is not None,
+                     "review_write_supported": False})

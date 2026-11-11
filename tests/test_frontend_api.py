@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 from qa_core.api.common import FrontendReader
+from qa_core.api.read_store import ReviewReader
 from qa_core.document_parsing.mineru_api import create_app
 from qa_core.document_parsing.mineru_config import MinerUConfig
 from qa_core.document_parsing.schemas import DocumentResult, LayoutBlock, PageResult
@@ -109,3 +110,32 @@ class FrontendAPITests(unittest.TestCase):
         for target in ("/api/documents", "/api/parse/tasks",
                        "/api/openapi.json"):
             self.assertEqual(self.client.get(target).status_code, 401, target)
+
+    def test_review_reader_ownership_no_finding_view_and_no_write_api(self):
+        review = MagicMock()
+        review.listing.return_value = {"list": [{"parse_id": "p", "requires_review": True}],
+                                       "total": 1, "page": 1, "page_size": 20,
+                                       "source": "document_review.documents"}
+        review.detail.return_value = dict(parse_id="p", document_id="different-document-id", file_name="合成.pdf",
+             parsing_status="needs_review", requires_review=True, source_location={"owner_id": "alice"},
+             quality={}, raw_text="合成文本", markdown_content="合成文本", original_result={"pages": []})
+        self.reader.review = review
+        self.assertEqual(self.get("/api/review").json()["total"], 1)
+        review.listing.assert_called_once_with("alice", 1, 20, True)
+        detail = self.get("/api/review/p")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertFalse(detail.json()["review_write_supported"])
+        self.assertFalse(detail.json()["local_candidate_available"])
+        self.assertEqual(self.client.post("/api/review/p/approve", headers=self.auth).status_code, 404)
+        connection, cursor = MagicMock(), MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = {"total": 0}
+        cursor.fetchall.return_value = []
+        with patch("psycopg2.connect", return_value=connection):
+            ReviewReader("never-connected").listing("alice", 1, 20, True)
+        connection.set_session.assert_called_once_with(readonly=True, isolation_level="REPEATABLE READ")
+        queries = [(call.args[0], call.args[1] if len(call.args) > 1 else None)
+                   for call in cursor.execute.call_args_list]
+        self.assertTrue(all("owner_id" in sql and "alice" in args for sql, args in queries[1:]))
+        self.assertNotIn("v_review_queue", str(queries))
+        connection.close.assert_called_once()

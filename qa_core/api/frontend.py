@@ -12,4 +12,6 @@ def register_frontend(app, service, config, owner, reader=None):
     register_documents(app, service, config, owner, reader)
     from .tasks import register_tasks
     register_tasks(app, service, config, owner, reader)
+    from .review import register_review
+    register_review(app, service, config, owner, reader)
     app.state.frontend_reader = reader
