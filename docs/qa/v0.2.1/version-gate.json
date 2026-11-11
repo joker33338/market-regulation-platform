@@ -7,9 +7,9 @@
   "qa_branch": "codex/qa-v0.2.1",
   "qa_test_commit": "40014200e15e6abb1b811a99eb66b8fa55b009ed",
   "execution_qa_base_commit": "59574c0f16dd960fe034f9f4d0aca8f75fb116a4",
-  "checked_at": "2026-11-11T01:39:07.267273+00:00",
+  "checked_at": "2026-11-11T01:55:58.867358+00:00",
   "test_execution_at": "2026-11-11T01:01:23.679389+00:00",
-  "report_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
+  "report_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
   "handoff_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
   "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
   "policy": {
@@ -25,10 +25,10 @@
     "single_difficult_sample_is_veto": false,
     "safety_requirements_unchanged": true
   },
-  "technical_status": "PASS_TESTED_SCOPE",
+  "technical_status": "PASS",
   "recognition_quality_status": "MIXED",
   "review_signal_status": "PASS",
-  "review_gate_status": "PASS_REPRESENTATIVE_AUTOMATED_COVERAGE",
+  "review_gate_status": "PASS",
   "integration_status": "BLOCKED",
   "total_tests": 292,
   "passed_tests": 285,
@@ -48,7 +48,9 @@
     "identity_files_matched": 57,
     "qrc001": "PASS",
     "compose_entrypoint": "PASS",
-    "real_http_postgres_restart": "PASS"
+    "real_http_postgres_restart": "PASS",
+    "error_applicability": "NOT_APPLICABLE_TO_RUNTIME_IMAGE",
+    "applicable_host_evidence": "EVIDENCE_REUSED: local/v021-security-retest/full-valid-fixtures/suite-result.json; four methods PASS"
   },
   "real_http_status": "PASS",
   "real_local_models_status": "PASS_REAL_OCR",
@@ -159,9 +161,40 @@
   ],
   "recognition_evidence_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
   "blocked_reasons": [
-    "当前镜像真实本地成功后到官方回退完整验证未闭环；首轮合成8次预算已耗尽且保留",
-    "旧官方任务GET403未闭环",
-    "Windows整机恢复未验证"
+    "EV-AUTO-01补证：公开合成原8次预算耗尽，新增6次尚待授权",
+    "旧具体任务是否属于必恢复承诺待用户确认，仍403",
+    "整机恢复是否改列上线前运维验收待用户确认，仍NOT_TESTED"
   ],
-  "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00"
+  "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00",
+  "scope_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
+  "scope_audit_qa_base_commit": "f3178e79bc533d1db7828f6734d3e2172f235293",
+  "technical_scope_note": "仅已验证核心安全与功能；完整真实auto能力仍BLOCKED，不能把技术子项PASS当整体PASS",
+  "review_gate_scope": "代表性审核桥自动化证据；不声称全局历史待审清单已交付",
+  "evidence_reuse_status": "EVIDENCE_REUSED",
+  "new_test_methods_this_round": 0,
+  "new_api_calls_this_round": 0,
+  "confirmed_release_blockers": [],
+  "evidence_gaps": [
+    {
+      "id": "EV-AUTO-01",
+      "category": "EVIDENCE_GAP",
+      "status": "BLOCKED",
+      "reason": "一条有效当前镜像真实本地推理→质量判断→获准官方回退→有效双候选链待最小补证"
+    }
+  ],
+  "pending_decisions": {
+    "synthetic_api_budget": {
+      "requested_additional_http": 6,
+      "max_post": 1,
+      "max_put": 1,
+      "max_get": 4,
+      "old_consumed": 8,
+      "old_ledger_reset": false,
+      "sample_sha256": "4722ea9314889ce3e0607b1818e326f0531ee92e75e9ec38d7b42c8aa849370e",
+      "status": "PENDING"
+    },
+    "historical_task_release_scope": "PENDING",
+    "windows_reboot_release_scope": "PENDING"
+  },
+  "scope_reduction_approved": false
 }
