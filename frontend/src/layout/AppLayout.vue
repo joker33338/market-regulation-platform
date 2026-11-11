@@ -43,7 +43,7 @@
       </el-menu>
 
       <div class="sidebar-foot">
-        <el-tag size="small" type="warning" effect="plain">{{ releaseStatus.shortLabel }}</el-tag>
+        <el-tag size="small" type="success" effect="plain">{{ releaseStatus.shortLabel }}</el-tag>
       </div>
     </aside>
 

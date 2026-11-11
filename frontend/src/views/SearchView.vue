@@ -47,7 +47,7 @@
       </div>
     </el-card>
 
-    <!-- 结果区：unpublished / 无命中 / 真实命中 三种明确状态 -->
+    <!-- 结果区：尚未检索 / unpublished / 无命中 / 真实命中 分别明确呈现 -->
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <div class="card-head">
@@ -57,21 +57,25 @@
               状态 {{ search.data.value.status }} · kb_version {{ search.data.value.kb_version || '—' }} ·
               模式 {{ search.data.value.mode }} · 命中 {{ search.data.value.count }} · 来源 {{ search.data.value.source }}
             </template>
-            <template v-else>尚无检索结果</template>
+            <template v-else>尚未发起检索</template>
           </span>
         </div>
       </template>
 
       <AsyncPanel :state="search.state.value" :error="search.error.value" @retry="runSearch">
         <template #empty>
-          <el-empty :image-size="70" :description="search.data.value?.status === 'unpublished'
-            ? '知识库尚未发布：public schema 无 ACTIVE 版本，后端返回 status=unpublished'
-            : '未检索到相关依据（后端返回空列表）'">
+          <el-empty :image-size="70" :description="emptyDescription">
             <p class="empty-note">
-              本页不会生成任何法规名称、条号、原文或结论；接口异常时显示错误态而非空结果。
-              <template v-if="!submittedQuery">请输入检索词并发起一次真实检索。</template>
+              <template v-if="!submittedQuery">
+                请输入检索词并点击「检索」；结果只来自 POST /api/knowledge/search 的真实响应，本页不生成任何法规原文。
+              </template>
+              <template v-else>
+                本页不会生成任何法规名称、条号、原文或结论；接口异常时显示错误态而非空结果，不会以演示数据填充。
+              </template>
             </p>
-            <el-button size="small" @click="runSearch">重新检索</el-button>
+            <el-button size="small" :disabled="!canSearch" @click="runSearch">
+              {{ submittedQuery ? '重新检索' : '发起检索' }}
+            </el-button>
           </el-empty>
         </template>
 
@@ -131,12 +135,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { searchKnowledge } from '@/api/frontend'
-import { contractState, contractLabel } from '@/api/dataSource'
+import { contractState, contractLabel, probeContract } from '@/api/dataSource'
 import type { SearchRequest, SearchResponse, SearchHit } from '@/api/types'
 
 /**
@@ -144,7 +148,7 @@ import type { SearchRequest, SearchResponse, SearchHit } from '@/api/types'
  * - 唯一数据源 POST /api/knowledge/search（仅 public ACTIVE）
  * - 请求体严格 {query,mode,limit}；不传后端不支持的筛选字段
  * - 法条原文只渲染后端 article_text，纯文本 <pre>，禁止 v-html
- * - unpublished / 空列表 / 接口异常 / 未认证 / 契约未加载 分别呈现，绝不伪造法条
+ * - 尚未检索 / unpublished / 空列表 / 接口异常 / 未认证 / 契约未加载 分别呈现，绝不伪造法条
  */
 const query = ref('')
 const submittedQuery = ref('')
@@ -169,6 +173,20 @@ const search = useAsyncData<SearchResponse>(
   { immediate: false }
 )
 search.state.value = 'empty'
+
+/** 初始态只是「尚未发起检索」，不得冒充「后端返回空列表」 */
+const emptyDescription = computed(() => {
+  if (!submittedQuery.value) return '尚未发起检索'
+  if (search.data.value?.status === 'unpublished') {
+    return '知识库尚未发布：public schema 无 ACTIVE 版本，后端返回 status=unpublished'
+  }
+  return '未检索到相关依据（后端返回空列表）'
+})
+
+/** 直接刷新本页时也探测运行期契约，使契约标签与真实服务一致（不发起检索、不写入任何结果） */
+onMounted(() => {
+  if (contractState.value === 'unknown') void probeContract()
+})
 
 function runSearch() {
   if (!query.value.trim() || search.loading.value) return

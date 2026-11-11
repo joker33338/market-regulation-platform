@@ -5,7 +5,7 @@
         <h1 class="page-title">首页工作台</h1>
         <p class="page-desc">
           文档解析与法规入库全局概览
-          <el-tag size="small" type="warning" effect="plain" style="margin-left: 8px">{{ releaseStatus.shortLabel }}</el-tag>
+          <el-tag size="small" type="success" effect="plain" style="margin-left: 8px">{{ releaseStatus.shortLabel }}</el-tag>
         </p>
       </div>
       <div class="header-tags">

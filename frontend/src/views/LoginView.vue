@@ -23,7 +23,7 @@
         <p>MinerU 官方 API Key 与数据库口令只存在于 FastAPI 后端，浏览器绝不接触。</p>
       </div>
       <el-alert type="warning" :closable="false" style="margin-top: 14px"
-        :title="releaseStatus.alertTitle" :description="releaseStatus.qaScope + '；页面中的 DEMO 数据不代表生产运行状态。'" />
+        :title="releaseStatus.alertTitle" :description="releaseStatus.qaScope + '；页面业务数据均来自真实接口，未就绪或出错时显示明确异常态，不回退演示数据。'" />
     </el-card>
   </div>
 </template>
@@ -51,7 +51,7 @@ async function login() {
     if (store.apiState === 'ONLINE') {
       router.push('/dashboard')
     } else {
-      ElMessage.warning('Token 已保存到当前会话，但后端离线；可进入系统查看 DEMO 数据')
+      ElMessage.warning('Token 已保存到当前会话，但后端未响应；页面将显示异常态，不会回退演示数据')
       router.push('/dashboard')
     }
   } finally {

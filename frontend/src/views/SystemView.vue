@@ -5,7 +5,7 @@
         <h1 class="page-title">系统监控</h1>
         <p class="page-desc">真实健康检查五态 · 运行期契约探测 · API Token 会话配置 · 接口能力清单</p>
       </div>
-      <el-tag type="warning" effect="plain">{{ releaseStatus.shortLabel }}</el-tag>
+      <el-tag type="success" effect="plain">{{ releaseStatus.shortLabel }}</el-tag>
     </div>
 
     <!-- 旧解析服务真实探活 + Token 会话配置 -->
