@@ -60,6 +60,9 @@ class FrontendReader:
         self.review = review or (ReviewReader(dsn) if dsn else None)
         self.kb_dsn = os.getenv("PG_DSN") or getattr(service.result_sink, "dsn", None)
         self.kb_factory = kb_factory or self._database
+        self.embeddings_factory = embeddings_factory or self._local_embeddings
+        self._embeddings = None
+        self._search_lock = threading.Lock()
 
     def root(self, owner):
         # GET 不创建目录；上传接口才拥有生成文件的职责。
@@ -172,3 +175,48 @@ class FrontendReader:
             raise MinerUError("knowledge_database_not_configured", 503)
         # HTTP 仅服务正式 public；绝不读取 mvp_test_* 的 ACTIVE 作为正式知识库。
         return Database(pg_dsn=self.kb_dsn, kb_schema="public")
+
+    @staticmethod
+    def _local_embeddings():
+        from qa_core.config.settings import Settings
+        from qa_core.retrieval.models import create_embeddings
+        settings = Settings.from_env()
+        if settings.embedding_backend != "local":
+            raise MinerUError("local_embeddings_required", 503)
+        return create_embeddings(settings)
+
+    def search(self, body):
+        from qa_core.retrieval.store import keyword_search, retrieve
+        database = self.kb_factory()
+        try:
+            with database.transaction(read_only=True):
+                active = database.active_version()
+                if not active:
+                    return {"status": "unpublished", "kb_version": None, "mode": body.mode,
+                            "list": [], "count": 0}
+                if body.mode == "keyword":
+                    hits = keyword_search(database, body.query, body.limit)
+            if body.mode == "hybrid":
+                if not self._search_lock.acquire(blocking=False):
+                    raise MinerUError("search_busy", 429)
+                try:
+                    self._embeddings = self._embeddings or self.embeddings_factory()
+                    hits = retrieve(database, self._embeddings, body.query, body.limit)
+                finally:
+                    self._search_lock.release()
+                # retrieve 在其只读快照内绑定 ACTIVE；版本在两次查询间切换时以命中为准。
+                active = hits[0]["kb_version"] if hits else active
+            rows = []
+            for hit in hits:
+                metadata = hit["metadata"]
+                if isinstance(metadata, str):
+                    metadata = json.loads(metadata)
+                rows.append({"chunk_id": hit["chunk_id"], "doc_version_id": hit["doc_version_id"],
+                             "regulation_name": hit["law_name"], "article_no": hit["article_no"],
+                             "article_text": hit["content"], "chapter": hit["chapter"],
+                             "kb_version": hit["kb_version"], "raw_score": hit.get("rrf_score", hit.get("score")),
+                             "score_kind": "rrf" if "rrf_score" in hit else "keyword_match",
+                             "source": safe(metadata)})
+            return {"status": "ready", "kb_version": active, "mode": body.mode, "list": rows, "count": len(rows)}
+        finally:
+            database.close()

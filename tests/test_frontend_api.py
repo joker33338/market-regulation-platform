@@ -110,6 +110,11 @@ class FrontendAPITests(unittest.TestCase):
         for target in ("/api/documents", "/api/parse/tasks",
                        "/api/review", "/api/knowledge/versions", "/api/openapi.json"):
             self.assertEqual(self.client.get(target).status_code, 401, target)
+        self.assertEqual(self.client.post("/api/knowledge/search", headers=self.auth,
+                                          json={"query": " "}).status_code, 422)
+        self.assertEqual(self.client.post("/api/knowledge/search", headers=self.auth,
+                                          json={"query": "x", "source_path": "arbitrary"}).status_code, 422)
+
 
     def test_preview_reuses_structure_without_writes(self):
         fid, task = self.upload_task()
@@ -169,7 +174,14 @@ class FrontendAPITests(unittest.TestCase):
             database.initialize()
             database.close()
         self.reader.kb_factory = lambda: Database(sqlite_path=kb)
+        self.reader.embeddings_factory = MagicMock(side_effect=AssertionError("must not load"))
         before = kb.read_bytes()
+        response = self.client.post("/api/knowledge/search", headers=self.auth,
+                                    json={"query": "合成", "mode": "hybrid"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "unpublished")
+        self.assertEqual(response.json()["list"], [])
+        self.reader.embeddings_factory.assert_not_called()
         self.assertEqual(self.get("/api/knowledge/versions").json()["total"], 0)
         self.assertEqual(self.get("/api/knowledge/versions/none").status_code, 404)
         self.assertEqual(kb.read_bytes(), before)
