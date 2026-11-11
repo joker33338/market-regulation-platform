@@ -282,12 +282,25 @@ class MinerUService:
                 directory = self.root / task["id"] / file["id"]
                 result_path = directory / "normalized.json"
                 if file.get("local_result_path"):
+                    from .config import ParsingConfig, ParsingSafetyError, validate_input_safety
+                    if Path(file['source_path']).stat().st_size > self.config.max_file_bytes:
+                        raise MinerUError('invalid_file_size', 413)
+                    try:
+                        await asyncio.to_thread(validate_input_safety, Path(file['source_path']), ParsingConfig.from_env())
+                    except ParsingSafetyError as exc:
+                        raise MinerUError(exc.code, 413) from exc
                     # Reuse the exact pre-DB result on retry: parsing timestamps
                     # must not change an already committed result's digest.
                     payload = await asyncio.to_thread(result_path.read_text, encoding="utf-8")
                     result = DocumentResult.from_dict(json.loads(payload))
                     if result.document_id != file["sha256"]:
                         raise MinerUError("source_integrity_mismatch", 409)
+                    if (result.schema_version != 'document-parsing-v1'
+                            or result.file_type.lower() != Path(file['source_path']).suffix.lower()
+                            or not result.pages or len({page.page_number for page in result.pages}) != len(result.pages)
+                            or any(page.page_number < 1 or page.parsing_status not in {'success', 'needs_review'}
+                                                for page in result.pages)):
+                        raise MinerUError('invalid_cached_result', 409)
                 else:
                     if self.dual_router:
                         result = await self.dual_router.parse(task, file, self._save)

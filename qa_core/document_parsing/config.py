@@ -19,7 +19,8 @@ class ParsingSafetyError(IngestionError):
     """不可通过换引擎绕过的本地资源拒绝，保留安全机器码。"""
     MESSAGES = {"image_pixel_limit": "图片像素数超过配置上限。",
                 "file_byte_limit": "文件大小超过配置上限。",
-                "pdf_page_limit": "PDF 页数超过配置上限。"}
+                "pdf_page_limit": "PDF 页数超过配置上限。",
+                "docx_expanded_limit": "DOCX 解压后超过资源上限。"}
 
     def __init__(self, code):
         self.code = code
@@ -34,6 +35,26 @@ def validate_image_safety(path: Path, config):
                 raise ParsingSafetyError("image_pixel_limit")
     except Image.DecompressionBombError as exc:
         raise ParsingSafetyError("image_pixel_limit") from exc
+
+
+def validate_input_safety(path: Path, config):
+    """复用缓存也必须接受当前原文件的硬限额，不加载 OCR、不改变文件。"""
+    if path.stat().st_size > config.max_file_bytes:
+        raise ParsingSafetyError('file_byte_limit')
+    if path.suffix.lower() in {'.png', '.jpg', '.jpeg'}:
+        validate_image_safety(path, config)
+    elif path.suffix.lower() == '.pdf':
+        import fitz
+        with fitz.open(path) as document:
+            if not document.is_pdf or document.needs_pass:
+                raise IngestionError('缓存源 PDF 无效或无法读取。')
+            if len(document) > config.max_pages:
+                raise ParsingSafetyError('pdf_page_limit')
+    elif path.suffix.lower() == '.docx':
+        from zipfile import ZipFile
+        with ZipFile(path) as archive:
+            if sum(info.file_size for info in archive.infolist()) > config.max_file_bytes:
+                raise ParsingSafetyError('docx_expanded_limit')
 
 
 @dataclass(frozen=True)

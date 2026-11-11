@@ -13,7 +13,7 @@ import tempfile
 import time
 
 from qa_core.utils import file_sha256
-from .config import ParsingConfig, ParsingSafetyError, validate_image_safety
+from .config import ParsingConfig, ParsingSafetyError, validate_input_safety
 from .document_router import DocumentParser
 from .diagnostics import attached_diagnostic, safe_diagnostic
 from .mineru_client import MinerUError
@@ -137,11 +137,7 @@ class DualEngineRouter:
             # 旧缓存即使无需云回退，也不能豁免当前源文件的资源限额。
             try:
                 limits = ParsingConfig.from_env()
-                source = Path(file['source_path'])
-                if source.stat().st_size > limits.max_file_bytes:
-                    raise ParsingSafetyError('file_byte_limit')
-                if source.suffix.lower() in {'.png', '.jpg', '.jpeg'}:
-                    validate_image_safety(source, limits)
+                validate_input_safety(Path(file['source_path']), limits)
             except ParsingSafetyError as exc:
                 # 保留原 checkpoint 和识别正文；失败候选不能进入结果 sink。
                 local.parsing_status = 'failed'
@@ -262,10 +258,7 @@ class DualEngineRouter:
         state = file['routing_state']
         # 恢复旧候选时也从当前原文件复验，不能依赖旧报告是否带安全码。
         local_limits = ParsingConfig.from_env()
-        if Path(file['source_path']).stat().st_size > local_limits.max_file_bytes:
-            raise ParsingSafetyError('file_byte_limit')
-        if Path(file['source_path']).suffix.lower() in {'.png', '.jpg', '.jpeg'}:
-            validate_image_safety(Path(file['source_path']), local_limits)
+        validate_input_safety(Path(file['source_path']), local_limits)
         allowed, _ = self.authorization(task, file)
         if not allowed:
             raise MinerUError('file_authorization_required', 403)
