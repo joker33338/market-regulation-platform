@@ -107,7 +107,7 @@ class FrontendAPITests(unittest.TestCase):
         self.assertEqual(self.get("/api/parse/tasks?page=100").json()["list"], [])
         for query in ("page=0", "page_size=101", "page=bad"):
             self.assertEqual(self.get("/api/documents?" + query).status_code, 422)
-        for target in ("/api/documents", "/api/parse/tasks",
+        for target in ("/api/documents", "/api/parse/tasks", "/api/stats/overview", "/api/system/health",
                        "/api/review", "/api/knowledge/versions", "/api/openapi.json"):
             self.assertEqual(self.client.get(target).status_code, 401, target)
         self.assertEqual(self.client.post("/api/knowledge/search", headers=self.auth,
@@ -185,3 +185,35 @@ class FrontendAPITests(unittest.TestCase):
         self.assertEqual(self.get("/api/knowledge/versions").json()["total"], 0)
         self.assertEqual(self.get("/api/knowledge/versions/none").status_code, 404)
         self.assertEqual(kb.read_bytes(), before)
+
+
+    def test_stats_sources_and_health_do_not_infer_or_contact_cloud(self):
+        fid, task = self.upload_task()
+        overview = self.get("/api/stats/overview")
+        self.assertEqual(overview.status_code, 200, overview.text)
+        body = overview.json()
+        self.assertEqual(body["tasks"]["total"], sum(body["tasks"]["status_distribution"].values()))
+        self.assertEqual(body["uploads"]["source"], "owner_upload_metadata")
+        self.assertIsNone(body["parsed_documents"]["total"])
+        before = self.service.repository.get(task["task_id"])
+        with patch("qa_core.retrieval.models.create_embeddings", side_effect=AssertionError("inference")):
+            health = self.get("/api/system/health")
+        self.assertEqual(health.status_code, 200, health.text)
+        self.assertEqual(health.json()["components"]["mineru"]["state"], "NOT_CONFIGURED")
+        self.assertEqual(before, self.service.repository.get(task["task_id"]))
+        for forbidden in (str(self.root), "source_path", "password", "api_key"):
+            self.assertNotIn(forbidden, health.text + overview.text)
+
+
+    def test_service_failure_is_sanitized_and_openapi_has_auth(self):
+        self.reader.kb_factory = MagicMock(side_effect=RuntimeError("postgres://secret@internal/path"))
+        response = self.get("/api/knowledge/versions")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"error": {"code": "read_service_unavailable"}})
+        schema = self.get("/api/openapi.json")
+        self.assertEqual(schema.status_code, 200, schema.text)
+        paths = schema.json()["paths"]
+        for target in ("/api/documents", "/api/parse/tasks", "/api/review", "/api/knowledge/search", "/api/system/health"):
+            method = "post" if target.endswith("search") else "get"
+            self.assertTrue(paths[target][method]["security"])
+            self.assertTrue(paths[target][method]["responses"]["200"]["content"]["application/json"]["schema"])

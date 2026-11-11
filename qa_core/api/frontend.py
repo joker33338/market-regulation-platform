@@ -18,4 +18,6 @@ def register_frontend(app, service, config, owner, reader=None):
     register_knowledge(app, service, config, owner, reader)
     from .search import register_search
     register_search(app, service, config, owner, reader)
+    from .monitoring import register_monitoring
+    register_monitoring(app, service, config, owner, reader)
     app.state.frontend_reader = reader
