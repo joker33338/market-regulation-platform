@@ -1,16 +1,16 @@
 {
   "version": "v0.2.1",
-  "gate_status": "BLOCKED",
+  "gate_status": "PASS",
   "source_branch": "codex/fix-v0.2.1",
   "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359",
-  "fix_handoff_commit": "4fea3064de4c699ab9de65c79f23a07b8c9e4a22",
+  "fix_handoff_commit": "3129479ef763f2d35758a68f514b7053aacdaec4",
   "qa_branch": "codex/qa-v0.2.1",
   "qa_test_commit": "40014200e15e6abb1b811a99eb66b8fa55b009ed",
-  "execution_qa_base_commit": "f381da61c0f7652227bfc1f8a229b93398679652",
-  "checked_at": "2026-11-11T02:03:32.224469+00:00",
+  "execution_qa_base_commit": "c3c9bbd23995603d5508ee4b0cadc658fd3851d8",
+  "checked_at": "2026-11-11T02:22:26.340804+00:00",
   "test_execution_at": "2026-11-11T01:01:23.679389+00:00",
-  "report_path": "docs/qa/v0.2.1/finite-auto-final-report.md",
-  "handoff_path": "docs/qa/v0.2.1/candidate-c915-qa-report.md",
+  "report_path": "docs/qa/v0.2.1/final-release-decision.md",
+  "handoff_path": "docs/qa/v0.2.1/final-release-decision.md",
   "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
   "policy": {
     "name": "功能安全门禁 + 识别质量分级 + 人工复核",
@@ -29,7 +29,7 @@
   "recognition_quality_status": "MIXED",
   "review_signal_status": "PASS",
   "review_gate_status": "PASS",
-  "integration_status": "BLOCKED",
+  "integration_status": "PASS",
   "total_tests": 292,
   "passed_tests": 285,
   "failed_tests": 0,
@@ -54,7 +54,7 @@
   },
   "real_http_status": "PASS",
   "real_local_models_status": "PASS_REAL_OCR",
-  "real_official_auto_status": "BLOCKED",
+  "real_official_auto_status": "PASS",
   "old_official_task_recovery_status": "BLOCKED_HTTP_403",
   "windows_whole_reboot_status": "NOT_TESTED",
   "database": {
@@ -91,9 +91,9 @@
       "reason": "代表性官方候选保留/复核及审核桥门禁已测；仅风险处理通过，不等于识别质量合格"
     },
     "R-05": {
-      "status": "BLOCKED",
-      "release_blocking": true,
-      "reason": "当前完整真实执行已完成；官方原始空输出，未取得有效双候选；风险处理PASS"
+      "status": "PASS",
+      "release_blocking": false,
+      "reason": "当前候选真实本地成功→short_page→官方非空产物→有效双候选已独立核验；本轮QA新HTTP0"
     },
     "R-06": {
       "status": "NOT_TESTED",
@@ -150,7 +150,7 @@
       "matching_cells": 48
     }
   },
-  "evidence_root": "local/v021-finite-close",
+  "evidence_root": "local/v021-final-evidence-audit",
   "deployment_status": "独立Compose候选实际入口及restart通过，测试app已停止；活动旧应用未切换",
   "automatic_release_allowed": false,
   "automatic_next_version_ready": false,
@@ -160,29 +160,26 @@
       "status": "PASS",
       "subcases": 4,
       "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359"
+    },
+    {
+      "id": "EV-AUTO-01",
+      "status": "PASS",
+      "evidence": "Fix真实运行原产物经QA独立断网重建、摘要/断言/来源/状态审查通过",
+      "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359"
     }
   ],
   "recognition_evidence_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
-  "blocked_reasons": [
-    "EV-AUTO-01：真实本地成功与官方5次200已取得，但供应商原始内容为空，未满足有效双候选补证；本批停止"
-  ],
+  "blocked_reasons": [],
   "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00",
   "scope_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
   "scope_audit_qa_base_commit": "f3178e79bc533d1db7828f6734d3e2172f235293",
-  "technical_scope_note": "仅已验证核心安全与功能；完整真实auto能力仍BLOCKED，不能把技术子项PASS当整体PASS",
+  "technical_scope_note": "用户确认的后端MVP及c915候选本地集成；不是生产部署或Windows整机恢复PASS",
   "review_gate_scope": "代表性审核桥自动化证据；不声称全局历史待审清单已交付",
   "evidence_reuse_status": "EVIDENCE_REUSED",
   "new_test_methods_this_round": 0,
-  "new_api_calls_this_round": 5,
+  "new_api_calls_this_round": 0,
   "confirmed_release_blockers": [],
-  "evidence_gaps": [
-    {
-      "id": "EV-AUTO-01",
-      "category": "EVIDENCE_GAP",
-      "status": "BLOCKED",
-      "reason": "EV-AUTO-01：真实本地成功与官方5次200已取得，但供应商原始内容为空，未满足有效双候选补证；本批停止"
-    }
-  ],
+  "evidence_gaps": [],
   "pending_decisions": {
     "synthetic_api_budget": {
       "status": "APPROVED",
@@ -226,6 +223,35 @@
     "provider_content_list_entries": 0,
     "provider_markdown_bytes": 0,
     "reason": "要求的有效非空云候选未形成，保留本地并复核；不构成已确认代码缺陷",
-    "no_database_used": true
-  }
+    "no_database_used": true,
+    "historical_status": "BLOCKED_QA021_EMPTY_PROVIDER_OUTPUT",
+    "note": "此前QA021失败保持历史事实，不冒充本次新样本成功"
+  },
+  "release_eligible": true,
+  "latest_auto_evidence": {
+    "status": "PASS",
+    "producer": "Fix",
+    "independent_qa_verification": "PASS",
+    "sample_sha256": "0fd15b84e03f5c23a220d4f8d4e980c2c843f59a92dab9047507d63853eca536",
+    "actual_http": 5,
+    "approved_window": 8,
+    "historical_synthetic_calls": 13,
+    "cumulative_synthetic_calls": 18,
+    "old_ledgers_unchanged": true,
+    "qa_new_http": 0,
+    "raw_zip_normalization": "PASS",
+    "checks_verified": 11,
+    "local_and_remote_nonempty": true,
+    "raw_hashes_verified": 9,
+    "authorization_basis": "Fix正式交接及approved-plan记载用户授权8次新窗口；QA未新增调用"
+  },
+  "acceptance_scope": "后端MVP及指定候选镜像本地集成",
+  "excluded_acceptance": [
+    "生产部署/活动实例切换",
+    "Windows整机恢复",
+    "具体历史403任务保证恢复",
+    "独立前端全部联调",
+    "未来增强"
+  ],
+  "qa_independent_audit_helper": "tests/verify_v021_auto_handoff.py"
 }
