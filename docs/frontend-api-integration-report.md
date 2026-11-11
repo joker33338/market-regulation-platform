@@ -277,11 +277,19 @@ QA 复核后仍为 **BLOCKED**，理由为验收证据不足；**未确认新的
 | QA 要求补齐 | 现状与可行性 | 责任边界 |
 |---|---|---|
 | ① 上传 → 创建任务 → 真实 OCR → 查询结果 → 原文对照 → 质量提示的**前端闭环** | 后端 `POST /api/parse/files`、`POST /api/parse/tasks` 存在且前端已接好；但共享库里已有 **3 个 `completed` 的真实 `self_hosted` OCR 任务**、7 条 review 记录（含 `raw_text`、`quality` 多维度、`source_location`、`source_file_id`）。**后四段只读即可补采**；前两段「上传 / 创建任务」会写入共享 PostgreSQL + SQLite，属写链路 | 只读段由本角色补采；写段需按统一规则使用**获得批准的隔离状态与测试数据**，不得由本角色擅自在共享 8180 触发 |
-| ② 可辨识的 PDF 原文画面及必要只读交互证据 | 已定位为**采集环境限制，非产品缺陷**：`GET /api/parse/files/{source_file_id}/source` 返回 `206` / `%PDF-1.7` / `application/pdf` / `inline` / 246331 B / `x-sha256`；既有审核页截图显示 SHA256「与文档记录一致」、页码「第 1/10 页」、右侧 OCR 文本与质量指标正常，仅 `<iframe>` 内画面空白。根因是 headless Edge 不渲染浏览器内置 PDF viewer（`DocumentPreview.vue` 用认证 ArrayBuffer → Blob URL → iframe） | 需改用可渲染 PDF viewer 的采集方式重截前端页面；**不改产品代码**（无确认缺陷、Fix 待命） |
+| ② 可辨识的 PDF 原文画面及必要只读交互证据 | 已定位为**采集环境限制，非产品缺陷**：`GET /api/parse/files/{source_file_id}/source` 返回 `206` / `%PDF-1.7` / `application/pdf` / `inline` / 246331 B / `x-sha256`；既有审核页截图显示 SHA256「与文档记录一致」、页码「第 1/10 页」、右侧 OCR 文本与质量指标正常，仅 `<iframe>` 内画面空白。根因是 headless / `headless=new` Edge 均不渲染浏览器内置 PDF viewer（`DocumentPreview.vue` 用认证 ArrayBuffer → Blob URL → iframe） | **已补齐**：改用有头 Edge + CDP 重截，PDF viewer 正常渲染出中文正文；**未改产品代码**（无确认缺陷、Fix 待命） |
 
 **本轮已完成的只读核实**：8180 六项身份重新复核无变化（源码 `4fc4cf1…` / 镜像 ID `sha256:8f169cd8…` / 容器 `market-regulation-app-1` healthy）；OpenAPI 22 路径中写方法仅 7 个；任务内 `files[].file_id` 与上传 `file_id` **不同**，直接拿任务文件 ID 请求 `/source` 会 404，前端审核页使用 `review/{parse_id}` 返回的 `source_file_id`，映射正确。详细诊断见 ignored 本地文件 `local/frontend-evidence/V022-E01-gap-analysis.md`。
 
-**状态**：报告结论 `FRONTEND_INTEGRATION_READY` 是前端自评（限定七页面约定只读能力），**不代表 QA 已 PASS**；QA 仍为 BLOCKED。本轮未改业务源码、未重启浏览器与预览服务、未执行任何写接口、未触碰后端镜像 / 数据库 / 授权账本。
+**已补齐的证据（用户授权后采集）**：恢复 Vite preview 4173，在真实 `/login` 页用已有会话凭证登录，以有头 Edge + CDP 新增 18 张截图至本机 `mrp-screenshots/v022-e01/`，逐张 SHA256 与用途见 `local/frontend-evidence/evidence-manifest.json` 的 `v022_e01_evidence` 段。
+- **只读闭环**：文档列表 → 详情/解析历史 → 任务列表 → 任务详情 → 标准化结果 → 审核左右对照 → 质量指标 / 候选对照 / 表格结构，全部基于共享库已有的 4 份 PDF、3 个 `completed` 的 `self_hosted/local` 真实 OCR 任务与 7 条 review 记录。
+- **可辨识 PDF 原文画面**：`e01-14-pdf-page1-full.png` 整页特写可清晰辨认中文正文（「二、案件来源及调查经过」「三、违法事实及相关证据」）；`e01-16` 为左右对照全景。
+- **只读交互证据**：翻页 1/10→2/10（页码、缩略图、右侧「按页对照」联动）、缩放 100%→150%、各结果页签切换。
+- **待 QA 判定的观察项（不认定缺陷、不改代码）**：同一 Blob URL 仅 fragment 变化时，上述状态联动正确（`iframe.src` 变为 `#page=2&zoom=100`），但 PDF viewer 内画面像素未同步跳转（`e01-14` 与 `e01-15`、`e01-07` 与 `e01-12` 的 SHA256 分别完全一致）。是否构成缺陷由 QA 绑定受测源码与镜像后确认；Fix 保持待命。
+
+**写链路归属（用户已决定）**：`上传 → 创建任务 → 真实 OCR` 由 **QA 使用获得批准的隔离状态与测试数据**验收；本角色**未触发** `POST /api/parse/files`、`POST /api/parse/tasks`、resume、cancel，共享 8180 无新增记录。
+
+**状态**：报告结论 `FRONTEND_INTEGRATION_READY` 是前端自评（限定七页面约定只读能力），**不代表 QA 已 PASS**；QA 是否解除 BLOCKED 由其独立判定。本轮未改业务源码、未执行任何写接口、未构建/重启/覆盖后端镜像、未改数据库 / SQLite / 授权账本、未中断活动任务、未 Push / Merge / 部署。
 
 ---
 
