@@ -1,0 +1,30 @@
+{
+  "version": "v0.2.1",
+  "gate_status": "BLOCKED",
+  "source_branch": "codex/fix-v0.2.1",
+  "source_commit": "a860abfa84bc2664bb119ae8f5b80c6794e6e23c",
+  "qa_initial_commit": "3bdcfdf007a30d29201760518263d12bca05924c",
+  "qa_test_commit": "78b7e05e747656414badd8350c83d48b672ecc16",
+  "target_agent": "Fix",
+  "task_type": "bugfix",
+  "issue_ids": [
+    "QFA-001",
+    "QFA-002",
+    "QFA-003",
+    "QFA-004"
+  ],
+  "handoff_status": "NEEDS_FIX",
+  "report_path": "docs/qa/v0.2.1/final-acceptance-report.md",
+  "handoff_path": "docs/qa/v0.2.1/final-handoff-to-fix.md",
+  "test_runner": "tests/run_v021_final_acceptance.py",
+  "regression_tests": "tests/test_v021_final_acceptance_edges.py",
+  "requires_new_fix_sha": true,
+  "auto_wakeup_performed": false,
+  "release_ready": false,
+  "restrictions": [
+    "不修改QA人工真值或测试断言以求通过",
+    "不清空原云账本或重发未知POST",
+    "不擅自DDL/DELETE",
+    "不Push/merge/main/生产部署"
+  ]
+}

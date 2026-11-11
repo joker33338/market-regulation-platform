@@ -1,0 +1,257 @@
+{
+  "version": "v0.2.1",
+  "gate_status": "PASS",
+  "source_branch": "codex/fix-v0.2.1",
+  "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359",
+  "fix_handoff_commit": "3129479ef763f2d35758a68f514b7053aacdaec4",
+  "qa_branch": "codex/qa-v0.2.1",
+  "qa_test_commit": "40014200e15e6abb1b811a99eb66b8fa55b009ed",
+  "execution_qa_base_commit": "c3c9bbd23995603d5508ee4b0cadc658fd3851d8",
+  "checked_at": "2026-11-11T02:22:26.340804+00:00",
+  "test_execution_at": "2026-11-11T01:01:23.679389+00:00",
+  "report_path": "docs/qa/v0.2.1/final-release-decision.md",
+  "handoff_path": "docs/qa/v0.2.1/final-release-decision.md",
+  "report_commit_reference": "包含本文件的实际Git提交；最终回复给出完整SHA",
+  "policy": {
+    "name": "功能安全门禁 + 识别质量分级 + 人工复核",
+    "confirmed_by": "用户本轮明确指示",
+    "reference_cer": {
+      "native_text": "1%-3%",
+      "ordinary_scan": "<=5%",
+      "complex_scan": "<=10%"
+    },
+    "table_reference": "结构与内容分别统计，90%试行参考；关键错误不得自动放行",
+    "routing_reference": "合理选择、正确安全拒绝、低质复核或合法回退；不机械使用95%",
+    "single_difficult_sample_is_veto": false,
+    "safety_requirements_unchanged": true
+  },
+  "technical_status": "PASS",
+  "recognition_quality_status": "MIXED",
+  "review_signal_status": "PASS",
+  "review_gate_status": "PASS",
+  "integration_status": "PASS",
+  "total_tests": 292,
+  "passed_tests": 285,
+  "failed_tests": 0,
+  "skipped_tests": 7,
+  "failure_subcases": 0,
+  "method_count_policy": "292唯一方法：285PASS/7SKIP；PG6同ID补跑后291PASS/1SKIP；额外Schema探针不加进方法数",
+  "candidate_regression": {
+    "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359",
+    "image_id": "sha256:92bc163c15210ec0ea9f0373db4d020f0be792dea2e2be4dc3f089727d202c0e",
+    "total": 177,
+    "passed": 172,
+    "errors": 4,
+    "skipped": 1,
+    "error_classification": "宿主部署源文件不在运行镜像路径；保留ERROR，不冒充通过",
+    "business_code_import": "/app/qa_core",
+    "identity_files_matched": 57,
+    "qrc001": "PASS",
+    "compose_entrypoint": "PASS",
+    "real_http_postgres_restart": "PASS",
+    "error_applicability": "NOT_APPLICABLE_TO_RUNTIME_IMAGE",
+    "applicable_host_evidence": "EVIDENCE_REUSED: local/v021-security-retest/full-valid-fixtures/suite-result.json; four methods PASS"
+  },
+  "real_http_status": "PASS",
+  "real_local_models_status": "PASS_REAL_OCR",
+  "real_official_auto_status": "PASS",
+  "old_official_task_recovery_status": "BLOCKED_HTTP_403",
+  "windows_whole_reboot_status": "NOT_TESTED",
+  "database": {
+    "current_source_six_tests": "PASS",
+    "schema_extra_probes_passed": 6,
+    "existing_business_rows_and_real_active_unchanged": true,
+    "test_data_and_schemas_retained": true,
+    "adversarial_integration_complete": true,
+    "remaining_adversarial_probes": {
+      "temporary_shadow": "PASS",
+      "vector_shadow": "PASS",
+      "cross_schema_fk": "PASS",
+      "non_current_role_owner": "PASS"
+    }
+  },
+  "known_p0_p1": [],
+  "historical_qfa_001_to_004": "已回归闭环；旧a860abf闸门失败不作为当前未修复缺陷",
+  "remaining_items": {
+    "R-01": {
+      "status": "PASS",
+      "reason": "用户已确认安全门禁、质量分级和人工复核的新标准"
+    },
+    "R-02": {
+      "status": "PASS",
+      "reason": "已核验扩展真值交付范围；不声称全66条在本轮重新测量"
+    },
+    "R-03": {
+      "status": "BLOCKED",
+      "release_blocking": false,
+      "reason": "旧具体任务403未解决，用户批准移出版本硬门禁，未重试"
+    },
+    "R-04": {
+      "status": "PASS",
+      "reason": "代表性官方候选保留/复核及审核桥门禁已测；仅风险处理通过，不等于识别质量合格"
+    },
+    "R-05": {
+      "status": "PASS",
+      "release_blocking": false,
+      "reason": "当前候选真实本地成功→short_page→官方非空产物→有效双候选已独立核验；本轮QA新HTTP0"
+    },
+    "R-06": {
+      "status": "NOT_TESTED",
+      "release_blocking": false,
+      "reason": "用户批准仅承诺已测容器恢复；整机另列上线前运维验收"
+    },
+    "R-07": {
+      "status": "PASS",
+      "reason": "当前源码PG六项独立执行通过，合成数据与自有Schema边界；额外Schema对抗集成尚未全测"
+    },
+    "R-08": {
+      "status": "PASS",
+      "reason": "原QRC-001四场景当前源码复测通过；S00019新任务真实证据仍为前轮SHA"
+    }
+  },
+  "recognition": {
+    "CER-01": {
+      "cer": 0.018518518518518517,
+      "reference": "普通扫描<=5%",
+      "result": "WITHIN_REFERENCE"
+    },
+    "CER-03": {
+      "cer": 0.024691358024691357,
+      "reference": "普通扫描<=5%",
+      "result": "WITHIN_REFERENCE"
+    },
+    "CER-02-auto": {
+      "cer": 0.188,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "CER-02-structure": {
+      "cer": 0.176,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "LAYOUT-01": {
+      "cer": 0.8960689283791061,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "TABLE-WIRED-auto": {
+      "reference_cells": 30,
+      "predicted_cells": 56,
+      "geometry_matching_cells": 19,
+      "text_matching_cells": 19,
+      "result": "QUALITY_INADEQUATE_REVIEW_REQUIRED"
+    },
+    "TABLE-WIRED-structure": {
+      "exact_structure": true,
+      "exact_text": true,
+      "matching_cells": 30
+    },
+    "TABLE-WIRELESS-auto": {
+      "exact_structure": true,
+      "exact_text": true,
+      "matching_cells": 48
+    }
+  },
+  "evidence_root": "local/v021-final-evidence-audit",
+  "deployment_status": "独立Compose候选实际入口及restart通过，测试app已停止；活动旧应用未切换",
+  "automatic_release_allowed": false,
+  "automatic_next_version_ready": false,
+  "closed_issues": [
+    {
+      "id": "QRC-001",
+      "status": "PASS",
+      "subcases": 4,
+      "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359"
+    },
+    {
+      "id": "EV-AUTO-01",
+      "status": "PASS",
+      "evidence": "Fix真实运行原产物经QA独立断网重建、摘要/断言/来源/状态审查通过",
+      "source_commit": "c91547d393ca6b049e216c0051e25271d06d7359"
+    }
+  ],
+  "recognition_evidence_source_commit": "bf66e10753757c2e1f92383755817dd8c31ab336",
+  "blocked_reasons": [],
+  "latest_test_execution_at": "2026-11-11T01:39:07.267273+00:00",
+  "scope_path": "docs/qa/v0.2.1/final-acceptance-scope.md",
+  "scope_audit_qa_base_commit": "f3178e79bc533d1db7828f6734d3e2172f235293",
+  "technical_scope_note": "用户确认的后端MVP及c915候选本地集成；不是生产部署或Windows整机恢复PASS",
+  "review_gate_scope": "代表性审核桥自动化证据；不声称全局历史待审清单已交付",
+  "evidence_reuse_status": "EVIDENCE_REUSED",
+  "new_test_methods_this_round": 0,
+  "new_api_calls_this_round": 0,
+  "confirmed_release_blockers": [],
+  "evidence_gaps": [],
+  "pending_decisions": {
+    "synthetic_api_budget": {
+      "status": "APPROVED",
+      "requested_additional_http": 6,
+      "max_post": 1,
+      "max_put": 1,
+      "max_get": 4,
+      "used": 5,
+      "old_consumed": 8,
+      "old_ledger_unchanged": true,
+      "remaining": 1
+    },
+    "historical_task_release_scope": "APPROVED_EXCLUDE_SPECIFIC_OLD_TASK",
+    "windows_reboot_release_scope": "APPROVED_SEPARATE_OPERATIONAL_ACCEPTANCE"
+  },
+  "scope_reduction_approved": true,
+  "scope_reduction_details": [
+    "旧具体任务403不保证恢复，移出本版本硬门禁但保留未解决",
+    "Windows整机恢复列上线前独立运维，仍NOT_TESTED",
+    "未缩减真实auto交付承诺"
+  ],
+  "finite_auto_result": {
+    "status": "BLOCKED",
+    "checks": {
+      "real_local_success": true,
+      "task_completed": true,
+      "real_local_candidate": true,
+      "real_remote_candidate": false,
+      "current_quality_trigger": true,
+      "official_selected": false,
+      "requires_review": true,
+      "source_unchanged": true,
+      "local_source_link": true,
+      "page_provenance": true,
+      "idempotent": true
+    },
+    "real_official_http": "PASS",
+    "risk_handling": "PASS",
+    "remote_recognition_quality": "INADEQUATE_EMPTY_PROVIDER_OUTPUT",
+    "actual_http": 5,
+    "provider_content_list_entries": 0,
+    "provider_markdown_bytes": 0,
+    "reason": "要求的有效非空云候选未形成，保留本地并复核；不构成已确认代码缺陷",
+    "no_database_used": true,
+    "historical_status": "BLOCKED_QA021_EMPTY_PROVIDER_OUTPUT",
+    "note": "此前QA021失败保持历史事实，不冒充本次新样本成功"
+  },
+  "release_eligible": true,
+  "latest_auto_evidence": {
+    "status": "PASS",
+    "producer": "Fix",
+    "independent_qa_verification": "PASS",
+    "sample_sha256": "0fd15b84e03f5c23a220d4f8d4e980c2c843f59a92dab9047507d63853eca536",
+    "actual_http": 5,
+    "approved_window": 8,
+    "historical_synthetic_calls": 13,
+    "cumulative_synthetic_calls": 18,
+    "old_ledgers_unchanged": true,
+    "qa_new_http": 0,
+    "raw_zip_normalization": "PASS",
+    "checks_verified": 11,
+    "local_and_remote_nonempty": true,
+    "raw_hashes_verified": 9,
+    "authorization_basis": "Fix正式交接及approved-plan记载用户授权8次新窗口；QA未新增调用"
+  },
+  "acceptance_scope": "后端MVP及指定候选镜像本地集成",
+  "excluded_acceptance": [
+    "生产部署/活动实例切换",
+    "Windows整机恢复",
+    "具体历史403任务保证恢复",
+    "独立前端全部联调",
+    "未来增强"
+  ],
+  "qa_independent_audit_helper": "tests/verify_v021_auto_handoff.py"
+}

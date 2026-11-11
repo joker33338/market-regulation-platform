@@ -1,3 +1,5 @@
+> 历史部署记录保留。当前操作说明见 docs/current/v0.2.1-guide.md；不要将历史镜像／未验收状态当作最新版本。
+
 # v0.2.1 本地 Docker 入口
 
 本机入口：`http://127.0.0.1:8180`。访问码在忽略目录 `local/workbench-access-code.txt`，不要提交或放进聊天。

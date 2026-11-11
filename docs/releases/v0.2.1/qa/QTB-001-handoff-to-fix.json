@@ -1,0 +1,21 @@
+{
+  "handoff_id": "v021-QTB-001-startup-failclosed",
+  "version": "v0.2.1",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_commit": "215807769feb2fbfedf8d91d275dec156cc038bb",
+  "qa_test_commit": "39c3c35a795ce002095a01836680d6e067379d85",
+  "status": "ready",
+  "bug_ids": [
+    "QTB-001"
+  ],
+  "severity": "P0",
+  "test_commands": [
+    "python -B -m unittest tests.test_v021_test_batch_startup_guard -v"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.1/QTB-001-handoff-to-fix.md"
+  ],
+  "real_requests": 0,
+  "real_uploads": 0
+}

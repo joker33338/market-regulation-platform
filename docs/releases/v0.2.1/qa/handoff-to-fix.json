@@ -1,0 +1,45 @@
+{
+  "handoff_id": "v021-confirmed-Q021-001-Q021-002",
+  "version": "v0.2.1",
+  "source_agent": "QA",
+  "target_agent": "Fix",
+  "source_commit": "5ed1ba6339dc817f53747c0db7cbcbde3224dd3b",
+  "qa_test_commit": "4022606420695a22579a82b3ce8e4c03448ca4ac",
+  "status": "ready",
+  "target_branch": "codex/fix-v0.2.1",
+  "bug_ids": [
+    "Q021-001",
+    "Q021-002"
+  ],
+  "accepted_scope": [
+    "保留结构增强失败之前已提取的原生候选与来源、失败原因、人工复核",
+    "CLI未提供--tables时保留from_env显式配置，报告使用effective值",
+    "不改原labels/全局默认/资源限制/模型/客户端/数据库不可变语义"
+  ],
+  "test_commands": [
+    "python -B -m unittest tests.test_v021_native_preservation tests.test_v021_table_cli -v"
+  ],
+  "report_paths": [
+    "docs/qa/v0.2.1/handoff-to-fix.md"
+  ],
+  "actual_tests": {
+    "total": 4,
+    "passed": 2,
+    "failed": 2,
+    "errors": 0
+  },
+  "issues": [
+    {
+      "id": "Q021-001",
+      "severity": "P1",
+      "expected": "结构增强失败保留已提取原生正文并保留复核与失败诊断",
+      "actual": "failed空页，原生正文与raw_result均清空"
+    },
+    {
+      "id": "Q021-002",
+      "severity": "P2",
+      "expected": "env OCR_ENABLE_TABLES=1 且无CLI flag时effective=true，报告一致",
+      "actual": "store_true默认false覆盖from_env为false，报告也记false"
+    }
+  ]
+}

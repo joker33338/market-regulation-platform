@@ -1,3 +1,5 @@
+> ARCHIVED：此文件保留历史设计／执行事实；当前v0.2.1操作入口为 docs/current/v0.2.1-guide.md。
+
 # 复用现有 PostgreSQL 结构
 
 用户已提供本地测试连接并允许本轮接入。现有 document_review schema 能容纳解析结果。
