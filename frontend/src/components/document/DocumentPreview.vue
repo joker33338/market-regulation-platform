@@ -35,7 +35,11 @@
 
       <div v-else-if="state === 'ready' && kind === 'pdf'" class="dp-viewer">
         <!-- Blob URL 来自认证 Axios ArrayBuffer；绝不把需要 Token 的接口地址直接塞进 iframe -->
-        <iframe :src="viewerUrl" title="原始 PDF 预览" class="dp-frame" />
+        <!-- V022-F01：浏览器内置 PDF viewer 只在文档首次加载时读取 #page/#zoom。
+             同一 Blob URL 仅改 fragment 不会跳页（页码/按页对照已变、画面仍是旧页）。
+             因此分页/缩放时受控重建 iframe：每次新建 Blob URL + 递增 key，
+             让 #page/#zoom 作为新文档的初始参数真实生效，而不是只改地址栏字符串。 -->
+        <iframe :key="frameKey" :src="viewerUrl" title="原始 PDF 预览" class="dp-frame" />
       </div>
 
       <div v-else-if="state === 'ready' && kind === 'image'" class="dp-viewer dp-image">
@@ -77,11 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import {
   getSourceFile, createSourceUrl, revokeSourceUrl, downloadSourceFile,
-  isValidFileId, SOURCE_FILE_API, type SourceKind
+  isValidFileId, SOURCE_FILE_API, type SourceFile, type SourceKind
 } from '@/api/documentFiles'
 import { toApiError, notifyApiError } from '@/api/errors'
 import { hasToken } from '@/api/client'
@@ -91,6 +95,10 @@ import { contractState } from '@/api/dataSource'
  * 文档预览统一入口（审核中心左侧）—— v0.2.2 真实实现
  * PDF 用浏览器内置 PDF viewer 渲染 iframe（Blob URL），图片用 <img>，DOCX 按后端契约仅授权下载。
  * 不新增 pdfjs-dist / vue-office 依赖，符合「优先复用已安装能力、不大规模更换组件库」。
+ *
+ * V022-F01 最小修复：分页/缩放不再只改同一 Blob URL 的 fragment，而是从已认证的
+ * 字节缓存生成新的 Blob URL 并递增 iframe key，强制 viewer 以 #page/#zoom 重新初始化。
+ * 字节仍只来自 /source 一次认证请求；权限、X-SHA256 校验、下载与 Blob 释放路径不变。
  */
 type ViewState = 'idle' | 'loading' | 'ready' | 'no-permission' | 'outdated' | 'unavailable' | 'error' | 'empty'
 
@@ -109,19 +117,22 @@ const emit = defineEmits<{ (e: 'update:page', value: number): void }>()
 
 const state = ref<ViewState>('idle')
 const errorHint = ref('')
-const sourceUrl = ref('')
+const sourceUrl = ref('')          // 基础 Blob URL：图片分支与当前原件共用
+const viewerUrl = ref('')          // PDF iframe 的 src：新 Blob URL + #page/#zoom
+const viewerBlobUrl = ref('')      // 与 viewerUrl 对应的纯 Blob URL，便于精确 revoke
+const frameKey = ref(0)            // 递增即重建 iframe，让 PDF viewer 重新初始化
+const sourceFile = ref<SourceFile | null>(null) // 已认证字节缓存，重建不再发起接口请求
 const sha256 = ref('')
 const kind = ref<SourceKind>('other')
 const zoom = ref(100)
 const innerPage = ref(props.page)
 const downloading = ref(false)
 let controller: AbortController | null = null
+/** 所有仍可能被 iframe 引用的 Blob URL；切换文件/卸载时统一释放，避免泄漏 */
+const liveBlobUrls = new Set<string>()
 
 const integrityOk = computed(() => !props.expectedSha256 || !sha256.value || props.expectedSha256 === sha256.value)
 const canPage = computed(() => state.value === 'ready' && kind.value === 'pdf' && integrityOk.value)
-const viewerUrl = computed(() =>
-  sourceUrl.value ? `${sourceUrl.value}#page=${innerPage.value}&zoom=${zoom.value}` : ''
-)
 
 const thumbPages = computed(() => {
   const total = Math.max(props.totalPages, 1)
@@ -146,10 +157,45 @@ function hintOf(s: ViewState): string {
           : '请重新加载；不会用解析产物或演示页面替代原始证据。'
 }
 
+function newBlobUrl(): string {
+  const file = sourceFile.value
+  if (!file) return ''
+  const url = createSourceUrl(file)
+  liveBlobUrls.add(url)
+  return url
+}
+
 function releaseUrl() {
-  if (sourceUrl.value) {
-    revokeSourceUrl(sourceUrl.value)
-    sourceUrl.value = ''
+  for (const url of liveBlobUrls) revokeSourceUrl(url)
+  liveBlobUrls.clear()
+  sourceUrl.value = ''
+  viewerBlobUrl.value = ''
+  viewerUrl.value = ''
+  sourceFile.value = null
+  frameKey.value += 1
+}
+
+/**
+ * V022-F01 受控重建：分页 / 缩放变化时给 iframe 一个全新的文档。
+ * - 不复用同一 Blob URL 只改 fragment：内置 viewer 实测会保留旧页画面；
+ * - 不操作 iframe.contentWindow.location：对 Blob URL 可能抛权限异常；
+ * - 旧 Blob 在 nextTick（旧 iframe 已卸载）后释放，销毁中的文档不会读取失败。
+ * 字节始终来自本次 /source 认证响应的缓存，不重复请求、不改写、不伪造页图。
+ */
+function rebuildViewer() {
+  const file = sourceFile.value
+  if (state.value !== 'ready' || kind.value !== 'pdf' || !file || !integrityOk.value) return
+  const previous = viewerBlobUrl.value
+  const next = newBlobUrl()
+  if (!next) return
+  viewerBlobUrl.value = next
+  viewerUrl.value = `${next}#page=${innerPage.value}&zoom=${zoom.value}`
+  frameKey.value += 1
+  if (previous) {
+    void nextTick(() => {
+      revokeSourceUrl(previous)
+      liveBlobUrls.delete(previous)
+    })
   }
 }
 
@@ -192,8 +238,11 @@ async function loadSource() {
       errorHint.value = '后端返回的 X-SHA256 与文档记录不一致（完整性校验失败），已阻断预览'
       return
     }
-    sourceUrl.value = createSourceUrl(file)
+    sourceFile.value = file
+    sourceUrl.value = newBlobUrl()
     state.value = 'ready'
+    // PDF 首次加载也走同一重建路径，保证 #page/#zoom 是文档初始参数
+    if (file.kind === 'pdf') rebuildViewer()
   } catch (err) {
     if (ctrl.signal.aborted) return
     const e = toApiError(err)
@@ -226,6 +275,8 @@ function changePage(v: number | null | undefined) {
   emit('update:page', p)
 }
 
+// 父组件 v-model:page / 工具栏页码 / 缩放变化 → 重建 viewer，实际画面随之跳转
+watch([innerPage, zoom], rebuildViewer)
 watch(() => props.page, (v) => { innerPage.value = v })
 watch([() => props.fileId, () => props.fileName, () => props.expectedSha256], loadSource, { immediate: true })
 
