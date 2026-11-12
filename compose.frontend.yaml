@@ -1,0 +1,25 @@
+name: market-regulation
+services:
+  frontend:
+    image: ${LOCAL_FRONTEND_IMAGE:?需要已构建的前端镜像}
+    pull_policy: never
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    ports:
+      - "127.0.0.1:${LOCAL_FRONTEND_PORT:-8181}:8080"
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=64m,mode=1777
+    healthcheck:
+      test: ["CMD", "python", "-B", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks: [database]
+networks:
+  database:
+    external: true
+    name: ${LOCAL_DATABASE_NETWORK:-market-regulation_default}
