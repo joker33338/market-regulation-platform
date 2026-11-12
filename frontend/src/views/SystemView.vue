@@ -70,6 +70,7 @@
         </el-tag>
         <span class="conn-note">
           OpenAPI 版本 <b>{{ contractMeta.version || '—' }}</b> ·
+          契约名 <b>{{ contractMeta.contractVersion || '未标注' }}</b> ·
           运行期路径数 <b class="num">{{ contractMeta.pathCount }}</b> ·
           探测时间 <b>{{ formatTime(contractMeta.probedAt) }}</b>
         </span>
@@ -77,6 +78,33 @@
       <el-alert type="info" :closable="false" style="margin-top: 12px"
         :title="contractMeta.hint"
         description="匿名 /openapi.json 被后端显式关闭；认证端点 GET /api/openapi.json 需要 Bearer Token。源码分支与离线快照只说明契约已交付，七个页面是否渲染真实数据一律以本探测结果为准；未就绪显示明确异常态，不回退 DEMO。" />
+    </el-card>
+
+    <!-- 当前登录人员：GET /api/auth/me（draft-2 新增，正式 8180 v0.2.2 未提供该接口） -->
+    <el-card shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>当前登录身份 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">
+            GET /api/auth/me · {{ principalState }}
+            <el-button text size="small" type="primary" :loading="identityLoading" @click="refreshIdentity">重新确认</el-button>
+          </span>
+        </div>
+      </template>
+      <el-descriptions v-if="principal" :column="2" border size="small">
+        <el-descriptions-item label="当前登录人员 principal_id">{{ principal.principal_id }}</el-descriptions-item>
+        <el-descriptions-item label="业务数据归属 owner_id">{{ principal.owner_id || '无个人 owner（纯审核身份）' }}</el-descriptions-item>
+        <el-descriptions-item label="角色 roles">{{ principalRoleText }}</el-descriptions-item>
+        <el-descriptions-item label="凭证状态">{{ principal.credential_status }}</el-descriptions-item>
+        <el-descriptions-item label="审核范围 review_owner_scopes" :span="2">{{ principalScopeText }}</el-descriptions-item>
+        <el-descriptions-item label="确认时间" :span="2">{{ formatTime(principalLoadedAt) }}</el-descriptions-item>
+      </el-descriptions>
+      <el-alert v-else type="warning" :closable="false" :title="`身份未确认（${principalState}）`"
+        :description="principalError || 'GET /api/auth/me 未返回有效身份：正式 8180 仍为 v0.2.2（22 路径），该接口只在 draft-2 隔离实例可用。'" />
+      <div class="mr-disabled-hint" style="margin-top: 8px">
+        principal_id 是实际操作者，owner_id 是业务数据归属，两者不能互相推导。USER 无审核写入能力，ADMIN 不隐含 REVIEWER；
+        审核可见与可写范围由后端按 review_owner_scopes 与逐请求授权限定，越界返回 404。旧 owner→writers 授权说明自 draft-2 起不再适用。
+      </div>
     </el-card>
 
     <!-- 组件五态：GET /api/system/health 真实响应 -->
@@ -161,7 +189,8 @@
             </el-table-column>
           </el-table>
           <div class="mr-disabled-hint" style="margin-top: 10px">
-            源码契约依据 0.2.3-dev / frontend-api-v0.2.3-draft-1（29 路径）。运行期是否可用一律以 GET /api/openapi.json 实测路径为准；
+            源码契约依据 0.2.3-dev / frontend-api-v0.2.3-draft-2（30 路径，含 GET /api/auth/me）。draft-1（29 路径）的
+            owner→writers 授权说明已不适用；运行期是否可用一律以 GET /api/openapi.json 实测路径与方法为准，
             未加载时相关功能保持禁用 / 空态，不调用不存在的接口。
           </div>
         </el-tab-pane>
@@ -215,21 +244,23 @@
       <template #header>
         <div class="card-head">
           <span>审核审计摘要 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">GET /api/system/audit-logs · 仅本 owner
+          <span class="card-sub">GET /api/system/audit-logs · 按当前 principal 与审核范围
             <el-button text size="small" type="primary" @click="auditLogs.load()">刷新</el-button>
           </span>
         </div>
       </template>
-      <AsyncPanel :state="auditLogs.state.value" :error="auditLogs.error.value" empty-text="当前 owner 暂无审核事件摘要" @retry="auditLogs.load()">
+      <AsyncPanel :state="auditLogs.state.value" :error="auditLogs.error.value" empty-text="当前身份范围内暂无审核事件摘要" @retry="auditLogs.load()">
         <el-table :data="auditLogs.data.value?.list || []" size="small" max-height="260">
           <el-table-column prop="action" label="动作" width="150" />
           <el-table-column prop="parse_id" label="parse_id" min-width="180" show-overflow-tooltip />
-          <el-table-column prop="operator" label="操作者" width="140" />
+          <el-table-column label="操作者 operator_id" width="180"><template #default="{ row }">{{ identityText(row.operator_id) }}</template></el-table-column>
+          <el-table-column label="文档所属人 owner_id" width="180"><template #default="{ row }">{{ identityText(row.owner_id) }}</template></el-table-column>
+          <el-table-column prop="operator" label="兼容别名" width="150" show-overflow-tooltip />
           <el-table-column prop="version" label="版本" width="80" />
           <el-table-column label="时间" width="180"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
         </el-table>
       </AsyncPanel>
-      <div class="mr-disabled-hint" style="margin-top: 8px">只展示真实审核事件摘要（approve / reject / mark-error / save-revision），不含修订正文；不编造未发生的历史事件。</div>
+      <div class="mr-disabled-hint" style="margin-top: 8px">只展示真实审核事件摘要（approve / reject / mark-error / save-revision），不含修订正文；不编造未发生的历史事件。旧事件 operator_id / owner_id 为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。</div>
     </el-card>
 
     <!-- 无真实 HTTP 数据源的模块：一律空态 -->
@@ -276,6 +307,10 @@ import {
   hasV023Monitoring, hasRuntimeRoutes
 } from '@/api/dataSource'
 import { releaseStatus } from '@/config/release'
+import {
+  principal, principalState, principalError, principalLoadedAt,
+  loadPrincipal, principalRoleText, principalScopeText, identityText
+} from '@/api/principal'
 import type {
   ComponentState, HealthResponse, ProcessResources, AuditLogItem, ListResponse
 } from '@/api/types'
@@ -291,6 +326,16 @@ const store = useAppStore()
 const tokenInput = ref(store.token)
 const apiTab = ref('routes')
 const probing = ref(false)
+
+const identityLoading = ref(false)
+async function refreshIdentity() {
+  identityLoading.value = true
+  try {
+    await loadPrincipal(true)
+  } finally {
+    identityLoading.value = false
+  }
+}
 
 const STATE_COLOR: Record<ComponentState, string> = {
   ONLINE: 'var(--mr-state-online)',
@@ -381,7 +426,7 @@ async function reprobe() {
   probing.value = true
   try {
     await probeContract(true)
-    await health.load()
+    await Promise.all([health.load(), loadPrincipal(true)])
   } finally {
     probing.value = false
   }
@@ -391,6 +436,7 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 
 onMounted(() => {
   if (store.token) void store.probeBackend()
+  if (principalState.value !== 'ready') void loadPrincipal(true)
 })
 </script>
 

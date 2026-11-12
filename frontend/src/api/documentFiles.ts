@@ -4,7 +4,7 @@ import client from './client'
  * 原始文件源适配层（v0.2.2 真实实现）
  *
  * 唯一来源：GET /api/parse/files/{file_id}/source
- *  - 后端按 owner 隔离，校验 SHA256 与字节数，不一致返回 409；支持 Range（206/416）
+ *  - 后端按当前 principal 与业务 owner 范围隔离，校验 SHA256 与字节数，不一致返回 409；支持 Range（206/416）
  *  - 响应头 X-SHA256 为后端计算的真实摘要；不得用 artifact.bin 冒充原始证据
  *  - PDF / 图片 inline、DOCX attachment；后端不提供 Word→PDF 转换
  *

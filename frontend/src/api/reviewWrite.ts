@@ -5,18 +5,24 @@ import type {
 } from './types'
 
 /**
- * v0.2.3 新增接口 —— 唯一依据 docs/integration/frontend-openapi-v023.json
- * （info.version=0.2.3-dev / x-contract-version=frontend-api-v0.2.3-draft-1 / 29 路径）
+ * v0.2.3 审核写入与台账只读接口 —— 唯一依据
+ * docs/integration/frontend-openapi-v023-draft2.json
+ * （info.version=0.2.3-dev / x-contract-version=frontend-api-v0.2.3-draft-2 / 30 路径）
  *
  * 硬边界：
  *  - 源码契约已交付 ≠ 运行期可用。调用方必须先经 dataSource.hasRuntimeRoutes() 判定；
  *    审核写操作还须详情 review_write_supported=true 且 review_ledger.available=true。
- *  - 正式 8180 当前仍是 0.2.2-api-candidate / 22 路径，本模块所有接口在那里都是 404，
- *    因此页面不得提前解锁按钮，也不得以本地状态模拟写入成功。
- *  - 请求只发契约允许的字段；body 公共字段 base_result_id 必须等于路径 parse_id。
- *  - 写操作必带 Idempotency-Key（1–128 字符）：同键同请求返回原回执，同键异请求 409。
+ *  - 正式 8180 当前仍是 0.2.2-api-candidate / 22 路径；本模块接口只应在获准的隔离
+ *    draft-2 实例上调用，不得默认向正式 8180 发起写入（开发代理有写入保护）。
+ *  - 请求只发契约允许的字段；ReviewAction 为 additionalProperties:false。
+ *    绝不在 body 发送 operator_id / owner_id / roles 等身份字段（后端返回 422）。
+ *    base_result_id 必须等于路径 parse_id。
+ *  - 实际操作者由后端按凭证解析的 principal_id 记录并回传 operator_id，
+ *    owner_id 是源文档业务归属；两者由服务端决定，客户端不指定、不推导。
+ *  - 写操作必带 Idempotency-Key（1–128 字符）：draft-2 按 数据owner + principal_id + 客户端键
+ *    隔离；同人同键同请求返回原回执，同人同键异请求 409，不同人复用键不会拿到对方回执。
  *  - 修订正文是人工输入的不可信文本，调用方一律纯文本渲染，禁止 v-html。
- *  - 操作者由 Token→owner 映射决定，客户端不传 operator；不授予发布权限、不创建解析任务。
+ *  - 审核通过不授予发布权限、不修改原始 OCR/原件、不自动创建解析任务。
  */
 function signalOf(signal?: AbortSignal) {
   return signal ? { signal } : {}
@@ -36,6 +42,20 @@ export function newIdempotencyKey(): string {
 
 export type ReviewActionName = 'approve' | 'reject' | 'mark-error' | 'save-revision'
 
+/** 后端 ReviewAction 为 additionalProperties:false；身份字段一律由服务端决定 */
+const FORBIDDEN_BODY_FIELDS = [
+  'operator_id', 'owner_id', 'operator', 'principal_id',
+  'roles', 'role', 'credential_status', 'review_owner_scopes', 'identity_model'
+]
+
+function assertNoIdentityFields(body: ReviewActionBody): void {
+  const hit = Object.keys(body).find((k) => FORBIDDEN_BODY_FIELDS.includes(k))
+  if (hit) {
+    // 不发出请求即可拦截；避免把伪造身份的错误归咎于后端 422
+    throw new Error(`审核写请求禁止携带身份字段 ${hit}：后端按 principal_id 记录操作者，客户端不得自定身份`)
+  }
+}
+
 /**
  * 统一写入出口：调用方传入「已冻结」的 body 快照。
  * 写入结果未确认时，重试必须复用同一 action / parseId / body / Idempotency-Key，
@@ -49,6 +69,7 @@ export function postReviewAction(
   idempotencyKey: string,
   signal?: AbortSignal
 ): Promise<ReviewReceipt> {
+  assertNoIdentityFields(body)
   return client
     .post<ReviewReceipt>(`/api/review/${encodeURIComponent(parseId)}/${action}`, body, {
       headers: { 'Idempotency-Key': idempotencyKey },
@@ -66,8 +87,9 @@ export interface ReviewActionInput {
 }
 
 /**
- * 按 action 构造契约允许的 body 快照（唯一构造点）。
- * 不传契约外字段、不指定 operator；修订正文原样保留前导空格与换行，不 trim。
+ * 按 action 构造契约允许的 body 快照（唯一构造点，白名单字段）。
+ * 不传契约外字段、不发送 operator_id/owner_id/roles 等身份字段；
+ * 修订正文原样保留前导空格与换行，不 trim。
  * 结果未确认的重试必须复用返回的同一个对象，避免同键异请求 409。
  */
 export function makeReviewActionBody(
@@ -144,7 +166,8 @@ export function saveReviewRevision(
 }
 
 /**
- * GET /api/review/{parse_id}/events —— 本对象真实追加事件，owner 隔离。
+ * GET /api/review/{parse_id}/events —— 本对象真实追加事件。
+ * 后端按 principal 与业务 owner 范围限定可见性，越界对象返回 404；前端不本地过滤造假。
  * 原样返回后端结构：body 外层是完整回执，content/reason/page/span 在必填的
  * event.request 内。这里刻意不做扁平映射，避免掩盖层级差异或伪造修订来源。
  */
@@ -168,7 +191,7 @@ export function getProcessResources(signal?: AbortSignal): Promise<ProcessResour
     .then((r) => r.data)
 }
 
-/** GET /api/system/audit-logs —— 仅本 owner 审核摘要，不含修订正文 */
+/** GET /api/system/audit-logs —— 按当前身份与审核范围返回的真实摘要，不含修订正文 */
 export function getAuditLogs(
   q: { page: number; pageSize: number; action?: AuditAction | '' },
   signal?: AbortSignal

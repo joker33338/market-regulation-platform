@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { getToken, setToken, clearToken } from '@/api/client'
 import { getParseInfo } from '@/api/parse'
 import { probeContract, resetContractState } from '@/api/dataSource'
+import { loadPrincipal, clearPrincipal } from '@/api/principal'
 import { releaseStatus } from '@/config/release'
 import type { ComponentState, ParseServiceInfo } from '@/api/types'
 
@@ -31,6 +32,7 @@ export const useAppStore = defineStore('app', () => {
     token.value = ''
     apiOnline.value = 'unknown'
     serviceInfo.value = null
+    clearPrincipal('已清除会话凭证')
     resetContractState()
   }
 
@@ -45,9 +47,10 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /** 同时探测旧服务探活与 v0.2.2 运行期契约；两者结论独立，不互相推断 */
+  /** 探测旧服务探活、运行期契约与当前登录人员；身份最后确认，401/403 广播可清掉旧契约缓存 */
   async function probeAll() {
     await Promise.all([probeBackend(), probeContract(true)])
+    await loadPrincipal(true)
   }
 
   return {

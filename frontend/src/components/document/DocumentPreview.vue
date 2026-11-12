@@ -62,7 +62,7 @@
           <el-button size="small" @click="loadSource">重新加载</el-button>
         </div>
         <p class="dp-note">
-          文件来源唯一：后端 owner 隔离的原始文件接口。不使用 artifact.bin（MinerU 产物）冒充原文，不提供本地选文件预览，不伪造页面或页码。
+          文件来源唯一：后端按当前 principal 与业务 owner 范围隔离的原始文件接口。不使用 artifact.bin（MinerU 产物）冒充原文，不提供本地选文件预览，不伪造页面或页码。
         </p>
       </div>
     </div>

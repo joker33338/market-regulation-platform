@@ -235,7 +235,7 @@
 
       <el-alert type="info" :closable="false" style="margin-top: 14px"
         title="原始文件为只读证据"
-        description="解析结果与原始文件通过后端 SHA256 绑定；下载字节来自 owner 隔离的 /source 接口，前端不修改原始文件、不绕过后端权限。" />
+        description="解析结果与原始文件通过后端 SHA256 绑定；下载字节来自按当前 principal 与业务 owner 范围隔离的 /source 接口，前端不修改原始文件、不绕过后端权限。" />
     </el-drawer>
   </div>
 </template>

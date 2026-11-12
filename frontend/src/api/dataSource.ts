@@ -13,6 +13,10 @@ import type { DataSource } from './types'
  *   - 但活动 8180 实例仍为 v0.2.1 旧镜像，实测新接口全部 404。
  * 因此页面一律以运行期 GET /api/openapi.json 的探测结果为准：
  *   ready → 允许真实数据渲染；其余状态 → AsyncPanel 显示明确异常态 + 重试，绝不回退 DEMO。
+ *
+ * v0.2.3 draft-2（30 路径）补充：新增 GET /api/auth/me 作为当前登录人员的唯一事实来源；
+ * principal_id 与 owner_id 分离，写授权由后端按 REVIEWER 角色 + review_owner_scopes 逐请求判定。
+ * 旧 draft-1 的「Token→owner→writers 名单」说明不再适用于当前契约（历史记录保留原事实）。
  */
 
 export type ContractState =
@@ -26,6 +30,8 @@ export type ContractState =
 export interface ContractMeta {
   probedAt: string
   version: string
+  /** info['x-contract-version']：draft-2 为 frontend-api-v0.2.3-draft-2 */
+  contractVersion: string
   pathCount: number
   hint: string
 }
@@ -35,6 +41,7 @@ export const contractState = ref<ContractState>('unknown')
 export const contractMeta = ref<ContractMeta>({
   probedAt: '',
   version: '',
+  contractVersion: '',
   pathCount: 0,
   hint: '尚未探测运行期接口'
 })
@@ -48,7 +55,8 @@ export const contractLabel = computed<Record<ContractState, string>>(() => ({
   error: '探测失败'
 }))
 
-/** v0.2.3 新增路由（离线契约 29 路径减去 v0.2.2 的 22 路径） */
+/** v0.2.3 新增路由（draft-1 为 29 路径；draft-2 再增 /api/auth/me 共 30 路径） */
+export const V023_IDENTITY_ROUTE = '/api/auth/me'
 export const V023_REVIEW_WRITE_ROUTES = [
   '/api/review/{parse_id}/approve',
   '/api/review/{parse_id}/reject',
@@ -116,6 +124,10 @@ export function hasV023Monitoring(): boolean {
 export function hasV023DocumentFilters(): boolean {
   return hasRuntimeRoutes(['/api/system/resources'])
 }
+/** GET /api/auth/me 是否在活动服务上真实可用（不是离线快照存在与否） */
+export function hasV023Identity(): boolean {
+  return hasRuntimeRoutes([V023_IDENTITY_ROUTE])
+}
 
 let inflight: Promise<ContractState> | null = null
 
@@ -126,7 +138,7 @@ export function probeContract(force = false): Promise<ContractState> {
     if (!hasToken()) {
       contractState.value = 'no-permission'
       contractMeta.value = {
-        probedAt: new Date().toISOString(), version: '', pathCount: 0,
+        probedAt: new Date().toISOString(), version: '', contractVersion: '', pathCount: 0,
         hint: '未配置 API Token，所有 /api/* 请求会被后端拒绝（401）。请在系统监控页配置会话凭证。'
       }
       return contractState.value
@@ -141,6 +153,7 @@ export function probeContract(force = false): Promise<ContractState> {
       contractMeta.value = {
         probedAt: new Date().toISOString(),
         version: doc?.info?.version || '',
+        contractVersion: doc?.info?.['x-contract-version'] || '',
         pathCount: paths.length,
         hint: hasNewRoutes
           ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}`
@@ -154,7 +167,7 @@ export function probeContract(force = false): Promise<ContractState> {
           : e.kind === 'outdated' || e.kind === 'not-found' ? 'outdated'
             : e.kind === 'unavailable' ? 'unavailable' : 'error'
       contractMeta.value = {
-        probedAt: new Date().toISOString(), version: '', pathCount: 0, hint: e.hint
+        probedAt: new Date().toISOString(), version: '', contractVersion: '', pathCount: 0, hint: e.hint
       }
     }
     return contractState.value
@@ -172,7 +185,7 @@ export function resetContractState() {
   contractState.value = 'unknown'
   runtimePaths.value = []
   runtimeMethodPaths.value = []
-  contractMeta.value = { probedAt: '', version: '', pathCount: 0, hint: '已重置，等待重新探测' }
+  contractMeta.value = { probedAt: '', version: '', contractVersion: '', pathCount: 0, hint: '已重置，等待重新探测' }
 }
 
 /** 写操作 / 未实现能力的统一禁用说明 */
@@ -274,7 +287,7 @@ export function isDemo(_key: CapabilityKey): boolean {
 }
 
 export const MISSING_CAPABILITIES: MissingCapability[] = [
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'v0.2.3 源码契约已交付；运行期未加载路由或当前 owner 未获写授权时保持禁用，绝不本地假成功' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'draft-2 源码契约已交付；运行期未加载路由、当前 principal 无 REVIEWER 角色、目标 owner 不在后端审核范围，或详情双门控未通过时保持禁用，绝不本地假成功' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '同上：双门控（运行期路径 + 详情 review_write_supported / review_ledger.available）' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '同上：必填 reason 与真实 page，失败按 409/422/403/503 明确提示' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '同上：修订正文按不可信纯文本渲染，不覆盖原始解析结果' },
@@ -285,8 +298,9 @@ export const MISSING_CAPABILITIES: MissingCapability[] = [
   { priority: 'P1', api: 'DELETE /api/documents/{file_id}', usage: '文档删除（单行 / 多选批量）', impact: 'v0.2.2 与 v0.2.3 契约均只声明 GET，原始证据只读；前端多选可用，删除按钮按运行期方法级门控保持禁用，不做本地假删除' }
 ]
 
-/** v0.2.3 相对 v0.2.2 新增的 7 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */
+/** v0.2.3 draft-2 相对 v0.2.2 新增的 8 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */
 export const CONTRACT_ROUTES_V023: ContractRoute[] = [
+  { method: 'GET', path: '/api/auth/me', page: '全局身份（当前登录人员）', group: 'new' },
   { method: 'POST', path: '/api/review/{parse_id}/approve', page: '审核中心（审核通过）', group: 'new' },
   { method: 'POST', path: '/api/review/{parse_id}/reject', page: '审核中心（退回）', group: 'new' },
   { method: 'POST', path: '/api/review/{parse_id}/mark-error', page: '审核中心（标记错误）', group: 'new' },

@@ -300,15 +300,41 @@ export interface HealthResponse {
 
 export interface RuntimeOpenApi {
   openapi: string
-  info: { title?: string; version?: string }
+  info: { title?: string; version?: string; 'x-contract-version'?: string }
   paths: Record<string, unknown>
 }
 
-/* ─────────────── v0.2.3 审核台账与监控 ───────────────
- * 依据 docs/integration/frontend-openapi-v023.json（0.2.3-dev / frontend-api-v0.2.3-draft-1，29 路径）。
- * 源码契约已交付 ≠ 运行期可用：所有调用方必须先经 hasRuntimeRoutes() 门控，
- * 且审核写操作还要求详情 review_write_supported=true 与 review_ledger.available=true。
+/* ─────────────── v0.2.3 draft-2 身份、审核台账与监控 ───────────────
+ * 依据 docs/integration/frontend-openapi-v023-draft2.json
+ * （info.version=0.2.3-dev / x-contract-version=frontend-api-v0.2.3-draft-2 / 30 路径）。
+ * 相对 draft-1 的关键变化：新增 GET /api/auth/me；principal_id（实际登录人员）
+ * 与 owner_id（业务数据归属）分离；roles 为 USER/REVIEWER/ADMIN，ADMIN 不隐含 REVIEWER；
+ * 写授权由 review_owner_scopes + 后端逐请求校验决定，旧 owner→writers 说明已不适用。
+ * 源码契约已交付 ≠ 运行期可用：调用方必须先经 hasRuntimeRoutes() 门控，
+ * 审核写操作还要求详情 review_write_supported=true 且 review_ledger.available=true。
  * ------------------------------------------------------------------ */
+
+export type PrincipalRole = 'USER' | 'REVIEWER' | 'ADMIN'
+export type CredentialStatus = 'active' | 'disabled' | 'revoked'
+
+/** GET /api/auth/me：当前凭证对应的不可变身份快照；五个字段全部必填且不返回凭证 */
+export interface PrincipalInfo {
+  principal_id: string
+  /** 业务数据归属，可为 null（纯审核员无个人 owner）；不等于实际操作者 */
+  owner_id: string | null
+  roles: PrincipalRole[]
+  /** 允许审核写入的目标 owner 白名单；非空也不代表已获写授权，仍以后端逐请求校验为准 */
+  review_owner_scopes: string[]
+  credential_status: CredentialStatus
+}
+
+/** 身份字段在 draft-2 的回执/事件里可为 null：旧事件不补认具体人员 */
+export interface ReviewIdentityFields {
+  operator_id?: string | null
+  owner_id?: string | null
+  /** principal-v1 = 新身份模型；legacy-owner = 历史 owner 别名，前端不得推导人员 */
+  identity_model?: string
+}
 
 /** GET /api/review/{parse_id} 的台账摘要；requires_review 是 OCR 来源信号，不能推导台账状态 */
 export interface ReviewLedger {
@@ -332,11 +358,12 @@ export interface ReviewActionBody {
 }
 
 /** 200 回执：write_performed 为真实写入结果，前端不自行判定成功 */
-export interface ReviewReceipt {
+export interface ReviewReceipt extends ReviewIdentityFields {
   event_id: string
   parse_id: string
   base_result_id: string
   action: string
+  /** 兼容别名（旧事件为历史 owner 值）；实际操作者以 operator_id 为准 */
   operator: string
   timestamp: string
   version: number
@@ -356,11 +383,12 @@ export interface ReviewReceipt {
  * 正文 content / 理由 reason / 页码 page / span 只在 request 内，顶层没有这些字段。
  * 前端不做扁平映射、不从顶层猜字段、不伪造修订；修订正文一律按不可信纯文本渲染。
  */
-export interface ReviewEvent {
+export interface ReviewEvent extends ReviewIdentityFields {
   event_id: string
   parse_id: string
   base_result_id: string
   action: string
+  /** 兼容别名；operator_id 为 null 时如实显示「未知（历史记录）」，不把 owner 补认成人员 */
   operator: string
   timestamp: string
   version: number
@@ -388,11 +416,12 @@ export interface ProcessResources {
   threads: number | null
 }
 
-/** GET /api/system/audit-logs：仅本 owner 审核摘要，不含修订正文 */
-export interface AuditLogItem {
+/** GET /api/system/audit-logs：按当前身份与审核范围返回的真实摘要，不含修订正文 */
+export interface AuditLogItem extends ReviewIdentityFields {
   event_id: string
   parse_id?: string
   action: string
+  /** 兼容别名；新事件以 operator_id / owner_id 展示实际操作者与文档所属人 */
   operator?: string
   timestamp: string
   version?: number

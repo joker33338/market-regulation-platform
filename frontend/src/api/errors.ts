@@ -21,6 +21,7 @@ export type ApiErrorKind =
 
 /** 新增接口标记：这些路径 404 说明活动实例未加载 v0.2.2 路由，而非业务对象不存在 */
 const NEW_API_MARKERS = [
+  '/api/auth/me',
   '/api/documents',
   '/api/review',
   '/api/knowledge/',
@@ -72,10 +73,10 @@ function hintOf(status: number, kind: ApiErrorKind, code: string): string {
   switch (kind) {
     case 'no-permission':
       return status === 401
-        ? `API Token 无效或未认证${suffix}，请在系统监控页配置有效会话凭证`
-        : `无权访问该资源${suffix}，后端按 owner 隔离，跨用户访问返回 404`
+        ? `凭证无效、被停用/撤销或未认证${suffix}，请在系统监控页配置有效会话凭证`
+        : `无权访问（HTTP 403）${suffix}：当前 principal 无该操作权限，或目标不在 REVIEWER 审核范围`
     case 'outdated':
-      return `接口不存在（HTTP 404）${suffix}：活动 8180 实例可能仍是 v0.2.1 旧镜像，未加载 v0.2.2 契约路由`
+      return `接口不存在（HTTP 404）${suffix}：活动实例未加载该契约路由（正式 8180 仍为 v0.2.2 / 22 路径）`
     case 'unavailable':
       return status === 0
         ? '无法连接后端服务，请确认 8180 端口与 Vite 代理可用'

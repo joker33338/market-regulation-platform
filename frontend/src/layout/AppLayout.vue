@@ -61,11 +61,16 @@
           <el-dropdown>
             <span class="user-chip">
               <el-icon><UserFilled /></el-icon>
-              {{ store.token ? '审核员' : '未配置 Token' }}
+              {{ identityChip }}
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item disabled>当前登录人员：{{ principalIdText }}</el-dropdown-item>
+                <el-dropdown-item disabled>业务数据归属：{{ principalOwnerText }}</el-dropdown-item>
+                <el-dropdown-item disabled>角色：{{ principalRoleText }}</el-dropdown-item>
+                <el-dropdown-item disabled>审核范围：{{ principalScopeText }}</el-dropdown-item>
+                <el-dropdown-item divided @click="refreshIdentity">重新确认身份（GET /api/auth/me）</el-dropdown-item>
                 <el-dropdown-item @click="goSystem">API Token 配置</el-dropdown-item>
                 <el-dropdown-item divided @click="logout">清除 Token</el-dropdown-item>
               </el-dropdown-menu>
@@ -89,12 +94,30 @@ import {
 } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { releaseStatus } from '@/config/release'
+import {
+  principal, principalState, loadPrincipal,
+  principalRoleText, principalOwnerText, principalScopeText
+} from '@/api/principal'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 
 const activePath = computed(() => route.path)
+
+/** 顶栏只展示后端确认的当前登录人员与角色，不再把 owner 显示成「审核员」 */
+const identityChip = computed(() => {
+  if (!store.token) return '未配置 Token'
+  if (principalState.value === 'ready' && principal.value) {
+    return `${principal.value.principal_id} · ${principalRoleText.value}`
+  }
+  return '身份未确认'
+})
+const principalIdText = computed(() => principal.value?.principal_id || '未确认')
+
+function refreshIdentity() {
+  void loadPrincipal(true)
+}
 
 const backendLabel = computed(() => {
   if (store.apiOnline === 'online') return '在线'
@@ -118,7 +141,10 @@ function logout() {
 }
 
 onMounted(() => {
-  if (store.token) store.probeBackend()
+  if (!store.token) return
+  store.probeBackend()
+  // 页面刷新后重新向后端确认身份；不使用任何本地缓存的旧角色/范围
+  if (principalState.value !== 'ready') void loadPrincipal(true)
 })
 </script>
 
