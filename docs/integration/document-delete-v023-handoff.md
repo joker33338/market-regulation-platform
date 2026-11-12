@@ -2,6 +2,8 @@
 
 日期：2026-11-12。状态：**BACKEND_API_PARTIAL，待 QA 独立验收**。未切换 8180，未写正式数据库或正式授权配置。
 
+本页保留首轮交接记录；QA_BLOCKED 后补充的真实 PG、浏览器和 pytest 证据见 [证据补齐报告](document-delete-v023-evidence-followup.md)。候选镜像和业务源码仍冻结于本页记录的版本，补验证据不等于 QA 签发通过。
+
 ## 契约与授权
 
 `DELETE /api/documents/{file_id}`，无请求体、无 Idempotency-Key。file_id 为 32 位小写十六进制上传 ID。HTTPBearer 认证；使用现有凭证到 principal/owner 的私密映射，不输出凭证或配置。
@@ -44,7 +46,7 @@
 - qa_core/api/document_delete.py、principals.py、frontend.py、contracts.py、common.py：接口、显式授权、契约与列表/详情一致性。
 - qa_core/api/read_store.py：只读引用核查。
 - qa_core/storage/document_lifecycle.py：生命周期锁与隔离元数据。
-- qa_core/storage/db.py、qa_core/document_parsing/mineru_service.py：入库及任务入口共享锁、防止重新引用归档上传。
+- qa_core/storage/database.py、qa_core/document_parsing/mineru_service.py：入库及任务入口共享锁、防止重新引用归档上传。
 - tests/test_document_delete.py、tests/check_document_delete_http.py：合成数据回归和真实 HTTP 探针。
 - docs/integration/frontend-openapi-v023-draft3.json 及本交接说明。
 
