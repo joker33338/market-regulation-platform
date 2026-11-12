@@ -113,6 +113,7 @@
         :loading="list.loading.value"
         :state="list.state.value"
         :error="list.error.value"
+        empty-text="当前筛选条件下没有解析任务（后端返回空列表）"
         @query="onQuery"
         @retry="list.load()"
       >
@@ -130,11 +131,6 @@
               <el-button text size="small" :disabled="isTerminalStatus(String(row.status))" @click="retryById(String(row.taskId))">重试</el-button>
             </template>
           </el-table-column>
-        </template>
-        <template #empty>
-          <el-empty :image-size="70" description="当前筛选条件下没有解析任务（后端返回空列表）">
-            <el-button size="small" @click="list.load()">刷新</el-button>
-          </el-empty>
         </template>
       </MrProTable>
     </el-card>

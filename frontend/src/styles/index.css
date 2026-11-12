@@ -217,6 +217,13 @@ body {
   color: var(--mr-text-3);
   font-size: 13px;
 }
+/* 列表空态操作：刷新 + 返回（返回＝清空筛选回到全部数据） */
+.mr-empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 
 /* 1920 大屏限宽 / 1366 笔记本收缩 */
 @media (min-width: 1800px) {
