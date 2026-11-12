@@ -48,6 +48,47 @@ export const contractLabel = computed<Record<ContractState, string>>(() => ({
   error: '探测失败'
 }))
 
+/** v0.2.3 新增路由（离线契约 29 路径减去 v0.2.2 的 22 路径） */
+export const V023_REVIEW_WRITE_ROUTES = [
+  '/api/review/{parse_id}/approve',
+  '/api/review/{parse_id}/reject',
+  '/api/review/{parse_id}/mark-error',
+  '/api/review/{parse_id}/save-revision'
+] as const
+export const V023_READ_ROUTES = [
+  '/api/review/{parse_id}/events',
+  '/api/system/resources',
+  '/api/system/audit-logs'
+] as const
+
+/** 运行期 OpenAPI 实际返回的路径；源码里存在某接口不等于活动服务已加载 */
+export const runtimePaths = ref<string[]>([])
+
+/** 纯粹的路径集合比对，不依赖探测状态（供 probeContract 内部使用） */
+function pathsInclude(required: readonly string[], paths: string[]): boolean {
+  return required.every((path) => paths.includes(path))
+}
+
+/** 所有入参路径都必须在运行期 OpenAPI 中出现，才允许启用对应能力 */
+export function hasRuntimeRoutes(required: readonly string[]): boolean {
+  if (contractState.value !== 'ready' || runtimePaths.value.length === 0) return false
+  return pathsInclude(required, runtimePaths.value)
+}
+
+export function hasV023ReviewWriteRoutes(): boolean {
+  return hasRuntimeRoutes(V023_REVIEW_WRITE_ROUTES)
+}
+export function hasV023ReviewEvents(): boolean {
+  return hasRuntimeRoutes(['/api/review/{parse_id}/events'])
+}
+export function hasV023Monitoring(): boolean {
+  return hasRuntimeRoutes(['/api/system/resources', '/api/system/audit-logs'])
+}
+/** 文档筛选新参数没有独立路径，用同批新增的监控路由作为 v0.2.3 运行期标记 */
+export function hasV023DocumentFilters(): boolean {
+  return hasRuntimeRoutes(['/api/system/resources'])
+}
+
 let inflight: Promise<ContractState> | null = null
 
 /** 运行期能力探测；并发调用共用同一 Promise，避免页面切换重复请求 */
@@ -66,12 +107,14 @@ export function probeContract(force = false): Promise<ContractState> {
       const doc = await getRuntimeOpenApi()
       const paths = doc && typeof doc === 'object' && doc.paths ? Object.keys(doc.paths) : []
       const hasNewRoutes = paths.includes('/api/documents') && paths.includes('/api/system/health')
+      runtimePaths.value = paths
+      const hasV023 = pathsInclude(V023_REVIEW_WRITE_ROUTES, paths)
       contractMeta.value = {
         probedAt: new Date().toISOString(),
         version: doc?.info?.version || '',
         pathCount: paths.length,
         hint: hasNewRoutes
-          ? `运行期 OpenAPI 返回 ${paths.length} 条路径，v0.2.2 契约已加载`
+          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}`
           : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像`
       }
       contractState.value = hasNewRoutes ? 'ready' : 'outdated'
@@ -98,6 +141,7 @@ export function isContractReady(): boolean {
 
 export function resetContractState() {
   contractState.value = 'unknown'
+  runtimePaths.value = []
   contractMeta.value = { probedAt: '', version: '', pathCount: 0, hint: '已重置，等待重新探测' }
 }
 
@@ -200,12 +244,23 @@ export function isDemo(_key: CapabilityKey): boolean {
 }
 
 export const MISSING_CAPABILITIES: MissingCapability[] = [
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: '审核中心「审核通过」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '审核中心「退回」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '审核中心「标记错误」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '审核中心「保存修订」按钮禁用' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'v0.2.3 源码契约已交付；运行期未加载路由或当前 owner 未获写授权时保持禁用，绝不本地假成功' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '同上：双门控（运行期路径 + 详情 review_write_supported / review_ledger.available）' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '同上：必填 reason 与真实 page，失败按 409/422/403/503 明确提示' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '同上：修订正文按不可信纯文本渲染，不覆盖原始解析结果' },
   { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: '入库页「发起入库批次」禁用' },
   { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: '入库页不开放发布/回滚' },
   { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: '解析中心日志仅能展示 public(task) 真实字段' },
-  { priority: 'P1', api: 'GET /api/system/resources、/api-logs、/error-logs、/audit-logs', usage: '资源与三类日志', impact: '系统监控相关卡片显示「未接入」空态' }
+  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: '仍无真实持久化事件来源，系统监控保持「未接入」空态，不编造历史事件' }
+]
+
+/** v0.2.3 相对 v0.2.2 新增的 7 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */
+export const CONTRACT_ROUTES_V023: ContractRoute[] = [
+  { method: 'POST', path: '/api/review/{parse_id}/approve', page: '审核中心（审核通过）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/reject', page: '审核中心（退回）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/mark-error', page: '审核中心（标记错误）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/save-revision', page: '审核中心（保存修订）', group: 'new' },
+  { method: 'GET', path: '/api/review/{parse_id}/events', page: '审核中心（台账事件）', group: 'new' },
+  { method: 'GET', path: '/api/system/resources', page: '系统监控（API 进程资源）', group: 'new' },
+  { method: 'GET', path: '/api/system/audit-logs', page: '系统监控（审核审计摘要）', group: 'new' }
 ]

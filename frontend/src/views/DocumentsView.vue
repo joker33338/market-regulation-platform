@@ -13,7 +13,9 @@
 
     <el-alert type="info" :closable="false" class="contract-note"
       title="筛选与列表均以后端契约为准"
-      description="GET /api/documents 仅支持 page、page_size、keyword、status、doc_type；后端明确不支持时间区间与任意排序，故本页不提供这两个筛选器，也不向后端发送额外字段。SHA256、状态、解析次数、上传时间来源标记均由后端返回。" />
+      :description="v023Filters
+        ? '运行期已加载 v0.2.3 查询能力：除 page / page_size / keyword / status / doc_type 外，支持 date_from / date_to（必须带时区的闭区间）与 sort_by / order 白名单排序（同值按 file_id 稳定分页）。高级筛选只发契约允许字段，非法区间与非法排序由后端返回 422。'
+        : '当前运行期契约仅支持 page、page_size、keyword、status、doc_type；v0.2.3 的日期区间与排序参数未加载，故本页不提供这两个筛选器，也不向后端发送额外字段。SHA256、状态、解析次数、上传时间来源标记均由后端返回。'" />
 
     <!-- 上传区：POST /api/parse/files，body 为原始二进制流 -->
     <el-card shadow="never" class="upload-card">
@@ -83,6 +85,26 @@
           <span class="card-sub">数据源：{{ listSource }}</span>
         </div>
       </template>
+      <!-- v0.2.3 高级筛选：只在运行期契约确认具备 date_from/date_to/sort_by/order 时出现 -->
+      <div v-if="v023Filters" class="advanced-filter">
+        <span class="af-label">上传时间（闭区间 · 自动带时区）</span>
+        <el-date-picker v-model="dateRange" type="datetimerange" size="small"
+          start-placeholder="开始时间" end-placeholder="结束时间" style="width: 350px" />
+        <span class="af-label">排序字段</span>
+        <el-select v-model="sortBy" size="small" placeholder="默认 uploaded_at" style="width: 150px">
+          <el-option label="上传时间" value="uploaded_at" />
+          <el-option label="文件名" value="file_name" />
+          <el-option label="文件大小" value="size_bytes" />
+          <el-option label="状态" value="status" />
+        </el-select>
+        <el-select v-model="order" size="small" style="width: 100px">
+          <el-option label="降序" value="desc" />
+          <el-option label="升序" value="asc" />
+        </el-select>
+        <el-button size="small" type="primary" @click="applyAdvanced">应用</el-button>
+        <el-button size="small" @click="resetAdvanced">重置</el-button>
+      </div>
+
       <MrProTable
         :columns="columns"
         :rows="tableRows"
@@ -185,7 +207,7 @@ import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { hasToken } from '@/api/client'
 import { apiErrorHint, notifyApiError } from '@/api/errors'
-import { contractState, contractLabel } from '@/api/dataSource'
+import { contractState, contractLabel, hasV023DocumentFilters } from '@/api/dataSource'
 import { downloadSourceFile } from '@/api/documentFiles'
 import { getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
 import { uploadFile, createParseTask, UPLOAD_LIMIT_BYTES, UPLOAD_ALLOWED_EXT, MAX_FILES_PER_TASK } from '@/api/parse'
@@ -199,6 +221,31 @@ const contractTagType = computed(() => (contractState.value === 'ready' ? 'succe
 /* ───────── 真实文档列表（受控 MrProTable） ───────── */
 const query = ref<DocumentQuery>({ page: 1, pageSize: 20, keyword: '', status: '', docType: '' })
 const list = useAsyncData<DocumentList>((signal) => listDocuments(query.value, signal), { immediate: false })
+
+/* v0.2.3 高级筛选：运行期契约未加载时不渲染控件，也不发 date_from/date_to/sort_by/order */
+const v023Filters = computed(() => hasV023DocumentFilters())
+const dateRange = ref<Date[] | null>(null)
+const sortBy = ref<DocumentQuery['sortBy']>('')
+const order = ref<DocumentQuery['order']>('')
+function applyAdvanced() {
+  const d = dateRange.value
+  query.value = {
+    ...query.value,
+    page: 1,
+    dateFrom: d?.[0] ? new Date(d[0]).toISOString() : '',
+    dateTo: d?.[1] ? new Date(d[1]).toISOString() : '',
+    sortBy: sortBy.value,
+    order: order.value
+  }
+  void list.load()
+}
+function resetAdvanced() {
+  dateRange.value = null
+  sortBy.value = ''
+  order.value = ''
+  query.value = { ...query.value, page: 1, dateFrom: '', dateTo: '', sortBy: '', order: '' }
+  void list.load()
+}
 
 const tableRows = computed(() => (list.data.value?.list || []) as unknown as Record<string, unknown>[])
 const tableTotal = computed(() => list.data.value?.total || 0)
@@ -228,7 +275,11 @@ function onQuery(q: MrQuery) {
     pageSize: q.pageSize,
     keyword: String(q.search.file_name || ''),
     status: String(q.search.status || ''),
-    docType: (String(q.search.doc_type || '') || '') as DocumentQuery['docType']
+    docType: (String(q.search.doc_type || '') || '') as DocumentQuery['docType'],
+    dateFrom: v023Filters.value ? query.value.dateFrom : undefined,
+    dateTo: v023Filters.value ? query.value.dateTo : undefined,
+    sortBy: v023Filters.value ? query.value.sortBy : undefined,
+    order: v023Filters.value ? query.value.order : undefined
   }
   void list.load()
 }
@@ -429,4 +480,10 @@ async function createTaskFor(row: RealUpload) {
 .queue-msg { flex-basis: 100%; font-size: 12px; color: var(--mr-st-danger); }
 .sha { font-size: 12px; word-break: break-all; color: var(--mr-text-2); }
 .drawer-pager { margin-top: 10px; display: flex; justify-content: flex-end; }
+/* v0.2.3 高级筛选：仅运行期契约确认具备参数时才渲染 */
+.advanced-filter {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 0 14px; margin-bottom: 4px; border-bottom: 1px dashed var(--mr-line);
+}
+.af-label { font-size: 12px; color: var(--mr-text-2); flex-shrink: 0; }
 </style>

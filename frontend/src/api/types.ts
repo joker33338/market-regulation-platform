@@ -129,6 +129,12 @@ export interface DocumentQuery extends PageQuery {
   keyword?: string
   status?: string
   docType?: 'pdf' | 'docx' | 'image' | ''
+  /** v0.2.3：ISO 8601 且必须带时区；仅运行期契约具备 date_from/date_to 时才发送 */
+  dateFrom?: string
+  dateTo?: string
+  /** v0.2.3 白名单，后端不接受其它值 */
+  sortBy?: 'uploaded_at' | 'file_name' | 'size_bytes' | 'status' | ''
+  order?: 'asc' | 'desc' | ''
 }
 
 /* ─────────────── 新增：任务列表 ─────────────── */
@@ -185,8 +191,10 @@ export interface ReviewDetail {
   /** 本地 checkpoint 未保留或身份无法核验时为 null，不得伪造对照 */
   local_candidate: Record<string, unknown> | null
   local_candidate_available: boolean
-  /** 后端恒为 false：正式审核写入未实现，四个写按钮必须禁用 */
+  /** v0.2.3 起由后端按台账可用性 + owner 写授权动态返回；v0.2.2 恒为 false */
   review_write_supported: boolean
+  /** v0.2.3 审核台账；v0.2.2 无此字段，前端按缺失处理，不推断为可用 */
+  review_ledger?: ReviewLedger | null
 }
 
 /* ─────────────── 新增：Chunk 预览 / 知识库版本 ─────────────── */
@@ -270,6 +278,8 @@ export interface StatsResponse {
     available: boolean
     total: number | null
     requires_review: number | null
+    /** v0.2.3：不可用时后端给出原因，成功为 null；不得把不可用显示成 0 */
+    reason?: string | null
   }
   recent_tasks: ParseTask[]
 }
@@ -293,6 +303,93 @@ export interface RuntimeOpenApi {
   info: { title?: string; version?: string }
   paths: Record<string, unknown>
 }
+
+/* ─────────────── v0.2.3 审核台账与监控 ───────────────
+ * 依据 docs/integration/frontend-openapi-v023.json（0.2.3-dev / frontend-api-v0.2.3-draft-1，29 路径）。
+ * 源码契约已交付 ≠ 运行期可用：所有调用方必须先经 hasRuntimeRoutes() 门控，
+ * 且审核写操作还要求详情 review_write_supported=true 与 review_ledger.available=true。
+ * ------------------------------------------------------------------ */
+
+/** GET /api/review/{parse_id} 的台账摘要；requires_review 是 OCR 来源信号，不能推导台账状态 */
+export interface ReviewLedger {
+  available: boolean
+  reason?: string | null
+  version: number
+  status: 'unreviewed' | 'pending' | 'flagged' | 'rejected' | 'approved' | string
+  current_revision?: string | null
+}
+
+/** POST /api/review/{parse_id}/approve|reject|mark-error|save-revision 的公共 body */
+export interface ReviewActionBody {
+  /** 必须等于路径 parse_id；后端拒绝不一致 */
+  base_result_id: string
+  /** 首次 0，之后取详情 review_ledger.version；并发/源变更返回 409 */
+  expected_version: number
+  reason?: string
+  page?: number | null
+  content?: string | null
+  span?: string | null
+}
+
+/** 200 回执：write_performed 为真实写入结果，前端不自行判定成功 */
+export interface ReviewReceipt {
+  event_id: string
+  parse_id: string
+  base_result_id: string
+  action: string
+  operator: string
+  timestamp: string
+  version: number
+  revision_id: string | null
+  status: string
+  before: Record<string, unknown>
+  write_performed: boolean
+  original_result_modified: boolean
+  publish_authorized: boolean
+  reparse_task_created: boolean
+}
+
+/** GET /api/review/{parse_id}/events 的真实追加事件；修订正文按不可信纯文本渲染 */
+export interface ReviewEvent {
+  event_id: string
+  parse_id: string
+  action: string
+  operator: string
+  timestamp: string
+  version: number
+  status?: string
+  revision_id?: string | null
+  reason?: string | null
+  page?: number | null
+  content?: string | null
+  [key: string]: unknown
+}
+
+/** GET /api/system/resources：仅 API 进程真实指标，不是宿主机/GPU/利用率 */
+export interface ProcessResources {
+  available: boolean
+  reason?: string | null
+  scope?: string
+  sampled_at: string
+  memory_rss_bytes: number | null
+  cpu_user_seconds: number | null
+  cpu_system_seconds: number | null
+  uptime_seconds: number | null
+  threads: number | null
+}
+
+/** GET /api/system/audit-logs：仅本 owner 审核摘要，不含修订正文 */
+export interface AuditLogItem {
+  event_id: string
+  parse_id?: string
+  action: string
+  operator?: string
+  timestamp: string
+  version?: number
+  [key: string]: unknown
+}
+
+export type AuditAction = 'approve' | 'reject' | 'mark-error' | 'save-revision'
 
 /* ─────────────── UI 状态枚举 ─────────────── */
 

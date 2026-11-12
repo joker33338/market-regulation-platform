@@ -122,7 +122,7 @@
         <div class="card-head">
           <span>接口接入状态总览 <span class="real-badge">REAL</span></span>
           <span class="card-sub">
-            契约 {{ CONTRACT_ROUTES.length }} 行 · 明确不支持 {{ MISSING_CAPABILITIES.length }} 组 ·
+            契约 {{ CONTRACT_ROUTES.length }} 行 · v0.2.3 新增 {{ CONTRACT_ROUTES_V023.length }} 行 · 明确不支持 {{ MISSING_CAPABILITIES.length }} 组 ·
             {{ releaseStatus.apiContractReview }}
           </span>
         </div>
@@ -149,6 +149,22 @@
             </el-table-column>
           </el-table>
         </el-tab-pane>
+        <el-tab-pane :label="`v0.2.3 新增（${CONTRACT_ROUTES_V023.length}）`" name="v023">
+          <el-table :data="CONTRACT_ROUTES_V023" size="small">
+            <el-table-column prop="method" label="方法" width="100" />
+            <el-table-column prop="path" label="路径" min-width="300" show-overflow-tooltip />
+            <el-table-column prop="page" label="使用页面" min-width="220" show-overflow-tooltip />
+            <el-table-column label="运行期" width="130">
+              <template #default="{ row }">
+                <span :class="runtimeHas(row.path) ? 'run-ready' : 'run-pending'">{{ runtimeHas(row.path) ? '已加载' : '未加载' }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="mr-disabled-hint" style="margin-top: 10px">
+            源码契约依据 0.2.3-dev / frontend-api-v0.2.3-draft-1（29 路径）。运行期是否可用一律以 GET /api/openapi.json 实测路径为准；
+            未加载时相关功能保持禁用 / 空态，不调用不存在的接口。
+          </div>
+        </el-tab-pane>
         <el-tab-pane :label="`明确不支持（${MISSING_CAPABILITIES.length}）`" name="missing">
           <el-table :data="MISSING_CAPABILITIES" size="small">
             <el-table-column label="优先级" width="90">
@@ -169,6 +185,53 @@
       </div>
     </el-card>
 
+    <!-- v0.2.3：API 进程真实资源 + 审核审计摘要（仅运行期契约加载后才请求） -->
+    <el-card v-if="v023Monitoring" shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>API 进程资源 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">GET /api/system/resources · scope=api_process
+            <el-button text size="small" type="primary" @click="resources.load()">刷新采样</el-button>
+          </span>
+        </div>
+      </template>
+      <AsyncPanel :state="resources.state.value" :error="resources.error.value" empty-text="后端未返回资源采样" @retry="resources.load()">
+        <el-alert v-if="resources.data.value && !resources.data.value.available" type="warning" :closable="false"
+          :title="`采样不可用：${resources.data.value.reason || '后端未给出原因'}`"
+          description="失败时后端返回 available=false 与 null 指标，前端不把不可用伪装成 0 或正常。" />
+        <el-descriptions v-else-if="resources.data.value" :column="3" border size="small">
+          <el-descriptions-item label="memory_rss_bytes">{{ resources.data.value.memory_rss_bytes ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="cpu_user_seconds">{{ resources.data.value.cpu_user_seconds ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="cpu_system_seconds">{{ resources.data.value.cpu_system_seconds ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="uptime_seconds">{{ resources.data.value.uptime_seconds ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="threads">{{ resources.data.value.threads ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="sampled_at">{{ formatTime(resources.data.value.sampled_at) }}</el-descriptions-item>
+        </el-descriptions>
+      </AsyncPanel>
+      <div class="mr-disabled-hint" style="margin-top: 8px">仅 API 进程真实采样：累计 CPU 秒不是利用率，不含宿主机、容器整体、GPU 或模型推理监控。</div>
+    </el-card>
+
+    <el-card v-if="v023Monitoring" shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>审核审计摘要 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">GET /api/system/audit-logs · 仅本 owner
+            <el-button text size="small" type="primary" @click="auditLogs.load()">刷新</el-button>
+          </span>
+        </div>
+      </template>
+      <AsyncPanel :state="auditLogs.state.value" :error="auditLogs.error.value" empty-text="当前 owner 暂无审核事件摘要" @retry="auditLogs.load()">
+        <el-table :data="auditLogs.data.value?.list || []" size="small" max-height="260">
+          <el-table-column prop="action" label="动作" width="150" />
+          <el-table-column prop="parse_id" label="parse_id" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="operator" label="操作者" width="140" />
+          <el-table-column prop="version" label="版本" width="80" />
+          <el-table-column label="时间" width="180"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+        </el-table>
+      </AsyncPanel>
+      <div class="mr-disabled-hint" style="margin-top: 8px">只展示真实审核事件摘要（approve / reject / mark-error / save-revision），不含修订正文；不编造未发生的历史事件。</div>
+    </el-card>
+
     <!-- 无真实 HTTP 数据源的模块：一律空态 -->
     <div class="card-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 16px">
       <el-card v-for="m in missingModules" :key="m.title" shadow="never">
@@ -179,11 +242,11 @@
       </el-card>
     </div>
 
-    <el-card shadow="never" style="margin-top: 16px">
-      <template #header><div class="card-head"><span>操作审计日志</span><span class="card-sub">后端未实现审计写入与查询接口</span></div></template>
-      <el-empty :image-size="54" description="无真实审计数据（接口未接入）">
+    <el-card v-if="!v023Monitoring" shadow="never" style="margin-top: 16px">
+      <template #header><div class="card-head"><span>操作审计日志</span><span class="card-sub">运行期未加载 v0.2.3 审计接口</span></div></template>
+      <el-empty :image-size="54" description="无真实审计数据（运行期接口未加载）">
         <span class="mr-disabled-hint">
-          GET /api/system/audit-logs 未实现；v0.2.2 起不再展示演示操作记录，避免把未发生的操作伪装成已留痕。
+          当前服务的 GET /api/openapi.json 未返回 /api/system/audit-logs；不展示演示操作记录，避免把未发生的操作伪装成已留痕。
         </span>
       </el-empty>
     </el-card>
@@ -199,19 +262,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAppStore } from '@/stores/app'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { tokenStorageMode } from '@/api/client'
 import { getSystemHealth } from '@/api/frontend'
+import { getProcessResources, getAuditLogs } from '@/api/reviewWrite'
 import {
   contractState, contractMeta, contractLabel, probeContract,
-  CONTRACT_ROUTES, MISSING_CAPABILITIES
+  CONTRACT_ROUTES, CONTRACT_ROUTES_V023, MISSING_CAPABILITIES,
+  hasV023Monitoring, hasRuntimeRoutes
 } from '@/api/dataSource'
 import { releaseStatus } from '@/config/release'
-import type { ComponentState, HealthResponse } from '@/api/types'
+import type {
+  ComponentState, HealthResponse, ProcessResources, AuditLogItem, ListResponse
+} from '@/api/types'
 
 /**
  * v0.2.2 系统监控
@@ -246,6 +313,21 @@ const stateLabel = computed(() => {
 
 const health = useAsyncData<HealthResponse>((signal) => getSystemHealth(signal))
 
+/* v0.2.3 新增只读接口：运行期契约加载后才请求，未加载时保持空态 */
+const v023Monitoring = computed(() => hasV023Monitoring())
+const resources = useAsyncData<ProcessResources>(
+  (signal) => getProcessResources(signal), { immediate: false }
+)
+const auditLogs = useAsyncData<ListResponse<AuditLogItem>>(
+  (signal) => getAuditLogs({ page: 1, pageSize: 20 }, signal), { immediate: false }
+)
+watch(v023Monitoring, (ok) => {
+  if (ok) { void resources.load(); void auditLogs.load() }
+}, { immediate: true })
+function runtimeHas(path: string): boolean {
+  return hasRuntimeRoutes([path])
+}
+
 const CHECKABLE_ONLINE = ['fastapi', 'task_store', 'postgresql']
 interface ComponentRow {
   name: string
@@ -274,7 +356,7 @@ const componentRows = computed<ComponentRow[]>(() =>
 )
 
 const missingModules = [
-  { title: '系统资源', hint: '接口未实现', api: 'GET /api/system/resources' },
+  { title: '系统资源', hint: '运行期未加载 v0.2.3 时保持空态', api: 'GET /api/system/resources（源码契约已交付）' },
   { title: '接口调用记录', hint: '接口未实现', api: 'GET /api/system/api-logs' },
   { title: '错误日志', hint: '接口未实现', api: 'GET /api/system/error-logs' }
 ]

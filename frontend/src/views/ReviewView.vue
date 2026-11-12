@@ -6,14 +6,13 @@
         <p class="page-desc">解析结果人工复核 —— 原始解析结果只读，人工修订须留痕，不得覆盖原始证据文件</p>
       </div>
       <div class="header-tags">
-        <el-tag type="danger" effect="plain">正式审核写入未实现 · 只读</el-tag>
+        <el-tag :type="writeGate === 'enabled' ? 'success' : 'warning'" effect="plain">{{ writeGateLabel }}</el-tag>
         <el-tag :type="contractState === 'ready' ? 'success' : 'warning'" effect="plain">{{ contractLabel[contractState] }}</el-tag>
       </div>
     </div>
 
-    <el-alert type="warning" :closable="false" class="review-notice"
-      title="当前为只读审核预览，四个审核写操作全部禁用"
-      description="待复核队列来自 GET /api/review（document_review.documents 完整语义，不依赖 findings 级 v_review_queue 视图）；详情来自 GET /api/review/{parse_id}；左侧原件来自 owner 隔离的 /source 接口。后端 review_write_supported 恒为 false，且未提供任何审核写入 HTTP 接口，前端不做本地状态变更、不假装审核成功。Markdown / 表格内容按纯文本展示，不执行 HTML。" />
+    <el-alert :type="writeGate === 'enabled' ? 'success' : 'warning'" :closable="false" class="review-notice"
+      :title="writeGateTitle" :description="writeGateDescription" />
 
     <!-- 待复核队列：真实完整语义接口；高度可由下方分隔条上下拖动调整 -->
     <el-card shadow="never" class="queue-card" :class="{ resizable: queueHeight !== null }" :style="queueStyle">
@@ -88,6 +87,7 @@
             <el-tab-pane label="表格结构" name="table" />
             <el-tab-pane label="质量指标" name="quality" />
             <el-tab-pane label="候选对照" name="candidate" />
+            <el-tab-pane v-if="eventsSupported" label="审核台账" name="ledger" />
           </el-tabs>
           <el-button class="expand-btn" size="small" :icon="expandedPane === 'result' ? Close : FullScreen"
             title="放大后可按 Esc 或点击空白区域还原" @click="togglePane('result')">
@@ -142,6 +142,35 @@
               </p>
             </div>
 
+            <div v-else-if="resultTab === 'ledger'" class="ledger-pane">
+              <div class="ledger-summary">
+                <span>台账可用：<b>{{ ledger?.available ? '是' : '否' }}</b></span>
+                <span>台账状态：<b>{{ ledger?.status || '—' }}</b></span>
+                <span>版本：<b class="num">{{ expectedVersion }}</b></span>
+                <span>当前修订：<code class="mono">{{ ledger?.current_revision || '—' }}</code></span>
+                <el-button size="small" text type="primary" @click="events.load()">刷新事件</el-button>
+              </div>
+              <AsyncPanel :state="events.state.value" :error="events.error.value" empty-text="该对象暂无审核台账事件" @retry="events.load()">
+                <el-table :data="events.data.value?.list || []" size="small" max-height="300">
+                  <el-table-column prop="version" label="版本" width="80" />
+                  <el-table-column prop="action" label="动作" width="140" />
+                  <el-table-column prop="status" label="台账状态" width="130" />
+                  <el-table-column prop="operator" label="操作者" width="130" />
+                  <el-table-column label="时间" width="170"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+                  <el-table-column label="理由 / 修订正文" min-width="240" show-overflow-tooltip>
+                    <template #default="{ row }"><span>{{ row.content || row.reason || '—' }}</span></template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="latestRevision" class="revision-box">
+                  <div class="revision-head">最近人工修订（不可信文本，仅纯文本展示，不执行 HTML）</div>
+                  <pre class="result-pre">{{ latestRevision.content }}</pre>
+                </div>
+              </AsyncPanel>
+              <el-alert v-if="lastReceipt" type="success" :closable="false" style="margin-top: 12px"
+                :title="`最近写入回执：${lastReceipt.action} · 版本 ${lastReceipt.version} · write_performed=${lastReceipt.write_performed}`"
+                :description="`event_id=${lastReceipt.event_id}；original_result_modified=${lastReceipt.original_result_modified}；publish_authorized=${lastReceipt.publish_authorized}；reparse_task_created=${lastReceipt.reparse_task_created}`" />
+            </div>
+
             <div v-else class="candidate-pane">
               <el-alert v-if="!detail.data.value?.local_candidate_available" type="warning" :closable="false" style="margin-bottom: 12px"
                 title="本地候选不可用"
@@ -161,43 +190,102 @@
             <span>解析状态：<b>{{ detail.data.value?.parsing_status || '—' }}</b></span>
             <span>结果来源：document_review.documents</span>
             <span>SHA256：<code class="mono">{{ expectedSha256 ? expectedSha256.slice(0, 16) + '…' : '由 /source 响应头校验' }}</code></span>
+            <span v-if="ledger">台账：v{{ expectedVersion }} / {{ ledger.status || '—' }}（{{ detail.data.value?.review_write_supported ? '已获写授权' : '未获写授权' }}）</span>
           </div>
         </AsyncPanel>
 
-        <!-- 底部操作：后端无写入接口 → 全部禁用，绝不假装成功 -->
+        <!-- 底部操作：运行期契约 + 审核详情双门控；未通过时保持禁用，绝不本地假成功 -->
         <div class="action-bar">
-          <el-tooltip v-for="a in actions" :key="a.label" :content="disabledHint" placement="top">
-            <span><el-button :type="a.type" disabled>{{ a.label }}</el-button></span>
+          <el-tooltip v-for="a in actions" :key="a.key" :content="actionHint" placement="top" :disabled="canWrite">
+            <span>
+              <el-button :type="a.type" :disabled="!canWrite" :loading="busy && activeAction === a.key" @click="openAction(a.key)">
+                {{ a.label }}
+              </el-button>
+            </span>
           </el-tooltip>
+          <el-button v-if="canWrite" size="small" text type="primary" :loading="detail.loading.value" @click="refreshAfterWrite">刷新台账</el-button>
         </div>
-        <div class="action-hint mr-disabled-hint">{{ disabledHint }}</div>
+        <div class="action-hint" :class="canWrite ? '' : 'mr-disabled-hint'">{{ actionHint }}</div>
       </el-card>
     </div>
 
     <!-- 放大态遮罩：点击空白或按 Esc 还原。只切换外层定位，不销毁左右栏 DOM，PDF iframe 保持当前页 -->
     <div v-if="expandedPane" class="pane-backdrop" @click="expandedPane = null" />
+
+    <!-- 审核写入确认：只有双门控通过才可打开；提交结果以后端回执 write_performed 为准 -->
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="620px" :close-on-click-modal="false" @closed="resetDialog">
+      <el-alert type="info" :closable="false" style="margin-bottom: 12px"
+        :title="`台账版本 ${expectedVersion} · ${currentParseId}`"
+        description="提交会带 Idempotency-Key 与 expected_version。操作者由会话凭证对应的 owner 决定，客户端不指定；审核通过不授予发布权限、不自动创建解析任务，原始解析结果与原件保持只读。" />
+      <el-form class="action-form" label-width="96px">
+        <el-form-item v-if="activeAction === 'approve'" label="备注（可选）">
+          <el-input v-model="form.reason" type="textarea" :rows="3" maxlength="2000" show-word-limit placeholder="可留空，前端不会生成假备注" />
+        </el-form-item>
+        <el-form-item v-if="activeAction === 'reject'" label="退回理由" required>
+          <el-input v-model="form.reason" type="textarea" :rows="4" maxlength="2000" show-word-limit placeholder="必填，随审核事件留痕" />
+        </el-form-item>
+        <template v-if="activeAction === 'mark-error'">
+          <el-form-item label="错误理由" required>
+            <el-input v-model="form.reason" type="textarea" :rows="4" maxlength="2000" show-word-limit placeholder="必填" />
+          </el-form-item>
+          <el-form-item label="页码" required>
+            <el-input-number v-model="form.page" :min="1" :max="totalPages" />
+            <span class="form-hint">须对应原始解析结果中的真实 page_number（当前对照第 {{ currentPage }} 页）</span>
+          </el-form-item>
+          <el-form-item label="定位片段">
+            <el-input v-model="form.span" maxlength="2000" placeholder="可选 span" />
+          </el-form-item>
+        </template>
+        <template v-if="activeAction === 'save-revision'">
+          <el-form-item label="页码" required>
+            <el-input-number v-model="form.page" :min="1" :max="totalPages" />
+          </el-form-item>
+          <el-form-item label="修订正文" required>
+            <el-input v-model="form.content" type="textarea" :rows="9" maxlength="200000" show-word-limit
+              placeholder="原样保存，保留前导空格与换行；按不可信纯文本渲染，不执行 HTML" />
+          </el-form-item>
+        </template>
+      </el-form>
+      <el-alert v-if="submitError" type="error" :closable="false" :title="submitError" />
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="busy" :disabled="!formValid" @click="submitAction">确认提交</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Connection, FullScreen, Close } from '@element-plus/icons-vue'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import DocumentPreview from '@/components/document/DocumentPreview.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { listReviews, getReviewDetail } from '@/api/frontend'
-import { contractState, contractLabel, unimplementedHint } from '@/api/dataSource'
-import type { ReviewDetail, ReviewQueue, ReviewQueueItem } from '@/api/types'
+import { toApiError } from '@/api/errors'
+import {
+  contractState, contractLabel, hasV023ReviewWriteRoutes, hasV023ReviewEvents
+} from '@/api/dataSource'
+import {
+  approveReview, rejectReview, markReviewError, saveReviewRevision,
+  getReviewEvents, newIdempotencyKey
+} from '@/api/reviewWrite'
+import type {
+  ReviewDetail, ReviewQueue, ReviewQueueItem, ReviewEvent, ReviewReceipt, ListResponse
+} from '@/api/types'
 
 /**
  * v0.2.2 审核中心：
  * - 队列 = GET /api/review（完整语义，后端读 document_review.documents，不依赖 v_review_queue）
  * - 详情 = GET /api/review/{parse_id}（raw_text / markdown / original_result / quality / 候选对照）
  * - 原件 = /source 授权字节，SHA256 由后端 X-SHA256 校验
- * - 写操作：后端契约 review_write_supported=false 且无 HTTP 接口 → 全部禁用
- * - Markdown / 表格一律纯文本，不使用 v-html，不执行不可信 HTML
+ * - 写操作（v0.2.3）：双门控 = 运行期 OpenAPI 含 4 条写路径 + 详情 review_write_supported / review_ledger.available
+ *   正式 8180 当前仍是 0.2.2-api-candidate / 22 路径，第一道门控必然不通过，按钮保持禁用。
+ * - 提交必带 Idempotency-Key 与 expected_version；409/403/401/422/503 分别给出明确提示，不隐藏错误。
+ * - 成功与否以后端回执 write_performed 为准，前端不改本地状态、不伪造事件。
+ * - Markdown / 表格 / 人工修订一律纯文本，不使用 v-html，不执行不可信 HTML。
  */
-const REVIEW_WRITE_AVAILABLE = false // 后端未提供写入 API，前端无写入适配层；不得改为 true
 
 const queuePage = ref(1)
 const queuePageSize = 10
@@ -260,24 +348,179 @@ const detail = useAsyncData<ReviewDetail>(
 // 尚未选择队列记录时显示明确空态，而非无限 loading
 detail.state.value = 'empty'
 
+type ReviewActionKey = 'approve' | 'reject' | 'mark-error' | 'save-revision'
 const actions = [
-  { label: '审核通过', type: 'success' },
-  { label: '退回重新解析', type: 'warning' },
-  { label: '标记识别错误', type: 'danger' },
-  { label: '保存人工修订', type: 'primary' }
+  { key: 'approve', label: '审核通过', type: 'success' },
+  { key: 'reject', label: '退回重新解析', type: 'warning' },
+  { key: 'mark-error', label: '标记识别错误', type: 'danger' },
+  { key: 'save-revision', label: '保存人工修订', type: 'primary' }
 ] as const
 
-const disabledHint = REVIEW_WRITE_AVAILABLE
-  ? ''
-  : unimplementedHint('POST /api/review/{parse_id}/approve | reject | mark-error | save-revision') +
-    '；后端 review_write_supported 恒为 false，且需保留原始解析结果与审计留痕'
+/* ───────── 运行期能力 + 审核详情双门控 ───────── */
+const contractWriteSupported = computed(() => hasV023ReviewWriteRoutes())
+const eventsSupported = computed(() => hasV023ReviewEvents())
+const ledger = computed(() => detail.data.value?.review_ledger ?? null)
+const detailWriteSupported = computed(() =>
+  detail.data.value?.review_write_supported === true && ledger.value?.available === true
+)
+const busy = ref(false)
+const canWrite = computed(() =>
+  contractWriteSupported.value && detailWriteSupported.value &&
+  !!currentParseId.value && !busy.value
+)
+const expectedVersion = computed(() => ledger.value?.version ?? 0)
+
+type WriteGate = 'contract-missing' | 'detail-locked' | 'enabled'
+const writeGate = computed<WriteGate>(() => {
+  if (!contractWriteSupported.value) return 'contract-missing'
+  if (!detailWriteSupported.value) return 'detail-locked'
+  return 'enabled'
+})
+const writeGateLabel = computed(() => ({
+  'contract-missing': '审核写入未启用 · 运行期契约未加载 v0.2.3',
+  'detail-locked': '审核写入未解锁 · 台账或写授权未就绪',
+  enabled: '审核写入已启用 · 真实台账'
+}[writeGate.value]))
+const writeGateTitle = computed(() => ({
+  'contract-missing': '当前运行服务未加载审核台账接口，四个写操作保持禁用',
+  'detail-locked': '当前对象的审核台账不可用或当前凭证未获写授权，写操作保持禁用',
+  enabled: '已按运行期契约与审核详情启用真实审核写入'
+}[writeGate.value]))
+const writeGateDescription = computed(() => ({
+  'contract-missing': '队列 / 详情 / 原件仍来自真实只读接口。v0.2.3 审核写入接口虽已在后端源码分支交付，但活动服务的 GET /api/openapi.json 未返回这 4 条路径，前端不提前解锁、不调用不存在的接口。',
+  'detail-locked': '写按钮还须逐对象确认详情返回 review_write_supported=true 且 review_ledger.available=true；台账未配置、存储异常或当前 owner 不在 writers 名单时均不置 true。requires_review 只是 OCR 复核信号，不能推导台账状态。',
+  enabled: '写操作使用 Idempotency-Key + expected_version 版本锁；操作者由 Token→owner 决定。审核通过不授予发布权限、不自动创建解析任务，原始解析结果与原件始终只读。'
+}[writeGate.value]))
+const actionHint = computed(() => {
+  if (writeGate.value === 'contract-missing') {
+    return '运行期 OpenAPI 未加载 v0.2.3 审核写入路由（当前正式服务仍为 0.2.2-api-candidate / 22 路径），按钮保持禁用，不提前解锁、不伪造成功。'
+  }
+  if (writeGate.value === 'detail-locked') {
+    return `当前对象台账不可用或当前凭证未获写授权（review_write_supported=${String(detail.data.value?.review_write_supported ?? false)}、available=${String(ledger.value?.available ?? false)}）${ledger.value?.reason ? `，原因：${ledger.value.reason}` : ''}；按钮保持禁用。`
+  }
+  return `已启用真实写入：台账 v${expectedVersion.value} / ${ledger.value?.status || '—'}。提交后以后端回执 write_performed 判定成功，并追加事件留痕。`
+})
+
+/* ───────── 台账事件（仅 v0.2.3 运行期契约具备时才请求） ───────── */
+const events = useAsyncData<ListResponse<ReviewEvent>>(
+  (signal) => getReviewEvents(currentParseId.value, { page: 1, pageSize: 50 }, signal),
+  { immediate: false }
+)
+events.state.value = 'empty'
+const latestRevision = computed(() =>
+  (events.data.value?.list || []).find((e) => e.action === 'save-revision' && typeof e.content === 'string') || null
+)
+const lastReceipt = ref<ReviewReceipt | null>(null)
+
+watch(resultTab, (tab) => {
+  if (tab === 'ledger' && eventsSupported.value && currentParseId.value) void events.load()
+})
+
+/* ───────── 写入确认弹窗 ───────── */
+const dialogVisible = ref(false)
+const activeAction = ref<ReviewActionKey>('approve')
+const idempotencyKey = ref('')
+const submitError = ref('')
+const form = reactive({ reason: '', page: 1, span: '', content: '' })
+const dialogTitle = computed(() => ({
+  approve: '确认审核通过', reject: '确认退回重新解析',
+  'mark-error': '确认标记识别错误', 'save-revision': '确认保存人工修订'
+}[activeAction.value]))
+const formValid = computed(() => {
+  const a = activeAction.value
+  if (a === 'approve') return true
+  if (a === 'reject' || a === 'mark-error') return form.reason.length > 0
+  return form.content.length > 0 && Number.isInteger(form.page) && form.page >= 1
+})
+
+function resetDialog() {
+  submitError.value = ''
+  form.reason = ''
+  form.span = ''
+  form.content = ''
+  form.page = currentPage.value
+}
+function openAction(key: ReviewActionKey) {
+  if (!canWrite.value) return
+  activeAction.value = key
+  idempotencyKey.value = newIdempotencyKey() // 一次操作一个键，失败重试沿用同键同 body
+  submitError.value = ''
+  form.reason = ''
+  form.span = ''
+  form.content = ''
+  form.page = currentPage.value
+  dialogVisible.value = true
+}
+
+async function submitAction() {
+  if (!canWrite.value || !formValid.value) return
+  busy.value = true
+  submitError.value = ''
+  const parseId = currentParseId.value
+  const version = expectedVersion.value
+  const key = idempotencyKey.value
+  try {
+    let receipt: ReviewReceipt
+    if (activeAction.value === 'approve') {
+      receipt = await approveReview(parseId, version, key, form.reason || undefined)
+    } else if (activeAction.value === 'reject') {
+      receipt = await rejectReview(parseId, version, form.reason, key)
+    } else if (activeAction.value === 'mark-error') {
+      receipt = await markReviewError(parseId, version, form.reason, form.page, form.span || undefined, key)
+    } else {
+      // content 原样提交：前导空格与换行是人工正文的一部分，不做 trim
+      receipt = await saveReviewRevision(parseId, version, form.page, form.content, key)
+    }
+    if (!receipt || receipt.write_performed !== true) {
+      const hint = '后端回执未确认写入（write_performed 非 true），前端不判定为成功。'
+      submitError.value = hint
+      ElMessage.warning(hint)
+      return
+    }
+    lastReceipt.value = receipt
+    dialogVisible.value = false
+    ElMessage.success(`审核写入成功：${receipt.action} · 台账 v${receipt.version}（event_id ${receipt.event_id.slice(0, 8)}…）`)
+    await Promise.all([
+      detail.load(),
+      eventsSupported.value ? events.load() : Promise.resolve()
+    ])
+  } catch (err) {
+    const e = toApiError(err)
+    let hint = e.hint
+    if (e.status === 409) {
+      hint = '写入被拒绝（409）：台账版本或原始结果已变化，或同一幂等键复用了不同请求。已刷新详情，请确认后重试。'
+      idempotencyKey.value = newIdempotencyKey()
+      void detail.load()
+    } else if (e.status === 403) {
+      hint = '无权写入（403）：当前会话凭证对应的 owner 未被配置为审核写入者。'
+    } else if (e.status === 401) {
+      hint = '凭证失效或未认证（401）：请重新配置 API Token 后再试。'
+    } else if (e.status === 422) {
+      hint = '参数被拒绝（422）：请检查必填理由、页码是否对应真实 page_number，以及是否传入契约外字段。'
+    } else if (e.status === 503) {
+      hint = '审核台账未配置或存储暂不可用（503），本次未执行写入。'
+    }
+    submitError.value = hint
+    ElMessage.error(hint)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function refreshAfterWrite() {
+  await detail.load()
+  if (eventsSupported.value) await events.load()
+}
 
 function onSelectQueue(row: ReviewQueueItem | null) {
   if (!row?.parse_id) return
   currentParseId.value = row.parse_id
   currentPage.value = 1
   resultTab.value = 'text'
+  lastReceipt.value = null
+  submitError.value = ''
   void detail.load()
+  if (eventsSupported.value) void events.load()
 }
 
 /* ───────── 按页关联与真实结果字段 ───────── */
@@ -445,4 +688,10 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 @media (max-width: 1280px) {
   .review-split { grid-template-columns: 1fr; overflow-y: auto; }
 }
+
+/* 审核台账与写入弹窗 */
+.ledger-summary { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--mr-text-2); }
+.revision-box { margin-top: 12px; border: 1px solid var(--mr-line); border-radius: 6px; padding: 10px; background: #fafbfe; }
+.revision-head { font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+.action-form .form-hint { margin-left: 10px; font-size: 12px; color: var(--mr-text-3); }
 </style>

@@ -51,6 +51,10 @@
         <StatCard label="需人工复核" :value="reviewTotal" scope="全历史" hint="· document_review 回执" color="var(--mr-st-warning)" real />
       </div>
 
+      <el-alert v-if="statsReason" type="warning" :closable="false" style="margin-top: 12px"
+        title="已解析文档统计不可用（不是 0）"
+        :description="`后端返回 available=false 与 null 计数；原因：${statsReason}。前端不做 0 填充、不生成模拟序列，也不把数据库异常伪装成统计成功。`" />
+
       <div class="card-grid" style="grid-template-columns: 2fr 1fr; margin-top: 16px">
         <el-card shadow="never">
           <template #header>
@@ -181,6 +185,8 @@ const reviewTotal = computed<number | string>(() => {
   if (!p || !p.available || p.requires_review == null) return '暂无数据'
   return p.requires_review
 })
+/** v0.2.3：parsed_documents 不可用时后端给出真实原因（含审核台账未配置/不可用），前端如实展示 */
+const statsReason = computed(() => stats.data.value?.parsed_documents?.reason || '')
 
 const statusEntries = computed(() =>
   Object.entries(stats.data.value?.tasks.status_distribution || {})

@@ -33,7 +33,12 @@ export function listDocuments(q: DocumentQuery, signal?: AbortSignal): Promise<D
         page_size: q.pageSize,
         keyword: q.keyword || undefined,
         status: q.status || undefined,
-        doc_type: q.docType || undefined
+        doc_type: q.docType || undefined,
+        // v0.2.3 新增；调用方须先确认运行期契约具备这些参数，未确认时字段保持 undefined（不发送）
+        date_from: q.dateFrom || undefined,
+        date_to: q.dateTo || undefined,
+        sort_by: q.sortBy || undefined,
+        order: q.order || undefined
       },
       ...signalOf(signal)
     })
