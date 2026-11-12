@@ -9,7 +9,7 @@ from .schemas import ListResponse
 
 
 class ReviewAction(BaseModel):
-    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    model_config = ConfigDict(extra='forbid')
     base_result_id: str = Field(min_length=1, max_length=128)
     expected_version: int = Field(ge=0)
     reason: str = Field(default='', max_length=2000)
@@ -56,9 +56,9 @@ def register_review_writes(app, owner, reader):
             ledger, source = authorize(identity, parse_id)
             if len(parse_id) > 128 or not parse_id.isascii() or body.base_result_id != parse_id:
                 raise MinerUError('review_base_result_mismatch', 409)
-            if action in ('reject', 'mark-error') and not body.reason:
+            if action in ('reject', 'mark-error') and not body.reason.strip():
                 raise MinerUError('review_reason_required', 422)
-            if action == 'save-revision' and (body.content is None or body.page is None):
+            if action == 'save-revision' and (body.content is None or not body.content.strip() or body.page is None):
                 raise MinerUError('review_revision_fields_required', 422)
             if action != 'save-revision' and body.content is not None:
                 raise MinerUError('review_content_not_allowed', 422)

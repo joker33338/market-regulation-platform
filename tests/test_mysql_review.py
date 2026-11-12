@@ -47,12 +47,12 @@ class MySQLReviewTests(unittest.TestCase):
 
     def test_append_revision_approve_and_replay(self):
         key=uuid4().hex
-        first=self.post('save-revision',key=key,page=1,content='synthetic revision')
+        first=self.post('save-revision',key=key,page=1,content='  synthetic revision\n')
         self.assertEqual(first.status_code,200,first.text)
         event=first.json()
         self.assertEqual(event['version'],1)
         self.assertIsNotNone(event['revision_id'])
-        self.assertEqual(self.post('save-revision',key=key,page=1,content='synthetic revision').json(),event)
+        self.assertEqual(self.post('save-revision',key=key,page=1,content='  synthetic revision\n').json(),event)
         self.assertEqual(self.post('save-revision',key=key,page=1,content='different').status_code,409)
         self.assertEqual(self.post('approve',version=0).status_code,409)
         approved=self.post('approve',version=1).json()
@@ -65,7 +65,7 @@ class MySQLReviewTests(unittest.TestCase):
         self.assertEqual(detail['raw_text'],'synthetic original')
         audit=self.client.get(f'/api/review/{self.pid}/events',headers=self.fixture.auth).json()
         self.assertEqual(audit['total'],2)
-        self.assertEqual(audit['list'][1]['request']['content'],'synthetic revision')
+        self.assertEqual(audit['list'][1]['request']['content'],'  synthetic revision\n')
 
     def test_auth_owner_write_grants_and_validation(self):
         url=f'/api/review/{self.pid}/approve'
