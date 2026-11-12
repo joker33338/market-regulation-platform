@@ -1,3 +1,5 @@
+> 历史draft-1记录保留。最新principal/RBAC设计与验收请见 [身份设计](identity-rbac-design.md) 和 [RBAC QA交接](rbac-qa-handoff.md)；旧writers建议不再适用。
+
 # v0.2.3 MySQL审核正式启用准备报告
 
 日期：2026-11-12。任务负责人Agent C。**候选状态READY_FOR_QA；正式初始化等待用户授权，未启用、未发布。**

@@ -1,3 +1,5 @@
+> 历史draft-1记录保留。最新principal/RBAC设计与验收请见 [身份设计](identity-rbac-design.md) 和 [RBAC QA交接](rbac-qa-handoff.md)；旧writers建议不再适用。
+
 # v0.2.3 正式审核启用前：owner与权限只读核查
 
 日期：2026-11-12。用户已明确暂不授权创建正式market_review、开放正式审核写入或修改正式runtime。本报告只记录只读核查与候选建议，不授予任何权限。

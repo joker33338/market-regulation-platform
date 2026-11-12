@@ -1,3 +1,5 @@
+> 历史draft-1记录保留。最新principal/RBAC设计与验收请见 [身份设计](identity-rbac-design.md) 和 [RBAC QA交接](rbac-qa-handoff.md)；旧writers建议不再适用。
+
 # v0.2.3 MySQL审核候选独立QA交接
 
 状态：READY_FOR_QA（候选），不表示QA_PASS或正式启用。用户明确禁止正式建库、runtime变更和8180切换。
