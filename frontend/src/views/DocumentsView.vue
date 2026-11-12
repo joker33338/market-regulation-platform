@@ -181,7 +181,16 @@
         </template>
         <template #empty>
           <el-empty :image-size="70" description="当前筛选条件下没有文档记录（后端返回空列表，非演示数据）">
-            <el-button size="small" @click="list.load()">刷新</el-button>
+            <div class="empty-actions">
+              <el-button size="small" @click="list.load()">刷新</el-button>
+              <el-tooltip :content="hasActiveFilter
+                ? '清空筛选条件（搜索词 / 状态 / 类型 / 时间区间 / 排序），返回全部文档'
+                : '当前没有生效的筛选条件，后端返回的就是全部文档，无需返回'" placement="top">
+                <span>
+                  <el-button size="small" :disabled="!hasActiveFilter" @click="backToAll">返回</el-button>
+                </span>
+              </el-tooltip>
+            </div>
           </el-empty>
         </template>
       </MrProTable>
@@ -295,6 +304,30 @@ function resetAdvanced() {
   void list.load()
 }
 
+/**
+ * 空态「返回」：把当前生效的筛选条件全部清掉，回到未筛选的全部文档。
+ * 只重置前端查询参数并重新请求真实接口，不做本地补数据、不伪造结果；
+ * 没有生效筛选条件时按钮禁用（此时后端返回的就是全部文档的真实空态）。
+ */
+const hasActiveFilter = computed(() => {
+  const q = query.value
+  if (q.keyword || q.status || q.docType) return true
+  return v023Filters.value ? Boolean(q.dateFrom || q.dateTo || q.sortBy || q.order) : false
+})
+
+function backToAll() {
+  if (!hasActiveFilter.value) return
+  dateRange.value = null
+  sortBy.value = ''
+  order.value = ''
+  query.value = { page: 1, pageSize: query.value.pageSize, keyword: '', status: '', docType: '' }
+  if (v023Filters.value) query.value = { ...query.value, dateFrom: '', dateTo: '', sortBy: '', order: '' }
+  clearTableSelection()
+  // reset() 会同时清空搜索表单、排序与页码并重新发起真实查询
+  if (tableRef.value) tableRef.value.reset()
+  else void list.load()
+}
+
 const tableRows = computed(() => (list.data.value?.list || []) as unknown as Record<string, unknown>[])
 const tableTotal = computed(() => list.data.value?.total || 0)
 const listSource = computed(() => list.data.value?.source || 'owner_upload_metadata+sqlite.parse_tasks')
@@ -369,7 +402,7 @@ const createdTaskCount = ref(0)
  * 因此必须比对 /api/openapi.json 里的 HTTP 方法声明，绝不本地隐藏行伪造删除成功。
  */
 const DELETE_DOCUMENT_PATH = '/api/documents/{file_id}'
-const tableRef = ref<{ clearSelection: () => void } | null>(null)
+const tableRef = ref<{ clearSelection: () => void; reset: () => void } | null>(null)
 const selectedRows = ref<Record<string, unknown>[]>([])
 const batchBusy = ref(false)
 
@@ -733,4 +766,6 @@ async function createTasksForAll() {
 }
 .batch-bar b { color: var(--mr-primary); }
 .delete-note { margin-bottom: 10px; }
+/* 空态操作：刷新 + 返回（返回＝清空筛选回到全部文档） */
+.empty-actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
 </style>
