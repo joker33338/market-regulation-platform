@@ -27,8 +27,8 @@
       title="身份口径：frontend-api-v0.2.3-draft-2 / principal-v1"
       :description="`principal_id 是实际操作者，owner_id 是文档业务归属，两者不能互相推导。USER 不具备审核写入能力，ADMIN 不隐含 REVIEWER；REVIEWER 也只在后端按 review_owner_scopes 与逐对象详情授权后才可写，前端角色仅用于收紧与展示，绝不代替后端授权。事件与回执中的 operator_id / owner_id 由后端给出；旧事件为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。审核通过不等于发布 ACTIVE，退回不等于已创建解析任务。${principalError ? ` 当前身份状态：${principalError}` : ''}`" />
 
-    <!-- 待复核队列：真实完整语义接口；高度可由下方分隔条上下拖动调整 -->
-    <el-card shadow="never" class="queue-card" :class="{ resizable: queueHeight !== null }" :style="queueStyle">
+    <!-- 待复核队列：真实完整语义接口；高度由内容自适应，不再提供上下拖动 -->
+    <el-card shadow="never" class="queue-card">
       <template #header>
         <div class="card-head">
           <span>待复核队列 <span class="real-badge">REAL</span></span>
@@ -50,14 +50,9 @@
       </AsyncPanel>
     </el-card>
 
-    <!-- 上下拖动分隔条 + 两栏同时放大：便于左边原文与右边解析结果对照 -->
+    <!-- 两栏同时放大：便于左边原文与右边解析结果对照；放大态工具条常驻顶部 -->
     <div class="split-toolbar" :class="{ 'on-top': expandedPane === 'both' }">
-      <div class="v-resizer" :class="{ disabled: expandedPane === 'both' }"
-        title="按住上下拖动，调整队列与对比区域高度；双击恢复默认" @mousedown.prevent="startResize" @dblclick="resetResize">
-        <span class="v-resizer-grip">⋮⋮</span>
-        <span>{{ expandedPane === 'both' ? '对照放大中 · 按 Esc 或点击空白区域还原' : '上下拖动调整对比区高度（双击恢复默认）' }}</span>
-        <span class="v-resizer-grip">⋮⋮</span>
-      </div>
+      <span v-if="expandedPane === 'both'" class="expand-hint">对照放大中 · 按 Esc 或点击空白区域还原</span>
       <el-button class="both-expand-btn" size="small" :icon="expandedPane === 'both' ? Close : FullScreen"
         title="左右两栏同时放大，便于原文与解析结果对照；按 Esc 或点击空白区域还原"
         @click="togglePane('both')">
@@ -353,35 +348,8 @@ onMounted(() => {
   if (principalState.value !== 'ready') void loadPrincipal(true)
 })
 
-/* 上下拖动：调整「待复核队列」与「左右对比区」的高度分配。
-   只在本地改容器高度，不触发任何接口请求，也不改动业务数据。 */
-const queueHeight = ref<number | null>(null)
-const queueStyle = computed(() => queueHeight.value == null ? {} : { height: `${queueHeight.value}px` })
-let resizeStartY = 0
-let resizeStartH = 0
-function startResize(e: MouseEvent) {
-  if (expandedPane.value) return // 放大态下分栏已脱离文档流，拖动无意义
-  const card = document.querySelector('.queue-card') as HTMLElement | null
-  if (!card) return
-  resizeStartY = e.clientY
-  resizeStartH = card.getBoundingClientRect().height
-  queueHeight.value = resizeStartH // 先固化当前高度，避免首帧跳动
-  window.addEventListener('mousemove', onResize)
-  window.addEventListener('mouseup', stopResize)
-}
-function onResize(e: MouseEvent) {
-  const max = Math.max(160, window.innerHeight - 280)
-  queueHeight.value = Math.min(max, Math.max(110, resizeStartH + e.clientY - resizeStartY))
-}
-function stopResize() {
-  window.removeEventListener('mousemove', onResize)
-  window.removeEventListener('mouseup', stopResize)
-}
-function resetResize() { queueHeight.value = null }
-
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  stopResize()
 })
 
 const queue = useAsyncData<ReviewQueue>(
@@ -785,7 +753,6 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 .identity-item b { font-weight: 600; word-break: break-all; }
 .identity-note { margin-bottom: 12px; }
 .queue-card { margin-bottom: 0; flex-shrink: 0; }
-.queue-card.resizable { overflow-y: auto; }
 .queue-card :deep(.el-card__body) { padding: 10px 14px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
@@ -824,16 +791,9 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 .action-bar { display: flex; gap: 10px; padding: 12px 14px 4px; border-top: 1px solid var(--mr-line); background: #fafbfe; flex-wrap: wrap; flex-shrink: 0; }
 .action-hint { padding: 0 14px 10px; background: #fafbfe; flex-shrink: 0; }
 
-/* 上下拖动分隔条：只调整队列卡片高度，对比区自动拿剩余空间 */
-.split-toolbar { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin: 8px 0; }
-.v-resizer {
-  flex: 1; min-width: 0; height: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;
-  cursor: row-resize; user-select: none; border: 1px solid var(--mr-line); border-radius: 4px;
-  background: #f1f5fb; color: var(--mr-text-3); font-size: 11px;
-}
-.v-resizer:hover { background: #e3ecfa; color: var(--mr-primary); border-color: #b9cdf0; }
-.v-resizer.disabled { cursor: default; }
-.v-resizer-grip { letter-spacing: 2px; font-weight: 700; }
+/* 放大工具条：已移除上下拖动分隔条，仅在对照放大态显示还原提示 */
+.split-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-shrink: 0; margin: 8px 0; }
+.expand-hint { flex: 1; min-width: 0; font-size: 12px; color: var(--mr-text-3); }
 .both-expand-btn { flex-shrink: 0; }
 /* 对照放大时工具条常驻顶部，保证「退出对照放大」始终可见可点 */
 .split-toolbar.on-top {
