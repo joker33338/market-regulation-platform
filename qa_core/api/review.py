@@ -26,7 +26,17 @@ def register_review(app, service, config, owner, reader):
     @router.get("/api/review/{parse_id}", response_model=ReviewDetail)
     @guarded
     def review(parse_id: str, identity=Depends(owner)):
-        return reader.review_detail(identity, parse_id)
+        result = reader.review_detail(identity, parse_id)
+        ledger = app.state.review_ledger
+        result['review_ledger'] = {'available': False, 'reason': 'not_configured'}
+        if ledger is not None:
+            try:
+                ledger.health()
+                result['review_ledger'] = {'available': True, 'reason': None, **ledger.state(identity, parse_id)}
+                result['review_write_supported'] = identity in ledger.writers
+            except Exception:
+                result['review_ledger'] = {'available': False, 'reason': 'ledger_unavailable'}
+        return result
 
 
     app.include_router(router)

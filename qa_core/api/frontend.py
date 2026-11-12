@@ -5,6 +5,8 @@ from .common import FrontendReader
 
 def register_frontend(app, service, config, owner, reader=None):
     reader = reader or FrontendReader(service, config)
+    from qa_core.storage.mysql_review_ledger import MySQLReviewLedger
+    app.state.review_ledger = MySQLReviewLedger.from_env()
     @app.get("/api/openapi.json", include_in_schema=False)
     def openapi(identity=Depends(owner)):
         return app.openapi()
@@ -14,12 +16,16 @@ def register_frontend(app, service, config, owner, reader=None):
     register_tasks(app, service, config, owner, reader)
     from .review import register_review
     register_review(app, service, config, owner, reader)
+    from .review_writes import register_review_writes
+    register_review_writes(app, owner, reader)
     from .knowledge import register_knowledge
     register_knowledge(app, service, config, owner, reader)
     from .search import register_search
     register_search(app, service, config, owner, reader)
     from .monitoring import register_monitoring
     register_monitoring(app, service, config, owner, reader)
+    from .resources import register_resources
+    register_resources(app, owner)
     from .contracts import annotate_legacy
     annotate_legacy(app)
     app.state.frontend_reader = reader

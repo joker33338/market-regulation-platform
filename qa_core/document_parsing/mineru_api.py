@@ -126,7 +126,7 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
 
     @app.exception_handler(MinerUError)
     async def parse_error(request, exc):
-        status = exc.status if exc.status in {400, 401, 403, 404, 409, 413, 415, 429, 503} else 502
+        status = exc.status if exc.status in {400, 401, 403, 404, 409, 413, 415, 422, 429, 503} else 502
         return JSONResponse({"error": {"code": exc.code}}, status_code=status)
 
     @app.exception_handler(RequestValidationError)

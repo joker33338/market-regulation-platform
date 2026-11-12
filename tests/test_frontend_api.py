@@ -138,7 +138,7 @@ class FrontendAPITests(unittest.TestCase):
         self.assertEqual(self.client.post(url, headers=self.other, json={"document_type": "law"}).status_code, 404)
 
 
-    def test_review_reader_ownership_no_finding_view_and_no_write_api(self):
+    def test_review_reader_ownership_and_unconfigured_write_ledger(self):
         review = MagicMock()
         review.listing.return_value = {"list": [{"parse_id": "p", "requires_review": True}],
                                        "total": 1, "page": 1, "page_size": 20,
@@ -153,7 +153,9 @@ class FrontendAPITests(unittest.TestCase):
         self.assertEqual(detail.status_code, 200, detail.text)
         self.assertFalse(detail.json()["review_write_supported"])
         self.assertFalse(detail.json()["local_candidate_available"])
-        self.assertEqual(self.client.post("/api/review/p/approve", headers=self.auth).status_code, 404)
+        self.assertEqual(self.client.post("/api/review/p/approve",
+            headers={**self.auth, "Idempotency-Key": "synthetic-review"},
+            json={"base_result_id": "p", "expected_version": 0}).status_code, 503)
         connection, cursor = MagicMock(), MagicMock()
         connection.cursor.return_value.__enter__.return_value = cursor
         cursor.fetchone.return_value = {"total": 0}

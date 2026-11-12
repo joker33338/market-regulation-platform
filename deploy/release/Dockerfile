@@ -7,6 +7,8 @@ LABEL org.opencontainers.image.title="market-regulation-platform" \
       cn.market-regulation.frontend.revision="${FRONTEND_COMMIT}"
 USER root
 WORKDIR /app
+COPY requirements-review.txt ./requirements-review.txt
+RUN pip install --no-cache-dir -r requirements-review.txt
 COPY qa_core ./qa_core
 COPY deploy/release/entrypoint.py /opt/workbench/entrypoint.py
 COPY deploy/release/application.py ./deploy/release/application.py

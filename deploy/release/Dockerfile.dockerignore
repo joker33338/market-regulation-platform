@@ -12,3 +12,5 @@
 **/__pycache__
 **/*.pyc
 !deploy/release/entrypoint.py
+
+!requirements-review.txt

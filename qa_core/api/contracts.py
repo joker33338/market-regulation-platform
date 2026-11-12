@@ -41,7 +41,7 @@ def annotate_legacy(app):
             continue
         extra = route.openapi_extra or {}
         responses = extra.setdefault("responses", {})
-        for status in (401, 404, 409, 429, 503):
+        for status in (401, 403, 404, 409, 422, 429, 503):
             responses.setdefault(str(status), {"description": "认证、权限、门禁、限流或服务不可用",
                 "content": {"application/json": {"schema": {"type": "object", "properties": {
                     "error": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"]}},
@@ -58,6 +58,7 @@ def annotate_legacy(app):
     def openapi():
         schema = default_openapi()
         schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)
-        schema["info"]["version"] = "0.2.2-api-candidate"
+        schema["info"]["version"] = "0.2.3-dev"
+        schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-1"
         return schema
     app.openapi = openapi

@@ -30,9 +30,9 @@ def register_monitoring(app, service, config, owner, reader):
                           for engine in (file.get("selected_engine") or ["unrecorded"]))
         trends = Counter(task["created_at"][:10] for task in selected)
         try:
-            pg = {"available": True, **reader.review_store().stats(identity)}
+            pg = {"available": True, "reason": None, **reader.review_store().stats(identity)}
         except Exception:
-            pg = {"available": False, "total": None, "requires_review": None}
+            pg = {"available": False, "reason": "review_store_unavailable" if reader.review else "review_store_not_configured", "total": None, "requires_review": None}
         uploads = reader.documents(identity)
         return {"generated_at": now.isoformat(), "window": {"since": since.isoformat(), "until": now.isoformat()},
                 "uploads": {"source": "owner_upload_metadata", "scope": "all_time", "total": len(uploads)},

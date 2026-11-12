@@ -66,6 +66,7 @@ class ReviewDetail(BaseModel):
     local_candidate: dict[str, Any] | None = None
     local_candidate_available: bool = False
     review_write_supported: bool = False
+    review_ledger: dict[str, Any] | None = None
 
 
 class PreviewResponse(BaseModel):
