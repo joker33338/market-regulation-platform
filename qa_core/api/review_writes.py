@@ -35,6 +35,15 @@ class ReviewReceipt(BaseModel):
     reparse_task_created: bool
 
 
+class ReviewEvent(ReviewReceipt):
+    # 原始审核请求单独保留；正文/理由不是回执顶层字段。
+    request: ReviewAction
+
+
+class ReviewEventsResponse(ListResponse):
+    list: list[ReviewEvent]
+
+
 def register_review_writes(app, owner, reader):
     router = APIRouter(tags=['review'], dependencies=[Depends(owner)])
 
@@ -76,7 +85,7 @@ def register_review_writes(app, owner, reader):
         router.add_api_route('/api/review/{parse_id}/'+action, endpoint(action), methods=['POST'],
                              response_model=ReviewReceipt, name='review_'+action.replace('-','_'))
 
-    @router.get('/api/review/{parse_id}/events', response_model=ListResponse)
+    @router.get('/api/review/{parse_id}/events', response_model=ReviewEventsResponse)
     @guarded
     def events(parse_id: str, page: int = Query(1, ge=1), page_size: int = Query(20,ge=1,le=100), identity=Depends(owner)):
         reader.review_store().detail(identity, parse_id)

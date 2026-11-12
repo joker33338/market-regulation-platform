@@ -5223,7 +5223,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListResponse"
+                  "$ref": "#/components/schemas/ReviewEventsResponse"
                 }
               }
             }
@@ -8019,6 +8019,132 @@
           "original_result"
         ],
         "title": "ReviewDetail"
+      },
+      "ReviewEvent": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "parse_id": {
+            "type": "string",
+            "title": "Parse Id"
+          },
+          "base_result_id": {
+            "type": "string",
+            "title": "Base Result Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "before": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before"
+          },
+          "write_performed": {
+            "type": "boolean",
+            "title": "Write Performed"
+          },
+          "original_result_modified": {
+            "type": "boolean",
+            "title": "Original Result Modified"
+          },
+          "publish_authorized": {
+            "type": "boolean",
+            "title": "Publish Authorized"
+          },
+          "reparse_task_created": {
+            "type": "boolean",
+            "title": "Reparse Task Created"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ReviewAction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "parse_id",
+          "base_result_id",
+          "action",
+          "operator",
+          "timestamp",
+          "version",
+          "revision_id",
+          "status",
+          "before",
+          "write_performed",
+          "original_result_modified",
+          "publish_authorized",
+          "reparse_task_created",
+          "request"
+        ],
+        "title": "ReviewEvent"
+      },
+      "ReviewEventsResponse": {
+        "properties": {
+          "list": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewEvent"
+            },
+            "type": "array",
+            "title": "List"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "list",
+          "total",
+          "page",
+          "page_size",
+          "source"
+        ],
+        "title": "ReviewEventsResponse"
       },
       "ReviewReceipt": {
         "properties": {

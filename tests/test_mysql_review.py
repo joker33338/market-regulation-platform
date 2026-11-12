@@ -64,6 +64,11 @@ class MySQLReviewTests(unittest.TestCase):
         self.assertTrue(detail['requires_review'])
         self.assertEqual(detail['raw_text'],'synthetic original')
         audit=self.client.get(f'/api/review/{self.pid}/events',headers=self.fixture.auth).json()
+        schema=self.client.get('/api/openapi.json',headers=self.fixture.auth).json()
+        event_schema=schema['components']['schemas']['ReviewEvent']
+        self.assertIn('request',event_schema['required'])
+        self.assertNotIn('content',event_schema['properties'])
+        self.assertNotIn('content',audit['list'][1])
         self.assertEqual(audit['total'],2)
         self.assertEqual(audit['list'][1]['request']['content'],'  synthetic revision\n')
 
