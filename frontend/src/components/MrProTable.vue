@@ -49,12 +49,15 @@
     </div>
 
     <el-table
+      ref="tableRef"
       :data="rows"
       v-loading="loading"
       style="margin-top: 12px; width: 100%"
       max-height="520"
       @sort-change="onSortChange"
+      @selection-change="onSelectionChange"
     >
+      <el-table-column v-if="selectable" type="selection" width="46" fixed="left" />
       <el-table-column
         v-for="col in columns"
         :key="col.prop"
@@ -93,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AsyncPanel from './AsyncPanel.vue'
 import type { LoadState } from '@/api/types'
 
@@ -139,13 +142,16 @@ const props = withDefaults(
     state?: LoadState
     error?: string
     pageSize?: number
+    /** 是否显示多选列；默认关闭，其他页面行为不变 */
+    selectable?: boolean
   }>(),
-  { loading: false, state: 'ready', error: '', pageSize: 20 }
+  { loading: false, state: 'ready', error: '', pageSize: 20, selectable: false }
 )
 
 const emit = defineEmits<{
   (e: 'query', payload: MrQuery): void
   (e: 'retry'): void
+  (e: 'selection-change', rows: Record<string, unknown>[]): void
 }>()
 
 const page = ref(1)
@@ -154,6 +160,23 @@ const sortBy = ref('')
 const order = ref('')
 const searchModel = reactive<Record<string, unknown>>({})
 const searchColumns = computed(() => props.columns.filter((c) => !!c.search))
+const tableRef = ref<{ clearSelection: () => void } | null>(null)
+
+function onSelectionChange(rows: Record<string, unknown>[]) {
+  emit('selection-change', rows)
+}
+
+/** 分页 / 筛选 / 刷新后 rows 会替换，清空选择避免跨页残留对已不存在的行执行批量操作 */
+watch(() => props.rows, () => {
+  if (!props.selectable) return
+  tableRef.value?.clearSelection()
+  emit('selection-change', [])
+})
+
+function clearSelection() {
+  tableRef.value?.clearSelection()
+  emit('selection-change', [])
+}
 
 function initModel() {
   for (const c of props.columns) {
@@ -199,7 +222,7 @@ function refresh() {
   emitQuery()
 }
 
-defineExpose({ refresh, search, reset })
+defineExpose({ refresh, search, reset, clearSelection })
 
 onMounted(emitQuery)
 </script>

@@ -66,6 +66,18 @@ export function getDocumentHistory(
     .then((r) => r.data)
 }
 
+/**
+ * DELETE /api/documents/{file_id} —— 文档删除（当前后端契约未声明，调用方必须先经方法级门控）
+ *
+ * 只有在运行期 GET /api/openapi.json 确实声明 DELETE 该方法时，页面才会解锁按钮并调用本函数。
+ * 删除结果以后端真实响应为准：成功只代表请求被接受，页面随后重新拉取列表确认，绝不本地删除行。
+ */
+export function deleteDocument(fileId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+  return client
+    .delete<Record<string, unknown>>(`/api/documents/${encodeURIComponent(fileId)}`, signalOf(signal))
+    .then((r) => r.data || {})
+}
+
 /* ───────────── 智能解析中心 ───────────── */
 
 /** GET /api/parse/tasks —— 真实任务列表（状态枚举以返回值 status 为准，前端不创造状态） */

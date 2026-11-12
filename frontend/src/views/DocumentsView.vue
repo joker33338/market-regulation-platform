@@ -52,6 +52,9 @@
           <span>本次会话真实上传 <span class="real-badge">REAL</span></span>
           <div class="card-actions">
             <span class="card-sub">来自 POST /api/parse/files 的真实响应 · 创建成功后自动移出待创建列表</span>
+            <el-button v-if="selectedUploads.length" size="small" type="danger" plain @click="removeSelectedUploads">
+              移出待创建（{{ selectedUploads.length }}）
+            </el-button>
             <el-tooltip :disabled="bulkCreatable" :content="bulkHint" placement="top">
               <span>
                 <el-button size="small" type="primary" :loading="bulkSubmitting" :disabled="!bulkCreatable" @click="createTasksForAll">
@@ -62,7 +65,8 @@
           </div>
         </div>
       </template>
-      <el-table :data="realUploads" size="small" max-height="200">
+      <el-table ref="uploadTableRef" :data="realUploads" size="small" max-height="200" @selection-change="onUploadSelectionChange">
+        <el-table-column type="selection" width="46" />
         <el-table-column prop="name" label="文件名称" min-width="220" show-overflow-tooltip />
         <el-table-column label="大小" width="100" align="right">
           <template #default="{ row }"><span class="num">{{ formatSize(row.bytes) }}</span></template>
@@ -120,7 +124,27 @@
         <el-button size="small" @click="resetAdvanced">重置</el-button>
       </div>
 
+      <div v-if="selectedRows.length" class="batch-bar">
+        <span>已选 <b>{{ selectedRows.length }}</b> 项（仅当前页，翻页 / 查询 / 刷新后自动清空）</span>
+        <el-button size="small" @click="clearTableSelection">取消选择</el-button>
+        <el-button size="small" type="primary" plain :loading="batchBusy" :disabled="!hasAuth || batchBusy" @click="batchDownload">
+          批量下载原件
+        </el-button>
+        <el-tooltip :disabled="canDeleteDocuments" :content="deleteDisabledHint" placement="top">
+          <span>
+            <el-button size="small" type="danger" plain :disabled="!canDeleteDocuments || batchBusy" @click="deleteSelected">
+              删除选中（{{ selectedRows.length }}）
+            </el-button>
+          </span>
+        </el-tooltip>
+      </div>
+      <el-alert v-if="!canDeleteDocuments" type="warning" :closable="false" class="delete-note"
+        title="删除功能需后端接口：当前运行期契约未提供 DELETE /api/documents/{file_id}"
+        description="原始文件为只读证据，前端不会本地隐藏行来假装删除成功。多选与批量下载原件现在即可使用；待后端实现并在 /api/openapi.json 声明该 DELETE 方法后，删除按钮自动解锁，并按真实回执刷新列表。" />
+
       <MrProTable
+        ref="tableRef"
+        selectable
         :columns="columns"
         :rows="tableRows"
         :total="tableTotal"
@@ -129,6 +153,7 @@
         :error="list.error.value"
         @query="onQuery"
         @retry="list.load()"
+        @selection-change="onSelectionChange"
       >
         <template #col-size_bytes="{ row }"><span class="num">{{ formatSize(Number(row.size_bytes)) }}</span></template>
         <template #col-status="{ row }"><StatusTag :status="String(row.status)" /></template>
@@ -140,12 +165,17 @@
           </el-tooltip>
         </template>
         <template #extra-columns>
-          <el-table-column label="操作" width="270" fixed="right">
+          <el-table-column label="操作" width="330" fixed="right">
             <template #default="{ row }">
               <el-button text size="small" type="primary" @click="openDetail(row)">详情</el-button>
               <el-button text size="small" :loading="downloadingId === row.file_id" :disabled="!hasAuth || downloadingId !== ''" @click="download(row)">下载原件</el-button>
               <el-button text size="small" :loading="submittingId === row.file_id" :disabled="!hasAuth || submittingId !== ''" @click="reparse(row)">重新解析</el-button>
               <el-button text size="small" :disabled="!row.latest_task_id" @click="viewResults(row)">解析结果</el-button>
+              <el-tooltip :disabled="canDeleteDocuments" :content="deleteDisabledHint" placement="top">
+                <span>
+                  <el-button text size="small" type="danger" :disabled="!canDeleteDocuments || batchBusy" @click="deleteOne(row)">删除</el-button>
+                </span>
+              </el-tooltip>
             </template>
           </el-table-column>
         </template>
@@ -213,7 +243,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import type { UploadRequestOptions } from 'element-plus'
 import StatusTag from '@/components/StatusTag.vue'
@@ -222,9 +252,12 @@ import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { hasToken } from '@/api/client'
 import { apiErrorHint, notifyApiError, toApiError } from '@/api/errors'
-import { contractState, contractLabel, hasV023DocumentFilters } from '@/api/dataSource'
+import {
+  contractState, contractLabel, hasV023DocumentFilters,
+  hasRuntimeMethod, unimplementedHint
+} from '@/api/dataSource'
 import { downloadSourceFile } from '@/api/documentFiles'
-import { getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
+import { deleteDocument, getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
 import { uploadFile, createParseTask, UPLOAD_LIMIT_BYTES, UPLOAD_ALLOWED_EXT, MAX_FILES_PER_TASK } from '@/api/parse'
 import type { DocumentInfo, DocumentList, DocumentQuery, ParseHistory, ParseTask } from '@/api/types'
 
@@ -330,6 +363,101 @@ const submittingId = ref('')
 const lastTask = ref<ParseTask | null>(null)
 const createdTaskCount = ref(0)
 
+/* ───────── 多选与删除 ─────────
+ * 多选列 / 批量下载是真实可用能力；删除按「方法级」运行期门控：
+ * /api/documents/{file_id} 只有 GET，路径存在不代表 DELETE 可用，
+ * 因此必须比对 /api/openapi.json 里的 HTTP 方法声明，绝不本地隐藏行伪造删除成功。
+ */
+const DELETE_DOCUMENT_PATH = '/api/documents/{file_id}'
+const tableRef = ref<{ clearSelection: () => void } | null>(null)
+const selectedRows = ref<Record<string, unknown>[]>([])
+const batchBusy = ref(false)
+
+const canDeleteDocuments = computed(() => hasToken() && hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH))
+const deleteDisabledHint = computed(() => hasToken()
+  ? unimplementedHint(`DELETE ${DELETE_DOCUMENT_PATH}`)
+  : '请先在系统监控页配置 API Token')
+
+function onSelectionChange(rows: Record<string, unknown>[]) {
+  selectedRows.value = rows
+}
+function clearTableSelection() {
+  tableRef.value?.clearSelection()
+  selectedRows.value = []
+}
+
+/** 批量下载走真实 GET /source，逐个字节下载；任一失败如实计数，不吞错 */
+async function batchDownload() {
+  if (!hasAuth.value || batchBusy.value || !selectedRows.value.length) return
+  batchBusy.value = true
+  let ok = 0
+  const failed: string[] = []
+  try {
+    for (const row of selectedRows.value) {
+      const id = String(row.file_id || '')
+      const name = String(row.file_name || id)
+      if (!id) continue
+      try {
+        await downloadSourceFile(id, name)
+        ok += 1
+      } catch {
+        failed.push(name)
+      }
+    }
+    if (ok) ElMessage.success(`已发起 ${ok} 个原件下载${failed.length ? `，${failed.length} 个失败` : ''}`)
+    if (failed.length) ElMessage.warning(`下载失败：${failed.slice(0, 3).join('、')}${failed.length > 3 ? ' 等' : ''}`)
+  } finally {
+    batchBusy.value = false
+  }
+}
+
+async function confirmDelete(count: number): Promise<boolean> {
+  return ElMessageBox.confirm(
+    `将对 ${count} 个文档调用真实 DELETE 接口。原始文件是只读证据，删除须由后端授权并执行；前端不会隐藏列表行来伪造成功，结果以刷新后的列表为准。`,
+    '确认删除文档',
+    { type: 'warning', confirmButtonText: '提交删除请求', cancelButtonText: '取消' }
+  ).then(() => true).catch(() => false)
+}
+
+/** 仅按后端真实响应计数：2xx 视为「请求被接受」，随后重新拉取列表确认，不本地移除行 */
+async function submitDeletes(rows: Record<string, unknown>[]) {
+  batchBusy.value = true
+  let accepted = 0
+  const rejected: string[] = []
+  try {
+    for (const row of rows) {
+      const id = String(row.file_id || '')
+      const name = String(row.file_name || id)
+      if (!id) continue
+      try {
+        await deleteDocument(id)
+        accepted += 1
+      } catch (err) {
+        rejected.push(`${name}：${apiErrorHint(err)}`)
+      }
+    }
+    if (accepted) ElMessage.success(`后端已接受 ${accepted} 个删除请求，正在刷新列表确认`)
+    if (rejected.length) ElMessage.warning(`${rejected.length} 个删除请求失败：${rejected.slice(0, 2).join('；')}`)
+    void list.load()
+  } finally {
+    batchBusy.value = false
+    clearTableSelection()
+  }
+}
+
+async function deleteSelected() {
+  if (!canDeleteDocuments.value || batchBusy.value || !selectedRows.value.length) return
+  const rows = [...selectedRows.value]
+  if (!(await confirmDelete(rows.length))) return
+  await submitDeletes(rows)
+}
+
+async function deleteOne(row: Record<string, unknown>) {
+  if (!canDeleteDocuments.value || batchBusy.value) return
+  if (!(await confirmDelete(1))) return
+  await submitDeletes([row])
+}
+
 async function download(row: Record<string, unknown>) {
   const id = String(row.file_id || '')
   const name = String(row.file_name || id)
@@ -392,6 +520,31 @@ interface RealUpload {
 const uploadQueue = ref<QueueItem[]>([])
 const realUploads = ref<RealUpload[]>([])
 const uploadedHashes = new Set<string>()
+
+/* 上传项多选：只清理本地「待创建」队列，不触碰后端已上传的原始文件与已创建任务 */
+const uploadTableRef = ref<{ clearSelection: () => void } | null>(null)
+const selectedUploads = ref<RealUpload[]>([])
+function onUploadSelectionChange(rows: RealUpload[]) {
+  selectedUploads.value = rows
+}
+
+async function removeSelectedUploads() {
+  const ids = new Set(selectedUploads.value.map((i) => i.fileId))
+  if (!ids.size) return
+  try {
+    await ElMessageBox.confirm(
+      `仅从「本次会话真实上传」待创建列表移除 ${ids.size} 项，不会删除后端已上传的原始文件，也不会取消已创建的解析任务。`,
+      '移出待创建列表',
+      { type: 'info', confirmButtonText: '确认移出', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  realUploads.value = realUploads.value.filter((i) => !ids.has(i.fileId))
+  selectedUploads.value = []
+  uploadTableRef.value?.clearSelection()
+  ElMessage.success(`已移出 ${ids.size} 项待创建文件`)
+}
 
 /* ───────── 一键解析全部：一次 POST 提交多个 file_id（后端单任务上限 20） ───────── */
 const bulkSubmitting = ref(false)
@@ -571,4 +724,13 @@ async function createTasksForAll() {
   padding: 10px 0 14px; margin-bottom: 4px; border-bottom: 1px dashed var(--mr-line);
 }
 .af-label { font-size: 12px; color: var(--mr-text-2); flex-shrink: 0; }
+/* 多选批量操作条：选中后才出现，避免常态占用列表空间 */
+.batch-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: 10px;
+  border: 1px solid var(--mr-line); border-radius: 6px;
+  background: var(--mr-bg-soft, transparent); font-size: 13px;
+}
+.batch-bar b { color: var(--mr-primary); }
+.delete-note { margin-bottom: 10px; }
 </style>

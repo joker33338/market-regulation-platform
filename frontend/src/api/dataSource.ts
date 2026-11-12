@@ -64,6 +64,28 @@ export const V023_READ_ROUTES = [
 /** 运行期 OpenAPI 实际返回的路径；源码里存在某接口不等于活动服务已加载 */
 export const runtimePaths = ref<string[]>([])
 
+/**
+ * 运行期 OpenAPI 实际支持的「方法 + 路径」。
+ * 路径存在不等于方法可用：例如 /api/documents/{file_id} 只有 GET，
+ * 若仅按路径集合判断就会错误解锁删除按钮，因此方法级能力必须单独比对。
+ */
+export const runtimeMethodPaths = ref<string[]>([])
+const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'])
+
+export function collectRuntimeMethodPaths(doc: unknown): string[] {
+  const result: string[] = []
+  if (!doc || typeof doc !== 'object') return result
+  const paths = (doc as { paths?: Record<string, unknown> }).paths
+  if (!paths || typeof paths !== 'object') return result
+  for (const [path, def] of Object.entries(paths)) {
+    if (!def || typeof def !== 'object') continue
+    for (const key of Object.keys(def as Record<string, unknown>)) {
+      if (HTTP_METHODS.has(key.toLowerCase())) result.push(`${key.toUpperCase()} ${path}`)
+    }
+  }
+  return result
+}
+
 /** 纯粹的路径集合比对，不依赖探测状态（供 probeContract 内部使用） */
 function pathsInclude(required: readonly string[], paths: string[]): boolean {
   return required.every((path) => paths.includes(path))
@@ -73,6 +95,12 @@ function pathsInclude(required: readonly string[], paths: string[]): boolean {
 export function hasRuntimeRoutes(required: readonly string[]): boolean {
   if (contractState.value !== 'ready' || runtimePaths.value.length === 0) return false
   return pathsInclude(required, runtimePaths.value)
+}
+
+/** 方法级门控：只有运行期契约确实声明了该 HTTP 方法，才允许启用对应写操作 */
+export function hasRuntimeMethod(method: string, path: string): boolean {
+  if (contractState.value !== 'ready' || runtimeMethodPaths.value.length === 0) return false
+  return runtimeMethodPaths.value.includes(`${method.toUpperCase()} ${path}`)
 }
 
 export function hasV023ReviewWriteRoutes(): boolean {
@@ -108,6 +136,7 @@ export function probeContract(force = false): Promise<ContractState> {
       const paths = doc && typeof doc === 'object' && doc.paths ? Object.keys(doc.paths) : []
       const hasNewRoutes = paths.includes('/api/documents') && paths.includes('/api/system/health')
       runtimePaths.value = paths
+      runtimeMethodPaths.value = collectRuntimeMethodPaths(doc)
       const hasV023 = pathsInclude(V023_REVIEW_WRITE_ROUTES, paths)
       contractMeta.value = {
         probedAt: new Date().toISOString(),
@@ -142,6 +171,7 @@ export function isContractReady(): boolean {
 export function resetContractState() {
   contractState.value = 'unknown'
   runtimePaths.value = []
+  runtimeMethodPaths.value = []
   contractMeta.value = { probedAt: '', version: '', pathCount: 0, hint: '已重置，等待重新探测' }
 }
 
@@ -251,7 +281,8 @@ export const MISSING_CAPABILITIES: MissingCapability[] = [
   { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: '入库页「发起入库批次」禁用' },
   { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: '入库页不开放发布/回滚' },
   { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: '解析中心日志仅能展示 public(task) 真实字段' },
-  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: '仍无真实持久化事件来源，系统监控保持「未接入」空态，不编造历史事件' }
+  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: '仍无真实持久化事件来源，系统监控保持「未接入」空态，不编造历史事件' },
+  { priority: 'P1', api: 'DELETE /api/documents/{file_id}', usage: '文档删除（单行 / 多选批量）', impact: 'v0.2.2 与 v0.2.3 契约均只声明 GET，原始证据只读；前端多选可用，删除按钮按运行期方法级门控保持禁用，不做本地假删除' }
 ]
 
 /** v0.2.3 相对 v0.2.2 新增的 7 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */
