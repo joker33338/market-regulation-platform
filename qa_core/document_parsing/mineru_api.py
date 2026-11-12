@@ -156,7 +156,7 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
     async def auth_me(identity=Depends(authenticated)):
         return {'principal_id':identity.principal_id,'owner_id':identity.owner_id,
                 'roles':sorted(identity.roles),'review_owner_scopes':list(identity.review_owner_scopes),
-                'credential_status':identity.credential_status}
+                'credential_status':identity.credential_status,'document_delete_owner_scopes':list(identity.document_delete_owner_scopes)}
 
     @app.get("/api/parse/info")
     async def info(identity=Depends(authenticated)):

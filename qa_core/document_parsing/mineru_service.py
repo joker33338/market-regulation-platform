@@ -34,6 +34,13 @@ class MinerUService:
         self._locks = {}  # 执行结束后移除，仅随活动任务数量增长
 
     async def submit(self, owner, request_key, inputs, *, parse_options=None):
+        from qa_core.storage.document_lifecycle import async_lifecycle, assert_active
+        async with async_lifecycle(self.root):
+            for item in inputs:
+                assert_active(item[1])
+            return await self._submit_unlocked(owner,request_key,inputs,parse_options=parse_options)
+
+    async def _submit_unlocked(self, owner, request_key, inputs, *, parse_options=None):
         if not self.config.enabled:
             raise MinerUError("parser_disabled", 503)
         if not owner or not 1 <= len(request_key) <= 128 or not 1 <= len(inputs) <= self.config.max_files:

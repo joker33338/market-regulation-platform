@@ -57,6 +57,11 @@ class ReviewReader:
             raise MinerUError("document_not_found", 404)
         return dict(row)
 
+    def deletion_references(self,file_id,source_hash):
+        with self.cursor() as cursor:
+            cursor.execute("SELECT EXISTS(SELECT 1 FROM document_review.documents WHERE source_location->>'source_file_id'=%s OR document_id=%s) AS referenced",(file_id,source_hash))
+            return bool(cursor.fetchone()['referenced'])
+
     def stats(self, owner):
         with self.cursor() as cursor:
             cursor.execute("""SELECT count(*) AS total,

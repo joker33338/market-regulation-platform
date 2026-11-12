@@ -20,6 +20,7 @@ class PrincipalInfo(BaseModel):
     roles: list[Literal['USER','REVIEWER','ADMIN']]
     review_owner_scopes: list[str]
     credential_status: Literal['active','disabled','revoked']
+    document_delete_owner_scopes: list[str] = []
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class Principal:
     roles: frozenset[str]
     review_owner_scopes: tuple[str, ...]
     credential_status: str
+    document_delete_owner_scopes: tuple[str, ...] = ()
 
     @property
     def read_owners(self):
@@ -36,6 +38,9 @@ class Principal:
         if 'REVIEWER' in self.roles:
             owners.extend(self.review_owner_scopes)
         return tuple(sorted(set(owners)))
+
+    def can_delete(self, owner_id):
+        return self.credential_status == 'active' and 'ADMIN' in self.roles and self.owner_id == owner_id and owner_id in self.document_delete_owner_scopes
 
     def can_review(self, owner_id):
         return self.credential_status == 'active' and 'REVIEWER' in self.roles and owner_id in self.review_owner_scopes
@@ -74,7 +79,7 @@ class AuthRegistry:
                         raise ValueError()
                     value = Principal('legacy:'+entry, entry, frozenset({'USER'}), (), 'active')
                 else:
-                    if not isinstance(entry, dict) or set(entry) != {'principal_id','owner_id','roles','review_owner_scopes','credential_status'}:
+                    if not isinstance(entry, dict) or not ({'principal_id','owner_id','roles','review_owner_scopes','credential_status'} <= set(entry) <= {'principal_id','owner_id','roles','review_owner_scopes','credential_status','document_delete_owner_scopes'}):
                         raise ValueError()
                     pid, owner = entry['principal_id'], entry['owner_id']
                     roles, scopes, status = entry['roles'], entry['review_owner_scopes'], entry['credential_status']
@@ -86,7 +91,10 @@ class AuthRegistry:
                         raise ValueError()
                     if status not in ('active','disabled','revoked') or ('USER' in roles and owner is None):
                         raise ValueError()
-                    value = Principal(pid,owner,frozenset(roles),tuple(sorted(set(scopes))),status)
+                    delete_scopes=entry.get('document_delete_owner_scopes',[])
+                    if not isinstance(delete_scopes,list) or not all(identifier(scope) for scope in delete_scopes):
+                        raise ValueError()
+                    value = Principal(pid,owner,frozenset(roles),tuple(sorted(set(scopes))),status,tuple(sorted(set(delete_scopes))))
                 if value.principal_id in principals:
                     raise ValueError()
                 if 'USER' in value.roles:

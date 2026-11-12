@@ -249,7 +249,16 @@ class Database:
             SET doc_version_id=excluded.doc_version_id, source_path=excluded.source_path""",
             {"v": version, "d": doc_id, "r": doc_version_id, "s": source_path}).close()
 
-    def save_revision(self, *, version: str, doc_id: str, doc_version_id: str, source_hash: str,
+    def save_revision(self, **kwargs):
+        from contextlib import nullcontext
+        from qa_core.storage.document_lifecycle import lifecycle, retained_upload, assert_active
+        path=kwargs['source_path']
+        root=retained_upload(path)
+        with lifecycle(root) if root is not None else nullcontext():
+            assert_active(path)
+            return self._save_revision_unlocked(**kwargs)
+
+    def _save_revision_unlocked(self, *, version: str, doc_id: str, doc_version_id: str, source_hash: str,
                       law_name: str, source_path: str, metadata: dict, chunks: list[Chunk]):
         with self.transaction():
             self.execute("""INSERT INTO mr_document_versions

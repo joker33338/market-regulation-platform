@@ -13,6 +13,8 @@ def register_frontend(app, service, config, owner, reader=None, principal=None):
         return app.openapi()
     from .documents import register_documents
     register_documents(app, service, config, owner, reader, principal)
+    from .document_delete import register_document_delete
+    register_document_delete(app, principal, reader)
     from .tasks import register_tasks
     register_tasks(app, service, config, owner, reader)
     from .review import register_review

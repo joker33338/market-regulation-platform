@@ -76,7 +76,10 @@ class FrontendReader:
         path = root / (file_id + ".json")
         if not path.is_file():
             raise MinerUError("source_not_found", 404)
-        value = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            raise MinerUError('source_not_found',404) from None
         suffix = Path(value["file_name"]).suffix.lower()
         from qa_core.document_parsing.mineru_service import SUFFIXES
         if suffix not in SUFFIXES:
@@ -106,7 +109,12 @@ class FrontendReader:
                 by_source.setdefault(file.get("source_file_id"), []).append((task, file))
         rows = []
         for path in self.root(owner).glob("*.json"):
-            value, _ = self.upload(owner, path.stem)
+            try:
+                value, _ = self.upload(owner, path.stem)
+            except MinerUError as exc:
+                if exc.status==404:
+                    continue
+                raise
             history = by_source.get(path.stem, [])
             task, file = history[0] if history else (None, None)
             status = file["status"] if file else "uploaded"

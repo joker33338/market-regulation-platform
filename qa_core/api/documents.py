@@ -37,7 +37,10 @@ def register_documents(app, service, config, owner, reader, principal):
     @guarded
     def document(file_id: str, identity=Depends(owner)):
         reader.upload(identity, file_id)
-        return next(row for row in reader.documents(identity) if row["file_id"] == file_id)
+        row = next((row for row in reader.documents(identity) if row["file_id"] == file_id),None)
+        if row is None:
+            raise MinerUError('document_not_found',404)
+        return row
 
     @router.get("/api/documents/{file_id}/parse-history", response_model=ListResponse)
     @guarded
