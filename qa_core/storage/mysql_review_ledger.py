@@ -75,6 +75,21 @@ class MySQLReviewLedger:
             rows = [{**json.loads(row['receipt']), 'request': json.loads(row['payload'])} for row in cursor.fetchall()]
             return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
 
+    def audit_logs(self, owner, page, page_size, action=None):
+        where = 'owner_key=%s'
+        args = [digest(owner)]
+        if action is not None:
+            where += " AND JSON_UNQUOTE(JSON_EXTRACT(receipt,'$.action'))=%s"
+            args.append(action)
+        with self.connection() as connection, connection.cursor() as cursor:
+            cursor.execute('SELECT count(*) AS total FROM review_events WHERE '+where, args)
+            total = cursor.fetchone()['total']
+            cursor.execute("SELECT receipt FROM review_events WHERE "+where+
+                " ORDER BY JSON_UNQUOTE(JSON_EXTRACT(receipt,'$.timestamp')) DESC,event_id DESC LIMIT %s OFFSET %s",
+                [*args,page_size,(page-1)*page_size])
+            rows = [json.loads(row['receipt']) for row in cursor.fetchall()]
+        return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
+
     def apply(self, owner, parse_id, action, body, request_key, source_digest):
         owner_key, key_hash = digest(owner), digest(request_key)
         fingerprint = digest(canonical({'parse_id': parse_id, 'action': action, 'body': body}))

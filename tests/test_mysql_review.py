@@ -108,6 +108,17 @@ class MySQLReviewTests(unittest.TestCase):
         self.assertEqual(self.ledger.events('alice',self.pid,1,20)['total'],1)
         self.assertEqual(self.ledger.state('alice',self.pid)['version'],1)
 
+    def test_audit_logs_are_owner_scoped_and_do_not_return_revision_text(self):
+        self.assertEqual(self.post('save-revision',page=1,content='synthetic private revision').status_code,200)
+        response=self.client.get('/api/system/audit-logs?action=save-revision',headers=self.fixture.auth)
+        self.assertEqual(response.status_code,200)
+        self.assertGreaterEqual(response.json()['total'],1)
+        self.assertNotIn('synthetic private revision',response.text)
+        other=self.client.get('/api/system/audit-logs',headers=self.fixture.other)
+        self.assertEqual(other.json()['total'],0)
+        self.assertEqual(self.client.get('/api/system/audit-logs').status_code,401)
+        self.assertEqual(self.client.get('/api/system/audit-logs?page=0',headers=self.fixture.auth).status_code,422)
+
     def test_runtime_account_cannot_rewrite_audit(self):
         import pymysql
         with self.assertRaises(pymysql.err.OperationalError):

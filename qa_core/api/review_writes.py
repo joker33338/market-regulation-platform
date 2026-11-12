@@ -1,4 +1,5 @@
 """审核动作适配：权限来自服务端，修订追加保存，不自动重解析或发布。"""
+from typing import Literal
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, ConfigDict, Field
 from qa_core.document_parsing.mineru_client import MinerUError
@@ -83,5 +84,15 @@ def register_review_writes(app, owner, reader):
         if ledger is None:
             raise MinerUError('review_ledger_not_configured', 503)
         return ledger.events(identity, parse_id, page, page_size)
+
+    @router.get('/api/system/audit-logs', response_model=ListResponse)
+    @guarded
+    def audit_logs(page: int = Query(1, ge=1), page_size: int = Query(20,ge=1,le=100),
+                   action: Literal['approve','reject','mark-error','save-revision'] | None = None,
+                   identity=Depends(owner)):
+        ledger = app.state.review_ledger
+        if ledger is None:
+            raise MinerUError('review_ledger_not_configured', 503)
+        return ledger.audit_logs(identity, page, page_size, action)
 
     app.include_router(router)
