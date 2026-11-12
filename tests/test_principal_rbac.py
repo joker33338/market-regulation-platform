@@ -47,12 +47,14 @@ class PrincipalConfigTests(unittest.TestCase):
         self.assertEqual(identity.roles,frozenset({'USER'}))
         self.assertFalse(identity.can_review('local-user'))
 
-    def test_user_scope_and_admin_do_not_grant_review(self):
+    def test_user_is_scoped_and_admin_has_all_permissions(self):
         registry=AuthRegistry({'a'*32:entry('ordinary','one',['USER'],['two']),
                                'b'*32:entry('administrator',roles=['ADMIN'],scopes=['one'])})
         self.assertEqual(registry.resolve('a'*32).read_owners,('one',))
         self.assertFalse(registry.resolve('a'*32).can_review('two'))
-        self.assertEqual(registry.resolve('b'*32).read_owners,())
+        from qa_core.access import is_all_owners
+        self.assertTrue(is_all_owners(registry.resolve('b'*32).read_owners))
+        self.assertTrue(registry.resolve('b'*32).can_review('unlisted-owner'))
 
 
 class PrincipalMySQLTests(unittest.TestCase):
@@ -133,9 +135,12 @@ class PrincipalMySQLTests(unittest.TestCase):
         self.assertEqual(self.write().status_code,403)
         self.assertEqual(self.client.get('/api/review/'+self.pid,headers=self.auth('c')).status_code,404)
 
-    def test_admin_is_not_reviewer(self):
-        self.assertEqual(self.write('f').status_code,403)
-        self.assertEqual(self.client.get('/api/review/'+self.pid,headers=self.auth('f')).status_code,404)
+    def test_admin_has_review_permission_with_real_operator(self):
+        response=self.write('f')
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['operator_id'],'administrator')
+        self.assertEqual(response.json()['owner_id'],'alice')
+        self.assertEqual(self.client.get('/api/review/'+self.pid,headers=self.auth('f')).status_code,200)
 
     def test_body_cannot_forge_actor_or_owner(self):
         self.assertEqual(self.write(operator_id='administrator').status_code,422)

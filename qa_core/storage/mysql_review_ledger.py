@@ -62,6 +62,27 @@ class MySQLReviewLedger:
                            (digest(owner), parse_id))
             return cursor.fetchone() or {'version': 0, 'status': 'unreviewed', 'current_revision': None}
 
+    def verify_for_ingestion(self, owner, parse_id, source_digest, expected_version):
+        with self.connection() as connection,connection.cursor() as cursor:
+            cursor.execute('SELECT version,status,current_revision,source_digest FROM review_heads WHERE owner_key=%s AND parse_id=%s',
+                           (digest(owner),parse_id))
+            value=cursor.fetchone()
+            if not value or value['status']!='approved' or value['version']!=expected_version or value['source_digest']!=source_digest:
+                raise MinerUError('review_approval_required',409)
+            return value
+
+    @contextmanager
+    def verified_ingestion_scope(self, references):
+        with self.connection() as connection,connection.cursor() as cursor:
+            for reference in sorted(references,key=lambda value:(digest(value['owner_id']),value['parse_id'])):
+                cursor.execute('SELECT version,status,current_revision,source_digest FROM review_heads WHERE owner_key=%s AND parse_id=%s FOR SHARE',
+                               (digest(reference['owner_id']),reference['parse_id']))
+                value=cursor.fetchone()
+                if (not value or value['status']!='approved' or value['version']!=reference['version']
+                        or value['source_digest']!=reference['source_digest'] or value['current_revision']):
+                    raise MinerUError('review_approval_required',409)
+            yield
+
     def events(self, owner, parse_id, page, page_size):
         with self.connection() as connection, connection.cursor() as cursor:
             args = (digest(owner), parse_id)
@@ -73,10 +94,12 @@ class MySQLReviewLedger:
             return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
 
     def audit_logs(self, owner, page, page_size, action=None):
-        owners = [owner] if isinstance(owner,str) else list(owner)
-        if not owners:
+        from qa_core.access import is_all_owners
+        global_scope=is_all_owners(owner)
+        owners = [] if global_scope else [owner] if isinstance(owner,str) else list(owner)
+        if not owners and not global_scope:
             return {'list': [], 'total': 0, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
-        where = 'owner_key IN ('+','.join(['%s']*len(owners))+')'
+        where = 'TRUE' if global_scope else 'owner_key IN ('+','.join(['%s']*len(owners))+')'
         args = [digest(value) for value in owners]
         if action is not None:
             where += " AND JSON_UNQUOTE(JSON_EXTRACT(receipt,'$.action'))=%s"

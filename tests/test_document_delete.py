@@ -49,9 +49,9 @@ class DocumentDeleteTests(unittest.TestCase):
     def test_auth_permissions_cross_owner_and_parameters(self):
         fid=self.upload();other=self.upload(self.f.other)
         self.assertEqual(self.client.delete('/api/documents/'+fid).status_code,401)
-        self.assertEqual(self.delete(other).status_code,403)
+        self.assertEqual(self.delete(other).status_code,200)
         self.assertEqual(self.delete('bad-id').status_code,422)
-        for roles,scopes in [(['ADMIN'],[]),(['USER'],['alice']),(['REVIEWER'],['alice'])]:
+        for roles,scopes in [(['USER'],['alice']),(['REVIEWER'],['alice'])]:
             self.records['a'*32].update(roles=roles,document_delete_owner_scopes=scopes)
             self.f.app.state.auth_registry.replace(self.records)
             self.assertEqual(self.delete(fid).status_code,403)
@@ -168,7 +168,7 @@ class DocumentDeleteTests(unittest.TestCase):
         schema=self.client.get('/api/openapi.json',headers=self.f.auth).json()
         path=schema['paths']['/api/documents/{file_id}']
         self.assertIn('get',path);self.assertIn('delete',path)
-        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-draft-3')
+        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-draft-4')
         self.assertIn('DocumentDeletion',schema['components']['schemas'])
         self.assertTrue(path['delete']['security'])
         for status in ('401','403','404','409','422','503'):

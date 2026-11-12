@@ -9,11 +9,13 @@ def review_source(reader, principal, parse_id):
 
 
 def require_reviewer(principal):
-    if 'REVIEWER' not in principal.roles:
+    if 'REVIEWER' not in principal.roles and not principal.is_admin:
         raise MinerUError('review_write_forbidden',403)
 
 
 def readable_upload(reader, principal, file_id):
+    if principal.is_admin:
+        return reader.upload(principal.read_owners,file_id)
     for owner_id in principal.read_owners:
         try:
             return reader.upload(owner_id,file_id)

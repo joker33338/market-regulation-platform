@@ -55,12 +55,13 @@ def page_of(rows, page, page_size, source):
 from .read_store import ReviewReader
 
 class FrontendReader:
-    def __init__(self, service, config, *, review=None, kb_factory=None, embeddings_factory=None):
+    def __init__(self, service, config, *, review=None, kb_factory=None, kb_write_factory=None, embeddings_factory=None):
         self.service, self.config = service, config
         dsn = getattr(service.result_sink, "dsn", None)
         self.review = review or (ReviewReader(dsn) if dsn else None)
         self.kb_dsn = os.getenv("PG_DSN") or getattr(service.result_sink, "dsn", None)
         self.kb_factory = kb_factory or self._database
+        self.kb_write_factory = kb_write_factory or self._write_database
         self.embeddings_factory = embeddings_factory or self._local_embeddings
         self._embeddings = None
         self._search_lock = threading.Lock()
@@ -72,7 +73,18 @@ class FrontendReader:
     def upload(self, owner, file_id):
         if not re.fullmatch(r"[0-9a-f]{32}", file_id):
             raise MinerUError("source_not_found", 404)
-        root = self.root(owner)
+        from qa_core.access import is_all_owners
+        if is_all_owners(owner):
+            matches=[directory/(file_id+'.json') for directory in (self.config.result_dir/'sources').glob('*')
+                     if not directory.is_symlink() and re.fullmatch('[a-f0-9]{64}',directory.name)
+                     and (directory/(file_id+'.json')).is_file()]
+            if not matches:
+                raise MinerUError('source_not_found',404)
+            if len(matches)!=1:
+                raise MinerUError('source_identity_ambiguous',409)
+            root=matches[0].parent
+        else:
+            root = self.root(owner)
         path = root / (file_id + ".json")
         if not path.is_file():
             raise MinerUError("source_not_found", 404)
@@ -108,7 +120,11 @@ class FrontendReader:
             for file in task["files"]:
                 by_source.setdefault(file.get("source_file_id"), []).append((task, file))
         rows = []
-        for path in self.root(owner).glob("*.json"):
+        from qa_core.access import is_all_owners
+        paths=((self.config.result_dir/'sources').glob('*/*.json') if is_all_owners(owner) else self.root(owner).glob('*.json'))
+        for path in paths:
+            if is_all_owners(owner) and (path.parent.is_symlink() or not re.fullmatch('[a-f0-9]{64}',path.parent.name)):
+                continue
             try:
                 value, _ = self.upload(owner, path.stem)
             except MinerUError as exc:
@@ -122,6 +138,7 @@ class FrontendReader:
                 status = "pending_review"
             suffix = Path(value["file_name"]).suffix.lower()[1:]
             rows.append({"file_id": path.stem, "file_name": value["file_name"],
+                         'owner_id':value.get('owner_id') or (task['owner'] if task else owner if not is_all_owners(owner) else None),
                          "doc_type": suffix if suffix in {"pdf", "docx"} else "image",
                          "size_bytes": value["bytes"], "sha256": value["sha256"],
                          "uploaded_at": value["uploaded_at"], "uploaded_at_source": value["uploaded_at_source"],
@@ -184,6 +201,13 @@ class FrontendReader:
             raise MinerUError("knowledge_database_not_configured", 503)
         # HTTP 仅服务正式 public；绝不读取 mvp_test_* 的 ACTIVE 作为正式知识库。
         return Database(pg_dsn=self.kb_dsn, kb_schema="public")
+
+    def _write_database(self):
+        from qa_core.storage.database import Database
+        dsn=os.getenv('KNOWLEDGE_WRITE_PG_DSN')
+        if not dsn:
+            raise MinerUError('knowledge_write_store_not_configured',503)
+        return Database(pg_dsn=dsn,kb_schema='public')
 
     @staticmethod
     def _local_embeddings():

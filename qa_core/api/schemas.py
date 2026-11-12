@@ -22,6 +22,7 @@ class DocumentInfo(BaseModel):
     status: str
     latest_task_id: str | None
     parse_count: int
+    owner_id: str | None=None
 
 
 class DocumentList(ListResponse):
@@ -109,6 +110,16 @@ class ParseFile(BaseModel):
     error: Any = None
 
 
+class TaskWorkload(BaseModel):
+    unit: Literal['files']
+    total: int
+    terminal: int
+    succeeded: int
+    failed: int
+    completion_ratio: float | None
+    scope: Literal['file_completion_not_ocr_stage_progress']
+
+
 class ParseTask(BaseModel):
     task_id: str
     status: str
@@ -120,6 +131,9 @@ class ParseTask(BaseModel):
     completed_at: str | None
     error: Any
     files: list[ParseFile]
+    current_step: str | None = None
+    workload: TaskWorkload | None = None
+    owner_id: str | None=None
 
 
 class TaskSummary(ParseTask):

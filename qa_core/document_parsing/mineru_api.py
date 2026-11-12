@@ -16,7 +16,15 @@ from .mineru_service import MinerUService
 
 
 def public(task):
-    return {"task_id": task["id"], "status": task["status"], "mode": task["mode"],
+    total=len(task['files'])
+    terminal=sum(file['status'] in {'completed','failed','canceled','timed_out'} for file in task['files'])
+    return {"task_id": task["id"], "status": task["status"], "mode": task["mode"],'owner_id':task.get('owner'),
+            'current_step':task['status'],
+            'workload':{'unit':'files','total':total,'terminal':terminal,
+                        'succeeded':sum(file['status']=='completed' for file in task['files']),
+                        'failed':sum(file['status']=='failed' for file in task['files']),
+                        'completion_ratio':terminal/total if total else None,
+                        'scope':'file_completion_not_ocr_stage_progress'},
             "cancel_requested": task.get("cancel_requested", False),
             "cancel_scope": task.get("cancel_scope"), "provider": task.get("provider", "self_hosted"),
             "created_at": task["created_at"], "completed_at": task["completed_at"], "error": task["error"],
@@ -62,13 +70,14 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
     explicit_tokens = tokens is not None
     tokens = tokens if tokens is not None else json.loads(os.getenv("PARSING_API_TOKENS_JSON", "{}"))
     from qa_core.api.principals import AuthRegistry, runtime_credentials, PrincipalInfo
-    registry = AuthRegistry(tokens)
+    registry = AuthRegistry(tokens,allow_empty=bool(os.getenv('AUTH_ACCOUNTS_FILE')))
     if not explicit_tokens:
         runtime = os.getenv('PARSING_AUTH_CONFIG_FILE')
         if runtime is None and Path('/private/runtime.json').is_file():
             runtime = '/private/runtime.json'
         registry = AuthRegistry(tokens, loader=(lambda: runtime_credentials(runtime)) if runtime else
-                                (lambda: json.loads(os.environ['PARSING_API_TOKENS_JSON'])))
+                                (lambda: json.loads(os.getenv('PARSING_API_TOKENS_JSON','{}'))),
+                                allow_empty=bool(os.getenv('AUTH_ACCOUNTS_FILE')))
     if service is None:
         dual_router = None
         if dual_config.enabled:
@@ -125,6 +134,10 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
 
     app = FastAPI(title="Document parsing", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
+    from qa_core.api.accounts import AccountStore,register_accounts,atomic_json
+    account_store=AccountStore(config.result_dir)
+    account_store.legacy_registry=registry
+    app.state.account_store=account_store
 
     @app.get("/", include_in_schema=False)
     async def upload_page():
@@ -143,20 +156,39 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
     async def authenticated(request: Request, credentials=Security(HTTPBearer(auto_error=False))):
         authorization = request.headers.get("authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
-        return registry.resolve(token)
+        try:
+            identity=registry.resolve(token)
+        except MinerUError as error:
+            if error.status!=401:
+                raise
+            identity=account_store.resolve(token)
+        request.state.principal=identity
+        return identity
 
     app.state.auth_registry = registry
+    register_accounts(app,authenticated,account_store)
 
-    async def owner(identity=Depends(authenticated)):
+    async def owner(request: Request,identity=Depends(authenticated)):
+        if identity.is_admin:
+            from qa_core.access import ALL_OWNERS
+            from qa_core.api.principals import identifier
+            selected=request.query_params.get('owner_id')
+            if selected is not None:
+                if not identifier(selected):
+                    raise MinerUError('invalid_owner_id',422)
+                return selected
+            if not (request.method=='POST' and request.url.path in {'/api/parse/files','/api/parse/tasks'}):
+                return ALL_OWNERS
+        elif 'owner_id' in request.query_params:
+            raise MinerUError('owner_selection_forbidden',403)
         if identity.owner_id is None:
-            raise MinerUError('owner_scope_required',403)
+            raise MinerUError('target_owner_required' if identity.is_admin else 'owner_scope_required',422 if identity.is_admin else 403)
         return identity.owner_id
 
     @app.get('/api/auth/me', response_model=PrincipalInfo)
     async def auth_me(identity=Depends(authenticated)):
-        return {'principal_id':identity.principal_id,'owner_id':identity.owner_id,
-                'roles':sorted(identity.roles),'review_owner_scopes':list(identity.review_owner_scopes),
-                'credential_status':identity.credential_status,'document_delete_owner_scopes':list(identity.document_delete_owner_scopes)}
+        from qa_core.api.principals import principal_info
+        return principal_info(identity)
 
     @app.get("/api/parse/info")
     async def info(identity=Depends(authenticated)):
@@ -199,8 +231,8 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
             valid = signature.startswith(b"%PDF-") if suffix == ".pdf" else signature.startswith(b"PK") if suffix == ".docx" else signature.startswith(b"\x89PNG\r\n\x1a\n") if suffix == ".png" else signature.startswith(b"\xff\xd8\xff")
             if not valid:
                 raise MinerUError("file_type_mismatch", 415)
-            metadata = {"file_name": file_name, "path": str(target.resolve()), "sha256": digest.hexdigest(), "bytes": size}
-            await asyncio.to_thread((root / (fid + ".json")).write_text, json.dumps(metadata), encoding="utf-8")
+            metadata = {"file_name": file_name, "path": str(target.resolve()), "sha256": digest.hexdigest(), "bytes": size,'owner_id':identity}
+            await asyncio.to_thread(atomic_json,root/(fid+'.json'),metadata)
         except BaseException:
             target.unlink(missing_ok=True)  # 仅清理程序生成的未完成上传文件，绝不使用语料路径
             raise

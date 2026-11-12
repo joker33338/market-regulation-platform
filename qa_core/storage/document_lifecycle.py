@@ -63,9 +63,18 @@ def delete_document(reader,principal,file_id,references):
     if not re.fullmatch('[a-f0-9]{32}',file_id):
         raise MinerUError('invalid_file_id',422)
     owner=principal.owner_id
-    if owner is None or not principal.can_delete(owner):
+    if not principal.is_admin:
         raise MinerUError('document_delete_forbidden',403)
     with lifecycle(reader.config.result_dir):
+        from qa_core.access import ALL_OWNERS
+        value,source=reader.upload(ALL_OWNERS,file_id)
+        owner=value.get('owner_id')
+        if not owner:
+            # 旧元数据不含owner时只使用真实认证映射，不反推或修改历史owner。
+            candidates=getattr(reader,'known_owner_ids',lambda:[])()
+            owner=next((candidate for candidate in candidates if reader.root(candidate)==source.parent),None)
+        if not owner:
+            raise MinerUError('legacy_owner_unresolved',409)
         root=reader.root(owner)
         if root.is_symlink() or root.resolve().parent != (reader.config.result_dir/'sources').resolve():
             raise MinerUError('source_storage_unavailable',503)

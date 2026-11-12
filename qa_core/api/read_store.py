@@ -25,6 +25,9 @@ class ReviewReader:
 
     @staticmethod
     def scope(owner):
+        from qa_core.access import is_all_owners
+        if is_all_owners(owner):
+            return 'TRUE',[]
         if isinstance(owner,str):
             return "source_location->>'owner_id'=%s", [owner]
         scopes = list(owner)
@@ -63,10 +66,11 @@ class ReviewReader:
             return bool(cursor.fetchone()['referenced'])
 
     def stats(self, owner):
+        where,args=self.scope(owner)
         with self.cursor() as cursor:
             cursor.execute("""SELECT count(*) AS total,
                 count(*) FILTER (WHERE requires_review) AS requires_review
-                FROM document_review.documents WHERE source_location->>'owner_id'=%s""", (owner,))
+                FROM document_review.documents WHERE """+where,args)
             return dict(cursor.fetchone())
 
     def health(self):

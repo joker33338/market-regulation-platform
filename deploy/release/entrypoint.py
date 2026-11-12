@@ -6,7 +6,7 @@ from pathlib import Path
 
 def configuration(path):
     values = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    allowed = {"PARSING_API_TOKENS_JSON", "PARSING_RESULT_PG_DSN", "MINERU_API_KEY", "REVIEW_MYSQL_CONFIG_JSON"}
+    allowed = {"PARSING_API_TOKENS_JSON", "PARSING_RESULT_PG_DSN", "MINERU_API_KEY", "REVIEW_MYSQL_CONFIG_JSON",'AUTH_ACCOUNTS_FILE','KNOWLEDGE_WRITE_PG_DSN'}
     if (not isinstance(values, dict) or set(values) - allowed
             or not all(isinstance(value, str) for value in values.values())
             or not all(values.get(key) for key in ("PARSING_API_TOKENS_JSON", "PARSING_RESULT_PG_DSN"))):

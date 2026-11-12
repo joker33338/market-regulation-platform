@@ -21,6 +21,8 @@ class PrincipalInfo(BaseModel):
     review_owner_scopes: list[str]
     credential_status: Literal['active','disabled','revoked']
     document_delete_owner_scopes: list[str] = []
+    permissions: list[str] = []
+    data_scope: str = 'scoped'
 
 
 @dataclass(frozen=True)
@@ -33,21 +35,31 @@ class Principal:
     document_delete_owner_scopes: tuple[str, ...] = ()
 
     @property
+    def is_admin(self):
+        return self.credential_status=='active' and 'ADMIN' in self.roles
+
+    @property
     def read_owners(self):
+        if self.is_admin:
+            from qa_core.access import ALL_OWNERS
+            return ALL_OWNERS
         owners = ([self.owner_id] if self.owner_id else [])
         if 'REVIEWER' in self.roles:
             owners.extend(self.review_owner_scopes)
         return tuple(sorted(set(owners)))
 
     def can_delete(self, owner_id):
-        return self.credential_status == 'active' and 'ADMIN' in self.roles and self.owner_id == owner_id and owner_id in self.document_delete_owner_scopes
+        return self.is_admin and isinstance(owner_id,str) and bool(owner_id)
 
     def can_review(self, owner_id):
-        return self.credential_status == 'active' and 'REVIEWER' in self.roles and owner_id in self.review_owner_scopes
+        return self.credential_status=='active' and (self.is_admin or 'REVIEWER' in self.roles and owner_id in self.review_owner_scopes)
 
 
 def owner_selector(principal):
     scopes = principal.read_owners
+    from qa_core.access import is_all_owners
+    if is_all_owners(scopes):
+        return scopes
     return scopes[0] if len(scopes) == 1 else scopes
 
 
@@ -59,9 +71,13 @@ def data_owner(principal, row):
 
 
 class AuthRegistry:
-    def __init__(self, records, loader=None):
-        self._records = self.validate(records)
+    def __init__(self, records, loader=None,allow_empty=False):
+        self.allow_empty=allow_empty
+        self._records = self.validated(records)
         self._loader = loader
+
+    def validated(self,records):
+        return () if self.allow_empty and records=={} else self.validate(records)
 
     @staticmethod
     def validate(records):
@@ -109,12 +125,16 @@ class AuthRegistry:
 
     def replace(self, records):
         # 仅供内部配置装载/测试使用，不提供公开账号或授权修改接口。
-        validated = self.validate(records)
+        validated = self.validated(records)
         self._records, self._loader = validated, None
+
+    def principals(self):
+        records=self.validated(self._loader()) if self._loader else self._records
+        return tuple(principal for _,principal in records)
 
     def resolve(self, token):
         try:
-            records = self.validate(self._loader()) if self._loader else self._records
+            records = self.validated(self._loader()) if self._loader else self._records
         except Exception:
             raise MinerUError('auth_configuration_unavailable',503) from None
         for expected, principal in records:
@@ -122,6 +142,21 @@ class AuthRegistry:
                 return principal
         raise MinerUError('unauthorized',401)
 
+
+def principal_info(identity):
+    permissions=['knowledge.read']
+    if identity.owner_id:
+        permissions+=['document.read:own','document.upload:own','parse.manage:own']
+    if 'REVIEWER' in identity.roles:
+        permissions+=['document.read:review_scopes','review.write:review_scopes']
+    if identity.is_admin:
+        permissions=['account.manage','document.read:any','document.delete:any','document.upload:any',
+                     'parse.manage:any','review.write:any','knowledge.build','knowledge.publish','knowledge.rollback',
+                     'knowledge.read','monitoring.read:any']
+    return {'principal_id':identity.principal_id,'owner_id':identity.owner_id,'roles':sorted(identity.roles),
+            'review_owner_scopes':list(identity.review_owner_scopes),'credential_status':identity.credential_status,
+            'document_delete_owner_scopes':list(identity.document_delete_owner_scopes),
+            'permissions':permissions,'data_scope':'all' if identity.is_admin else 'scoped'}
 
 def runtime_credentials(path):
     value = json.loads(Path(path).read_text(encoding='utf-8-sig'))

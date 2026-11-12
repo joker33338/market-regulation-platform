@@ -38,25 +38,34 @@ class TaskRepository:
             count = connection.execute("SELECT COUNT(*) FROM parse_tasks WHERE status IN ('created','uploading','pending','running')").fetchone()[0]
             if count >= queue_limit:
                 raise MinerUError("queue_full", 429)
+            from .task_events import append_events
+            append_events(task)
             connection.execute("INSERT INTO parse_tasks(id,owner,request_key,fingerprint,payload,status) VALUES(?,?,?,?,?,?)", (
                 task["id"], task["owner"], task["request_key"], task["fingerprint"], json.dumps(task), task["status"]))
             return task, True
 
     def get(self, task_id, owner=None):
+        from qa_core.access import is_all_owners
         with self.connect() as connection:
             row = connection.execute("SELECT owner,payload,cancel_requested FROM parse_tasks WHERE id=?", (task_id,)).fetchone()
-        if row is None or (owner is not None and row[0] != owner):
+        if row is None or (owner is not None and not is_all_owners(owner) and row[0] != owner):
             raise MinerUError("task_not_found", 404)
         return {**json.loads(row[1]), "cancel_requested": bool(row[2])}
 
     def save(self, task):
         with self.connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT payload FROM parse_tasks WHERE id=? AND owner=?',(task['id'],task['owner'])).fetchone()
+            if row is None:
+                raise MinerUError('task_not_found',404)
+            from .task_events import append_events
+            append_events(task,json.loads(row[0]))
             connection.execute("UPDATE parse_tasks SET payload=?,status=? WHERE id=?", (json.dumps(task), task["status"], task["id"]))
 
     def request_cancel(self, task_id, owner):
-        self.get(task_id, owner)
+        task=self.get(task_id, owner)
         with self.connect() as connection:
-            connection.execute("UPDATE parse_tasks SET cancel_requested=1 WHERE id=? AND owner=?", (task_id, owner))
+            connection.execute("UPDATE parse_tasks SET cancel_requested=1 WHERE id=? AND owner=?", (task_id, task['owner']))
 
     def resumable(self, limit=20):
         with self.connect() as connection:
@@ -66,7 +75,8 @@ class TaskRepository:
     def owned_tasks(self, owner):
         """只读一致性快照；列表、文件关联和统计共用现有任务，不创建第二套队列。"""
         with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT payload,cancel_requested FROM parse_tasks WHERE owner=? ORDER BY rowid DESC",
-                (owner,)).fetchall()
+            from qa_core.access import is_all_owners
+            rows = connection.execute("SELECT payload,cancel_requested FROM parse_tasks"+
+                ('' if is_all_owners(owner) else ' WHERE owner=?')+' ORDER BY rowid DESC',
+                () if is_all_owners(owner) else (owner,)).fetchall()
         return [{**json.loads(row[0]), "cancel_requested": bool(row[1])} for row in rows]
