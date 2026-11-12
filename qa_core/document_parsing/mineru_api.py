@@ -38,9 +38,11 @@ def redact_paths(value):
     return value
 
 
-def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None, batch_authorizer=None):
+def create_app(config=None, *, tokens=None, service=None, dual_config=None, cloud_grants=None, batch_authorizer=None,
+               frontend_reader=None):
     # API 可选依赖按需导入，不影响 CLI 和业务模块的独立加载。
-    from fastapi import Depends, FastAPI, Request
+    from fastapi import Depends, FastAPI, Request, Security
+    from fastapi.security import HTTPBearer
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
     config = config or MinerUConfig.from_env()
@@ -124,14 +126,14 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
 
     @app.exception_handler(MinerUError)
     async def parse_error(request, exc):
-        status = exc.status if exc.status in {400, 401, 404, 409, 413, 415, 429, 503} else 502
+        status = exc.status if exc.status in {400, 401, 403, 404, 409, 413, 415, 429, 503} else 502
         return JSONResponse({"error": {"code": exc.code}}, status_code=status)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request, exc):
         return JSONResponse({"error": {"code": "invalid_request"}}, status_code=422)
 
-    async def owner(request: Request):
+    async def owner(request: Request, credentials=Security(HTTPBearer(auto_error=False))):
         authorization = request.headers.get("authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         for expected, identity in tokens.items():
@@ -253,4 +255,6 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
                 if path.is_file():
                     return FileResponse(path, media_type="application/octet-stream", filename=file_id + ".bin")
         raise MinerUError("artifact_not_found", 404)
+    from qa_core.api.frontend import register_frontend
+    register_frontend(app, service, config, owner, reader=frontend_reader)
     return app

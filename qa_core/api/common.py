@@ -1,0 +1,223 @@
+"""前端查询适配：复用任务身份、解析结果及 public 知识库，禁止隐式业务写入。"""
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import threading
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
+
+from qa_core.document_parsing.mineru_client import MinerUError
+from qa_core.document_parsing.mineru_api import public
+from qa_core.utils import IngestionError
+from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
+                      PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse,
+                      VersionInfo)
+
+
+def safe(value):
+    """保留解析正文；去除运行目录、认证数据及可能含内部路径的异常详情。"""
+    if isinstance(value, dict):
+        return {key: safe(item) for key, item in value.items()
+                if key.lower() not in {"path", "dsn", "token", "api_key", "password", "authorization",
+                                       "raw_result_location", "error_message", "traceback", "authorization_context",
+                                       "url", "headers", "credentials", "upload"}
+                and not key.lower().endswith(("_path", "_dir", "_root", "_token", "_secret"))}
+    if isinstance(value, (list, tuple)):
+        return [safe(item) for item in value]
+    return value
+
+
+def guarded(function):
+    """查询失败显式返回不可用，不把连接异常及驱动调试文本发给浏览器。"""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except MinerUError:
+            raise
+        except Exception:
+            raise MinerUError("read_service_unavailable", 503) from None
+    return wrapped
+
+
+def page_of(rows, page, page_size, source):
+    return {"list": rows[(page - 1) * page_size:page * page_size], "total": len(rows),
+            "page": page, "page_size": page_size, "source": source}
+
+
+from .read_store import ReviewReader
+
+class FrontendReader:
+    def __init__(self, service, config, *, review=None, kb_factory=None, embeddings_factory=None):
+        self.service, self.config = service, config
+        dsn = getattr(service.result_sink, "dsn", None)
+        self.review = review or (ReviewReader(dsn) if dsn else None)
+        self.kb_dsn = os.getenv("PG_DSN") or getattr(service.result_sink, "dsn", None)
+        self.kb_factory = kb_factory or self._database
+        self.embeddings_factory = embeddings_factory or self._local_embeddings
+        self._embeddings = None
+        self._search_lock = threading.Lock()
+
+    def root(self, owner):
+        # GET 不创建目录；上传接口才拥有生成文件的职责。
+        return self.config.result_dir / "sources" / hashlib.sha256(owner.encode()).hexdigest()
+
+    def upload(self, owner, file_id):
+        if not re.fullmatch(r"[0-9a-f]{32}", file_id):
+            raise MinerUError("source_not_found", 404)
+        root = self.root(owner)
+        path = root / (file_id + ".json")
+        if not path.is_file():
+            raise MinerUError("source_not_found", 404)
+        value = json.loads(path.read_text(encoding="utf-8"))
+        suffix = Path(value["file_name"]).suffix.lower()
+        from qa_core.document_parsing.mineru_service import SUFFIXES
+        if suffix not in SUFFIXES:
+            raise MinerUError("unsupported_file", 415)
+        expected = root / (file_id + suffix)
+        # 只允许 owner 目录内按上传 ID 生成的文件，不能接受任意绝对路径或链接逃逸。
+        if (expected.resolve().parent != root.resolve() or expected.is_symlink() or path.is_symlink()
+                or Path(value["path"]).resolve() != expected.resolve()):
+            raise MinerUError("source_not_found", 404)
+        value["file_id"] = file_id
+        has_timestamp = "uploaded_at" in value
+        value["uploaded_at"] = value.get("uploaded_at") or datetime.fromtimestamp(
+            path.stat().st_mtime, timezone.utc).isoformat()
+        value["uploaded_at_source"] = "upload_metadata" if has_timestamp else "metadata_mtime"
+        return value, expected
+
+    def history(self, owner, file_id, tasks=None):
+        tasks = self.service.repository.owned_tasks(owner) if tasks is None else tasks
+        return [(task, file) for task in tasks for file in task["files"]
+                if file.get("source_file_id") == file_id]
+
+    def documents(self, owner):
+        tasks = self.service.repository.owned_tasks(owner)
+        by_source = {}
+        for task in tasks:
+            for file in task["files"]:
+                by_source.setdefault(file.get("source_file_id"), []).append((task, file))
+        rows = []
+        for path in self.root(owner).glob("*.json"):
+            value, _ = self.upload(owner, path.stem)
+            history = by_source.get(path.stem, [])
+            task, file = history[0] if history else (None, None)
+            status = file["status"] if file else "uploaded"
+            if file and status == "completed" and file.get("requires_review"):
+                status = "pending_review"
+            suffix = Path(value["file_name"]).suffix.lower()[1:]
+            rows.append({"file_id": path.stem, "file_name": value["file_name"],
+                         "doc_type": suffix if suffix in {"pdf", "docx"} else "image",
+                         "size_bytes": value["bytes"], "sha256": value["sha256"],
+                         "uploaded_at": value["uploaded_at"], "uploaded_at_source": value["uploaded_at_source"],
+                         "status": status, "latest_task_id": task["id"] if task else None,
+                         "parse_count": len(history)})
+        return sorted(rows, key=lambda row: (row["uploaded_at"], row["file_id"]), reverse=True)
+
+    def review_store(self):
+        if self.review is None:
+            raise MinerUError("review_database_not_configured", 503)
+        return self.review
+
+    def task_file(self, owner, task_id, file_id):
+        task = self.service.repository.get(task_id, owner)
+        for file in task["files"]:
+            if file["id"] == file_id:
+                return task, file
+        raise MinerUError("file_not_found", 404)
+
+    def candidate(self, task, file, *, local=False):
+        if local:
+            if not task.get("routing_protocol"):
+                return None
+            path = self.config.result_dir / task["id"] / file["id"] / "local-candidate.json"
+        else:
+            directory = file.get("result_path") or (file.get("local_result_path") if task.get("routing_protocol") else None)
+            if not directory:
+                return None
+            path = Path(directory) / "normalized.json"
+        root = self.config.result_dir.resolve()
+        if not path.resolve().is_relative_to(root) or not path.is_file():
+            return None
+        if path.stat().st_size > self.config.max_expanded_bytes:
+            raise MinerUError("result_too_large", 503)
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def review_detail(self, owner, parse_id):
+        row = self.review_store().detail(owner, parse_id)
+        location = row["source_location"]
+        task_id, source_id = location.get("local_task_id"), location.get("source_file_id")
+        candidate = None
+        if task_id and source_id:
+            try:
+                task = self.service.repository.get(task_id, owner)
+            except MinerUError as exc:
+                if exc.status != 404:
+                    raise
+            else:
+                for file in task["files"]:
+                    # 使用已持久映射交叉核验；绝不从 parse_id 推导文件 ID。
+                    if file.get("database_parse_id") == parse_id and file.get("source_file_id") == source_id:
+                        candidate = self.candidate(task, file, local=True)
+        return safe({**row, "task_id": task_id, "source_file_id": source_id,
+                     "local_candidate": candidate, "local_candidate_available": candidate is not None,
+                     "review_write_supported": False})
+
+    def _database(self):
+        from qa_core.storage.database import Database
+        if not self.kb_dsn:
+            raise MinerUError("knowledge_database_not_configured", 503)
+        # HTTP 仅服务正式 public；绝不读取 mvp_test_* 的 ACTIVE 作为正式知识库。
+        return Database(pg_dsn=self.kb_dsn, kb_schema="public")
+
+    @staticmethod
+    def _local_embeddings():
+        from qa_core.config.settings import Settings
+        from qa_core.retrieval.models import create_embeddings
+        settings = Settings.from_env()
+        if settings.embedding_backend != "local":
+            raise MinerUError("local_embeddings_required", 503)
+        return create_embeddings(settings)
+
+    def search(self, body):
+        from qa_core.retrieval.store import keyword_search, retrieve
+        database = self.kb_factory()
+        try:
+            with database.transaction(read_only=True):
+                active = database.active_version()
+                if not active:
+                    return {"status": "unpublished", "kb_version": None, "mode": body.mode,
+                            "list": [], "count": 0}
+                if body.mode == "keyword":
+                    hits = keyword_search(database, body.query, body.limit)
+            if body.mode == "hybrid":
+                if not self._search_lock.acquire(blocking=False):
+                    raise MinerUError("search_busy", 429)
+                try:
+                    self._embeddings = self._embeddings or self.embeddings_factory()
+                    hits = retrieve(database, self._embeddings, body.query, body.limit)
+                finally:
+                    self._search_lock.release()
+                # retrieve 在其只读快照内绑定 ACTIVE；版本在两次查询间切换时以命中为准。
+                active = hits[0]["kb_version"] if hits else active
+            rows = []
+            for hit in hits:
+                metadata = hit["metadata"]
+                if isinstance(metadata, str):
+                    metadata = json.loads(metadata)
+                rows.append({"chunk_id": hit["chunk_id"], "doc_version_id": hit["doc_version_id"],
+                             "regulation_name": hit["law_name"], "article_no": hit["article_no"],
+                             "article_text": hit["content"], "chapter": hit["chapter"],
+                             "kb_version": hit["kb_version"], "raw_score": hit.get("rrf_score", hit.get("score")),
+                             "score_kind": "rrf" if "rrf_score" in hit else "keyword_match",
+                             "source": safe(metadata)})
+            return {"status": "ready", "kb_version": active, "mode": body.mode, "list": rows, "count": len(rows)}
+        finally:
+            database.close()
