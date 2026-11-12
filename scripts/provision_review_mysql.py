@@ -13,7 +13,6 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', required=True)
     parser.add_argument('--config-out', required=True, type=Path)
-    parser.add_argument('--writer', action='append', default=[])
     parser.add_argument('--api-host', required=True)
     parser.add_argument('--api-port', type=int, default=3306)
     args=parser.parse_args()
@@ -46,7 +45,7 @@ def main():
         target.parent.mkdir(parents=True,exist_ok=True)
         with target.open('x',encoding='utf-8') as stream:
             json.dump(dict(host=args.api_host,port=args.api_port,user=user,password=password,
-                           database=args.database,writers=args.writer),stream)
+                           database=args.database),stream)
         print('新审核库与最小权限账号准备完成；配置仅保存在指定ignored文件。')
     finally:
         connection.close()

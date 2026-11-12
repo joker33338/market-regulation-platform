@@ -27,11 +27,15 @@ class MySQLReviewTests(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.fixture.setUp()
         self.client=self.fixture.client
+        self.records = {
+            'a'*32: dict(principal_id='reviewer-a',owner_id='alice',roles=['REVIEWER'],review_owner_scopes=['alice'],credential_status='active'),
+            'b'*32: dict(principal_id='user-b',owner_id='bob',roles=['USER'],review_owner_scopes=[],credential_status='active')}
+        self.fixture.app.state.auth_registry.replace(self.records)
         self.ledger=MySQLReviewLedger(self.config)
         self.fixture.app.state.review_ledger=self.ledger
         self.pid='synthetic-'+uuid4().hex
         self.source=dict(parse_id=self.pid,document_id='synthetic-document',file_name='synthetic.pdf',
-            parsing_status='needs_review',requires_review=True,source_location={},quality={},
+            parsing_status='needs_review',requires_review=True,source_location={'owner_id':'alice'},quality={},
             raw_text='synthetic original',markdown_content='synthetic original',original_result={'pages':[{'page_number':1}]})
         def detail(owner,parse_id):
             if owner!='alice' or parse_id!=self.pid:
@@ -76,15 +80,18 @@ class MySQLReviewTests(unittest.TestCase):
         url=f'/api/review/{self.pid}/approve'
         body=dict(base_result_id=self.pid,expected_version=0)
         self.assertEqual(self.client.post(url,json=body).status_code,401)
-        self.assertEqual(self.client.post(url,json=body,headers={**self.fixture.other,'Idempotency-Key':'x'}).status_code,404)
+        self.assertEqual(self.client.post(url,json=body,headers={**self.fixture.other,'Idempotency-Key':'x'}).status_code,403)
         self.assertEqual(self.post('reject').status_code,422)
         self.assertEqual(self.post('save-revision',page=99,content='x').status_code,422)
         self.assertEqual(self.post('mark-error',reason='synthetic').status_code,422)
         self.assertEqual(self.post('save-revision',content='x').status_code,422)
         self.assertEqual(self.post('approve',content='x').status_code,422)
         self.assertEqual(self.client.post(url,json=body,headers=self.fixture.auth).status_code,422)
-        self.ledger.writers=frozenset()
+        self.records['a'*32]['roles']=['USER']
+        self.fixture.app.state.auth_registry.replace(self.records)
         self.assertEqual(self.post('approve').status_code,403)
+        self.records['a'*32]['roles']=['REVIEWER']
+        self.fixture.app.state.auth_registry.replace(self.records)
         self.fixture.app.state.review_ledger=None
         self.assertEqual(self.post('approve').status_code,503)
 
@@ -104,7 +111,7 @@ class MySQLReviewTests(unittest.TestCase):
         body=dict(base_result_id=self.pid,expected_version=0,reason='',page=None,content=None,span=None)
         def write(_):
             try:
-                return self.ledger.apply('alice',self.pid,'approve',body,uuid4().hex,'a'*64)['version']
+                return self.ledger.apply('alice',self.pid,'approve',body,uuid4().hex,'a'*64,operator_id='reviewer-a')['version']
             except MinerUError as exc:
                 return exc.code
         with ThreadPoolExecutor(max_workers=2) as pool:

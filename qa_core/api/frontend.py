@@ -3,29 +3,30 @@ from fastapi import Depends
 from .common import FrontendReader
 
 
-def register_frontend(app, service, config, owner, reader=None):
+def register_frontend(app, service, config, owner, reader=None, principal=None):
+    principal = principal or owner
     reader = reader or FrontendReader(service, config)
     from qa_core.storage.mysql_review_ledger import MySQLReviewLedger
     app.state.review_ledger = MySQLReviewLedger.from_env()
     @app.get("/api/openapi.json", include_in_schema=False)
-    def openapi(identity=Depends(owner)):
+    def openapi(identity=Depends(principal)):
         return app.openapi()
     from .documents import register_documents
-    register_documents(app, service, config, owner, reader)
+    register_documents(app, service, config, owner, reader, principal)
     from .tasks import register_tasks
     register_tasks(app, service, config, owner, reader)
     from .review import register_review
-    register_review(app, service, config, owner, reader)
+    register_review(app, service, config, principal, reader)
     from .review_writes import register_review_writes
-    register_review_writes(app, owner, reader)
+    register_review_writes(app, principal, reader)
     from .knowledge import register_knowledge
-    register_knowledge(app, service, config, owner, reader)
+    register_knowledge(app, service, config, owner, reader, principal)
     from .search import register_search
-    register_search(app, service, config, owner, reader)
+    register_search(app, service, config, principal, reader)
     from .monitoring import register_monitoring
-    register_monitoring(app, service, config, owner, reader)
+    register_monitoring(app, service, config, owner, reader, principal)
     from .resources import register_resources
-    register_resources(app, owner)
+    register_resources(app, principal)
     from .contracts import annotate_legacy
     annotate_legacy(app)
     app.state.frontend_reader = reader

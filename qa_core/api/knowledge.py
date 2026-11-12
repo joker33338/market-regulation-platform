@@ -14,15 +14,16 @@ from .common import guarded, page_of, safe
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
-def register_knowledge(app, service, config, owner, reader):
-    router = APIRouter(tags=["knowledge"], dependencies=[Depends(owner)])
+def register_knowledge(app, service, config, owner, reader, principal):
+    router = APIRouter(tags=["knowledge"], dependencies=[Depends(principal)])
     pagination = Query(default=1, ge=1)
     size = Query(default=20, ge=1, le=100)
 
     @router.post("/api/review/{parse_id}/preview", response_model=PreviewResponse)
     @guarded
-    def review_preview(parse_id: str, body: PreviewRequest, identity=Depends(owner)):
-        row = reader.review_store().detail(identity, parse_id)
+    def review_preview(parse_id: str, body: PreviewRequest, identity=Depends(principal)):
+        from .review_rbac import review_source
+        row, _ = review_source(reader, identity, parse_id)
         return preview(row["original_result"], body)
 
     def preview(value, body):

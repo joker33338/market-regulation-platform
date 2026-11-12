@@ -24,10 +24,7 @@ class MySQLReviewLedger:
             raise ValueError('审核台账必须使用独立数据库')
         if config.get('user', '').lower() == 'root':
             raise ValueError('审核服务禁止使用root')
-        writers = config.get('writers', [])
-        if not isinstance(writers, list) or not all(isinstance(value, str) and value for value in writers):
-            raise ValueError('审核写入授权名单格式错误')
-        self.writers = frozenset(writers)
+        # 旧writers键仅兼容读取；不再参与身份或审核授权。
         self.config = {key: config[key] for key in ('host', 'port', 'user', 'password', 'database')}
 
     @classmethod
@@ -76,8 +73,11 @@ class MySQLReviewLedger:
             return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
 
     def audit_logs(self, owner, page, page_size, action=None):
-        where = 'owner_key=%s'
-        args = [digest(owner)]
+        owners = [owner] if isinstance(owner,str) else list(owner)
+        if not owners:
+            return {'list': [], 'total': 0, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
+        where = 'owner_key IN ('+','.join(['%s']*len(owners))+')'
+        args = [digest(value) for value in owners]
         if action is not None:
             where += " AND JSON_UNQUOTE(JSON_EXTRACT(receipt,'$.action'))=%s"
             args.append(action)
@@ -90,8 +90,10 @@ class MySQLReviewLedger:
             rows = [json.loads(row['receipt']) for row in cursor.fetchall()]
         return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
 
-    def apply(self, owner, parse_id, action, body, request_key, source_digest):
-        owner_key, key_hash = digest(owner), digest(request_key)
+    def apply(self, owner, parse_id, action, body, request_key, source_digest, *, operator_id):
+        if not operator_id:
+            raise MinerUError('principal_required',403)
+        owner_key, key_hash = digest(owner), digest(canonical({'principal_id':operator_id,'key':request_key}))
         fingerprint = digest(canonical({'parse_id': parse_id, 'action': action, 'body': body}))
         with self.connection() as connection, connection.cursor() as cursor:
             # 同一对象先锁头记录，串行化版本分配；事件与头记录在同一事务提交。
@@ -113,7 +115,8 @@ class MySQLReviewLedger:
             revision = str(uuid4()) if action == 'save-revision' else head['current_revision']
             status = {'approve': 'approved', 'reject': 'rejected', 'mark-error': 'flagged', 'save-revision': 'pending'}[action]
             receipt = {'event_id': str(uuid4()), 'parse_id': parse_id, 'base_result_id': parse_id,
-                       'action': action, 'operator': owner, 'timestamp': datetime.now(timezone.utc).isoformat(),
+                       'action': action, 'operator': operator_id, 'operator_id': operator_id, 'owner_id': owner,
+                       'identity_model':'principal-v1', 'timestamp': datetime.now(timezone.utc).isoformat(),
                        'version': head['version']+1, 'revision_id': revision, 'status': status,
                        'before': {'version': head['version'], 'status': head['status'], 'revision_id': head['current_revision']},
                        'write_performed': True, 'original_result_modified': False,

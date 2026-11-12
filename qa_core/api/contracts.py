@@ -59,6 +59,6 @@ def annotate_legacy(app):
         schema = default_openapi()
         schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)
         schema["info"]["version"] = "0.2.3-dev"
-        schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-1"
+        schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-2"
         return schema
     app.openapi = openapi

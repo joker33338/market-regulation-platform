@@ -157,7 +157,7 @@ class FrontendReader:
         candidate = None
         if task_id and source_id:
             try:
-                task = self.service.repository.get(task_id, owner)
+                task = self.service.repository.get(task_id, location.get("owner_id"))
             except MinerUError as exc:
                 if exc.status != 404:
                     raise

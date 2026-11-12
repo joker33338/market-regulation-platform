@@ -23,9 +23,15 @@ class ReviewReader:
         finally:
             connection.close()
 
+    @staticmethod
+    def scope(owner):
+        if isinstance(owner,str):
+            return "source_location->>'owner_id'=%s", [owner]
+        scopes = list(owner)
+        return ("source_location->>'owner_id'=ANY(%s)", [scopes]) if scopes else ('FALSE', [])
+
     def listing(self, owner, page, page_size, requires_review=None):
-        where = "source_location->>'owner_id'=%s"
-        args = [owner]
+        where, args = self.scope(owner)
         if requires_review is not None:
             where += " AND requires_review=%s"
             args.append(requires_review)
@@ -40,11 +46,12 @@ class ReviewReader:
                     "page": page, "page_size": page_size, "source": "document_review.documents"}
 
     def detail(self, owner, parse_id):
+        where, args = self.scope(owner)
         with self.cursor() as cursor:
             cursor.execute("""SELECT parse_id,document_id,file_name,file_type,parsing_status,
                 requires_review,source_location,quality,raw_text,markdown_content,original_result,imported_at
-                FROM document_review.documents WHERE parse_id=%s AND source_location->>'owner_id'=%s""",
-                (parse_id, owner))
+                FROM document_review.documents WHERE parse_id=%s AND """ + where,
+                tuple([parse_id, *args]))
             row = cursor.fetchone()
         if row is None:
             raise MinerUError("document_not_found", 404)

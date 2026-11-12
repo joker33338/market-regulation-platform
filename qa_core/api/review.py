@@ -10,6 +10,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 from qa_core.document_parsing.mineru_api import public
 from qa_core.utils import IngestionError
 from .common import guarded, page_of, safe
+from .principals import owner_selector, data_owner
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
@@ -21,19 +22,20 @@ def register_review(app, service, config, owner, reader):
     @router.get("/api/review", response_model=ListResponse)
     @guarded
     def reviews(page: int = pagination, page_size: int = size, requires_review: bool = True, identity=Depends(owner)):
-        return safe(reader.review_store().listing(identity, page, page_size, requires_review))
+        return safe(reader.review_store().listing(owner_selector(identity), page, page_size, requires_review))
 
     @router.get("/api/review/{parse_id}", response_model=ReviewDetail)
     @guarded
     def review(parse_id: str, identity=Depends(owner)):
-        result = reader.review_detail(identity, parse_id)
+        result = reader.review_detail(owner_selector(identity), parse_id)
+        target_owner = data_owner(identity, result)
         ledger = app.state.review_ledger
         result['review_ledger'] = {'available': False, 'reason': 'not_configured'}
         if ledger is not None:
             try:
                 ledger.health()
-                result['review_ledger'] = {'available': True, 'reason': None, **ledger.state(identity, parse_id)}
-                result['review_write_supported'] = identity in ledger.writers
+                result['review_ledger'] = {'available': True, 'reason': None, **ledger.state(target_owner, parse_id)}
+                result['review_write_supported'] = identity.can_review(target_owner)
             except Exception:
                 result['review_ledger'] = {'available': False, 'reason': 'ledger_unavailable'}
         return result

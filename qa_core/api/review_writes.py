@@ -6,6 +6,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 from qa_core.storage.mysql_review_ledger import canonical, digest
 from .common import guarded
 from .schemas import ListResponse
+from .review_rbac import review_source, require_reviewer
 
 
 class ReviewAction(BaseModel):
@@ -24,6 +25,9 @@ class ReviewReceipt(BaseModel):
     base_result_id: str
     action: str
     operator: str
+    operator_id: str | None = None
+    owner_id: str | None = None
+    identity_model: str = "legacy-owner"
     timestamp: str
     version: int
     revision_id: str | None
@@ -48,21 +52,22 @@ def register_review_writes(app, owner, reader):
     router = APIRouter(tags=['review'], dependencies=[Depends(owner)])
 
     def authorize(identity, parse_id):
-        # 先复用PG只读owner检查；不存在或跨owner仍404，不泄露对象存在性。
-        source = reader.review_store().detail(identity, parse_id)
+        # 先校验审核角色，再执行范围限定PG查询；越界对象始终不可见。
+        require_reviewer(identity)
+        source, target_owner = review_source(reader, identity, parse_id)
+        if not identity.can_review(target_owner):
+            raise MinerUError("document_not_found",404)
         ledger = app.state.review_ledger
         if ledger is None:
             raise MinerUError('review_ledger_not_configured', 503)
-        if identity not in ledger.writers:
-            raise MinerUError('review_write_forbidden', 403)
         ledger.health()
-        return ledger, source
+        return ledger, source, target_owner
 
     def endpoint(action):
         @guarded
         def write(parse_id: str, body: ReviewAction,
                   idempotency_key: str = Header(min_length=1, max_length=128), identity=Depends(owner)):
-            ledger, source = authorize(identity, parse_id)
+            ledger, source, target_owner = authorize(identity, parse_id)
             if len(parse_id) > 128 or not parse_id.isascii() or body.base_result_id != parse_id:
                 raise MinerUError('review_base_result_mismatch', 409)
             if action in ('reject', 'mark-error') and not body.reason.strip():
@@ -75,10 +80,10 @@ def register_review_writes(app, owner, reader):
                 raise MinerUError('review_page_required', 422)
             if body.page is not None and body.page not in {page.get('page_number') for page in source['original_result'].get('pages', [])}:
                 raise MinerUError('review_page_not_found', 422)
-            return ledger.apply(identity, parse_id, action, body.model_dump(), idempotency_key,
+            return ledger.apply(target_owner, parse_id, action, body.model_dump(), idempotency_key,
                                 digest(canonical({'document_id': source['document_id'],
                                                   'original_result': source['original_result'],
-                                                  'raw_text': source.get('raw_text'), 'markdown_content': source.get('markdown_content')})))
+                                                  'raw_text': source.get('raw_text'), 'markdown_content': source.get('markdown_content')})), operator_id=identity.principal_id)
         return write
 
     for action in ('approve', 'reject', 'mark-error', 'save-revision'):
@@ -88,11 +93,11 @@ def register_review_writes(app, owner, reader):
     @router.get('/api/review/{parse_id}/events', response_model=ReviewEventsResponse)
     @guarded
     def events(parse_id: str, page: int = Query(1, ge=1), page_size: int = Query(20,ge=1,le=100), identity=Depends(owner)):
-        reader.review_store().detail(identity, parse_id)
+        _, target_owner = review_source(reader, identity, parse_id)
         ledger = app.state.review_ledger
         if ledger is None:
             raise MinerUError('review_ledger_not_configured', 503)
-        return ledger.events(identity, parse_id, page, page_size)
+        return ledger.events(target_owner, parse_id, page, page_size)
 
     @router.get('/api/system/audit-logs', response_model=ListResponse)
     @guarded
@@ -102,6 +107,6 @@ def register_review_writes(app, owner, reader):
         ledger = app.state.review_ledger
         if ledger is None:
             raise MinerUError('review_ledger_not_configured', 503)
-        return ledger.audit_logs(identity, page, page_size, action)
+        return ledger.audit_logs(identity.read_owners, page, page_size, action)
 
     app.include_router(router)

@@ -14,8 +14,8 @@ from .common import guarded, page_of, safe
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
-def register_documents(app, service, config, owner, reader):
-    router = APIRouter(tags=["documents"], dependencies=[Depends(owner)])
+def register_documents(app, service, config, owner, reader, principal):
+    router = APIRouter(tags=["documents"], dependencies=[Depends(principal)])
     pagination = Query(default=1, ge=1)
     size = Query(default=20, ge=1, le=100)
 
@@ -51,8 +51,9 @@ def register_documents(app, service, config, owner, reader):
     @router.get("/api/parse/files/{file_id}/source", response_class=FileResponse)
     @router.head("/api/parse/files/{file_id}/source", include_in_schema=False)
     @guarded
-    def source(file_id: str, identity=Depends(owner)):
-        value, path = reader.upload(identity, file_id)
+    def source(file_id: str, identity=Depends(principal)):
+        from .review_rbac import readable_upload
+        value, path = readable_upload(reader, identity, file_id)
         if not path.is_file():
             raise MinerUError("source_not_found", 404)
         digest = hashlib.sha256()

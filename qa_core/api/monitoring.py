@@ -13,8 +13,8 @@ from .common import guarded, page_of, safe
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
-def register_monitoring(app, service, config, owner, reader):
-    router = APIRouter(tags=["monitoring"], dependencies=[Depends(owner)])
+def register_monitoring(app, service, config, owner, reader, principal):
+    router = APIRouter(tags=["monitoring"], dependencies=[Depends(principal)])
     pagination = Query(default=1, ge=1)
     size = Query(default=20, ge=1, le=100)
 

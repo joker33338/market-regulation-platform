@@ -155,7 +155,7 @@ class FrontendAPITests(unittest.TestCase):
         self.assertFalse(detail.json()["local_candidate_available"])
         self.assertEqual(self.client.post("/api/review/p/approve",
             headers={**self.auth, "Idempotency-Key": "synthetic-review"},
-            json={"base_result_id": "p", "expected_version": 0}).status_code, 503)
+            json={"base_result_id": "p", "expected_version": 0}).status_code, 403)
         connection, cursor = MagicMock(), MagicMock()
         connection.cursor.return_value.__enter__.return_value = cursor
         cursor.fetchone.return_value = {"total": 0}

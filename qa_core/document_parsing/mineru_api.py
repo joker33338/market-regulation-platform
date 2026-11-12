@@ -59,9 +59,16 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
                     router.config.authorization_mode != 'TEST_BATCH' or not router.config.enabled or
                     not isinstance(router.batch_authorizer, TrustedTestBatch)):
                 raise MinerUError('test_batch_requires_bound_service', 503)
+    explicit_tokens = tokens is not None
     tokens = tokens if tokens is not None else json.loads(os.getenv("PARSING_API_TOKENS_JSON", "{}"))
-    if not tokens or any(len(token) < 32 or not owner for token, owner in tokens.items()):
-        raise MinerUError("api_auth_configuration_required", 503)
+    from qa_core.api.principals import AuthRegistry, runtime_credentials, PrincipalInfo
+    registry = AuthRegistry(tokens)
+    if not explicit_tokens:
+        runtime = os.getenv('PARSING_AUTH_CONFIG_FILE')
+        if runtime is None and Path('/private/runtime.json').is_file():
+            runtime = '/private/runtime.json'
+        registry = AuthRegistry(tokens, loader=(lambda: runtime_credentials(runtime)) if runtime else
+                                (lambda: json.loads(os.environ['PARSING_API_TOKENS_JSON'])))
     if service is None:
         dual_router = None
         if dual_config.enabled:
@@ -133,16 +140,26 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
     async def invalid_request(request, exc):
         return JSONResponse({"error": {"code": "invalid_request"}}, status_code=422)
 
-    async def owner(request: Request, credentials=Security(HTTPBearer(auto_error=False))):
+    async def authenticated(request: Request, credentials=Security(HTTPBearer(auto_error=False))):
         authorization = request.headers.get("authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
-        for expected, identity in tokens.items():
-            if hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
-                return identity
-        raise MinerUError("unauthorized", 401)
+        return registry.resolve(token)
+
+    app.state.auth_registry = registry
+
+    async def owner(identity=Depends(authenticated)):
+        if identity.owner_id is None:
+            raise MinerUError('owner_scope_required',403)
+        return identity.owner_id
+
+    @app.get('/api/auth/me', response_model=PrincipalInfo)
+    async def auth_me(identity=Depends(authenticated)):
+        return {'principal_id':identity.principal_id,'owner_id':identity.owner_id,
+                'roles':sorted(identity.roles),'review_owner_scopes':list(identity.review_owner_scopes),
+                'credential_status':identity.credential_status}
 
     @app.get("/api/parse/info")
-    async def info(identity=Depends(owner)):
+    async def info(identity=Depends(authenticated)):
         return {"mode": config.mode, "provider": config.provider, "enabled": config.enabled,
                 "database_enabled": service.result_sink is not None, 'dual_engine_enabled': bool(service.dual_router)}
 
@@ -256,5 +273,5 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
                     return FileResponse(path, media_type="application/octet-stream", filename=file_id + ".bin")
         raise MinerUError("artifact_not_found", 404)
     from qa_core.api.frontend import register_frontend
-    register_frontend(app, service, config, owner, reader=frontend_reader)
+    register_frontend(app, service, config, owner, reader=frontend_reader, principal=authenticated)
     return app

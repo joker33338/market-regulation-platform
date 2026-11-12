@@ -20,7 +20,7 @@ class ReviewProvisionSafetyTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.target=Path(self.temp.name)/'runtime.json'
         self.args=['provision','--database','market_review_test_abcdef','--config-out',str(self.target),
-                   '--api-host','mysql','--writer','synthetic-reviewer']
+                   '--api-host','mysql']
 
     def invoke(self,connection,args=None):
         with patch('sys.argv',args or self.args), patch.dict(os.environ,{'REVIEW_MYSQL_ADMIN_JSON':json.dumps({'host':'synthetic','user':'admin','password':'synthetic'})}), patch('pymysql.connect',return_value=connection):
@@ -54,7 +54,7 @@ class ReviewProvisionSafetyTests(unittest.TestCase):
         with patch('sys.stdout',io.StringIO()): self.invoke(connection)
         config=json.loads(self.target.read_text())
         self.assertNotEqual(config['user'],'root')
-        self.assertEqual(config['writers'],['synthetic-reviewer'])
+        self.assertNotIn('writers',config)
         grants=[call.args[0] for call in cursor.execute.call_args_list if call.args[0].startswith('GRANT')]
         self.assertEqual(len(grants),3)
         self.assertTrue(any('GRANT SELECT,INSERT ON' in sql and 'review_events' in sql for sql in grants))
