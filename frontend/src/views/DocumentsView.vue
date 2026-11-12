@@ -51,7 +51,7 @@
           <span class="card-sub">来自 POST /api/parse/files 的真实响应</span>
         </div>
       </template>
-      <el-table :data="realUploads" size="small">
+      <el-table :data="realUploads" size="small" max-height="200">
         <el-table-column prop="name" label="文件名称" min-width="220" show-overflow-tooltip />
         <el-table-column label="大小" width="100" align="right">
           <template #default="{ row }"><span class="num">{{ formatSize(row.bytes) }}</span></template>
@@ -142,7 +142,7 @@
 
       <el-divider content-position="left">关联 OCR 解析历史（真实 GET /parse-history）</el-divider>
       <AsyncPanel :state="history.state.value" :error="history.error.value" empty-text="该文档尚无关联解析任务" @retry="history.load()">
-        <el-table :data="history.data.value?.list || []" size="small">
+        <el-table :data="history.data.value?.list || []" size="small" max-height="240">
           <el-table-column label="任务 ID" min-width="140" show-overflow-tooltip>
             <template #default="{ row }"><code class="sha">{{ row.task.task_id }}</code></template>
           </el-table-column>

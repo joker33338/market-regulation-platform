@@ -162,7 +162,7 @@
           </el-descriptions>
 
           <el-divider content-position="left">任务文件（引擎与回退均由后端返回）</el-divider>
-          <el-table :data="realDetail.files" size="small">
+          <el-table :data="realDetail.files" size="small" max-height="240">
             <el-table-column prop="file_name" label="文件" min-width="150" show-overflow-tooltip />
             <el-table-column label="选定引擎" width="150"><template #default="{ row }">{{ engineLabel(row.selected_engine) }}</template></el-table-column>
             <el-table-column label="状态" width="100"><template #default="{ row }"><StatusTag :status="row.status" /></template></el-table-column>

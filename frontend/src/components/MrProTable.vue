@@ -52,6 +52,7 @@
       :data="rows"
       v-loading="loading"
       style="margin-top: 12px; width: 100%"
+      max-height="520"
       @sort-change="onSortChange"
     >
       <el-table-column

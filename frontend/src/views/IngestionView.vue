@@ -104,7 +104,7 @@
           </div>
         </template>
         <AsyncPanel :state="versions.state.value" :error="versions.error.value" empty-text="public 知识库暂无版本记录（后端返回空列表）" @retry="versions.load()">
-          <el-table :data="versions.data.value?.list || []" size="small" highlight-current-row @current-change="onSelectVersion">
+          <el-table :data="versions.data.value?.list || []" size="small" highlight-current-row max-height="260" @current-change="onSelectVersion">
             <el-table-column prop="kb_version" label="kb_version" min-width="170" show-overflow-tooltip />
             <el-table-column prop="status" label="状态" width="110" />
             <el-table-column label="ACTIVE" width="80">

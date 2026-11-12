@@ -15,8 +15,8 @@
       title="当前为只读审核预览，四个审核写操作全部禁用"
       description="待复核队列来自 GET /api/review（document_review.documents 完整语义，不依赖 findings 级 v_review_queue 视图）；详情来自 GET /api/review/{parse_id}；左侧原件来自 owner 隔离的 /source 接口。后端 review_write_supported 恒为 false，且未提供任何审核写入 HTTP 接口，前端不做本地状态变更、不假装审核成功。Markdown / 表格内容按纯文本展示，不执行 HTML。" />
 
-    <!-- 待复核队列：真实完整语义接口 -->
-    <el-card shadow="never" class="queue-card">
+    <!-- 待复核队列：真实完整语义接口；高度可由下方分隔条上下拖动调整 -->
+    <el-card shadow="never" class="queue-card" :class="{ resizable: queueHeight !== null }" :style="queueStyle">
       <template #header>
         <div class="card-head">
           <span>待复核队列 <span class="real-badge">REAL</span></span>
@@ -24,7 +24,7 @@
         </div>
       </template>
       <AsyncPanel :state="queue.state.value" :error="queue.error.value" empty-text="当前没有待人工复核的文档（后端返回空列表）" @retry="queue.load()">
-        <el-table :data="queue.data.value?.list || []" size="small" highlight-current-row @current-change="onSelectQueue">
+        <el-table :data="queue.data.value?.list || []" size="small" highlight-current-row max-height="220" @current-change="onSelectQueue">
           <el-table-column prop="file_name" label="文件名称" min-width="220" show-overflow-tooltip />
           <el-table-column prop="parsing_status" label="解析状态" width="110" />
           <el-table-column label="需复核" width="80"><template #default="{ row }"><el-tag size="small" :type="row.requires_review ? 'warning' : 'info'" effect="plain">{{ row.requires_review ? '是' : '否' }}</el-tag></template></el-table-column>
@@ -38,12 +38,34 @@
       </AsyncPanel>
     </el-card>
 
+    <!-- 上下拖动分隔条 + 两栏同时放大：便于左边原文与右边解析结果对照 -->
+    <div class="split-toolbar" :class="{ 'on-top': expandedPane === 'both' }">
+      <div class="v-resizer" :class="{ disabled: expandedPane === 'both' }"
+        title="按住上下拖动，调整队列与对比区域高度；双击恢复默认" @mousedown.prevent="startResize" @dblclick="resetResize">
+        <span class="v-resizer-grip">⋮⋮</span>
+        <span>{{ expandedPane === 'both' ? '对照放大中 · 按 Esc 或点击空白区域还原' : '上下拖动调整对比区高度（双击恢复默认）' }}</span>
+        <span class="v-resizer-grip">⋮⋮</span>
+      </div>
+      <el-button class="both-expand-btn" size="small" :icon="expandedPane === 'both' ? Close : FullScreen"
+        title="左右两栏同时放大，便于原文与解析结果对照；按 Esc 或点击空白区域还原"
+        @click="togglePane('both')">
+        {{ expandedPane === 'both' ? '退出对照放大' : '对照放大（两栏）' }}
+      </el-button>
+    </div>
+
     <!-- 左右双栏 -->
-    <div class="review-split">
-      <el-card shadow="never" class="pane" :body-style="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }">
+    <div class="review-split" :class="{ 'expanded-both': expandedPane === 'both' }">
+      <el-card shadow="never" class="pane" :class="{ expanded: expandedPane === 'preview' }"
+        :body-style="{ padding: 0, display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }">
         <div class="pane-toolbar">
-          <span class="pane-title">原始文件预览</span>
-          <span class="source-hint">GET /api/parse/files/{source_file_id}/source</span>
+          <div class="pane-head-left">
+            <span class="pane-title">原始文件预览</span>
+            <span class="source-hint">GET /api/parse/files/{source_file_id}/source</span>
+          </div>
+          <el-button class="expand-btn" size="small" :icon="expandedPane === 'preview' ? Close : FullScreen"
+            title="放大后可按 Esc 或点击空白区域还原" @click="togglePane('preview')">
+            {{ expandedPane === 'preview' ? '还原' : '单独放大' }}
+          </el-button>
         </div>
         <div class="preview-body">
           <DocumentPreview
@@ -56,7 +78,8 @@
         </div>
       </el-card>
 
-      <el-card shadow="never" class="pane" :body-style="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }">
+      <el-card shadow="never" class="pane" :class="{ expanded: expandedPane === 'result' }"
+        :body-style="{ padding: 0, display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }">
         <div class="pane-toolbar">
           <el-tabs v-model="resultTab" class="result-tabs">
             <el-tab-pane label="OCR 文本" name="text" />
@@ -66,6 +89,10 @@
             <el-tab-pane label="质量指标" name="quality" />
             <el-tab-pane label="候选对照" name="candidate" />
           </el-tabs>
+          <el-button class="expand-btn" size="small" :icon="expandedPane === 'result' ? Close : FullScreen"
+            title="放大后可按 Esc 或点击空白区域还原" @click="togglePane('result')">
+            {{ expandedPane === 'result' ? '还原' : '单独放大' }}
+          </el-button>
         </div>
 
         <AsyncPanel :state="detail.state.value" :error="detail.error.value" empty-text="请从上方待复核队列选择一条记录" @retry="detail.load()">
@@ -146,12 +173,15 @@
         <div class="action-hint mr-disabled-hint">{{ disabledHint }}</div>
       </el-card>
     </div>
+
+    <!-- 放大态遮罩：点击空白或按 Esc 还原。只切换外层定位，不销毁左右栏 DOM，PDF iframe 保持当前页 -->
+    <div v-if="expandedPane" class="pane-backdrop" @click="expandedPane = null" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Connection } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Connection, FullScreen, Close } from '@element-plus/icons-vue'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import DocumentPreview from '@/components/document/DocumentPreview.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
@@ -174,6 +204,51 @@ const queuePageSize = 10
 const currentParseId = ref('')
 const currentPage = ref(1)
 const resultTab = ref('text')
+
+/**
+ * 放大查看：只切换外层容器的定位，不销毁/重建左右栏 DOM。
+ * 这样 V022-F01 的 PDF iframe 与 Blob URL 生命周期保持连续，放大后仍可翻页/缩放。
+ */
+type ExpandablePane = 'preview' | 'result' | 'both' | null
+const expandedPane = ref<ExpandablePane>(null)
+function togglePane(which: 'preview' | 'result' | 'both') {
+  expandedPane.value = expandedPane.value === which ? null : which
+}
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && expandedPane.value) expandedPane.value = null
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+
+/* 上下拖动：调整「待复核队列」与「左右对比区」的高度分配。
+   只在本地改容器高度，不触发任何接口请求，也不改动业务数据。 */
+const queueHeight = ref<number | null>(null)
+const queueStyle = computed(() => queueHeight.value == null ? {} : { height: `${queueHeight.value}px` })
+let resizeStartY = 0
+let resizeStartH = 0
+function startResize(e: MouseEvent) {
+  if (expandedPane.value) return // 放大态下分栏已脱离文档流，拖动无意义
+  const card = document.querySelector('.queue-card') as HTMLElement | null
+  if (!card) return
+  resizeStartY = e.clientY
+  resizeStartH = card.getBoundingClientRect().height
+  queueHeight.value = resizeStartH // 先固化当前高度，避免首帧跳动
+  window.addEventListener('mousemove', onResize)
+  window.addEventListener('mouseup', stopResize)
+}
+function onResize(e: MouseEvent) {
+  const max = Math.max(160, window.innerHeight - 280)
+  queueHeight.value = Math.min(max, Math.max(110, resizeStartH + e.clientY - resizeStartY))
+}
+function stopResize() {
+  window.removeEventListener('mousemove', onResize)
+  window.removeEventListener('mouseup', stopResize)
+}
+function resetResize() { queueHeight.value = null }
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  stopResize()
+})
 
 const queue = useAsyncData<ReviewQueue>(
   (signal) => listReviews({ page: queuePage.value, pageSize: queuePageSize, requiresReview: true }, signal)
@@ -281,25 +356,30 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 .review-page { display: flex; flex-direction: column; height: calc(100vh - var(--mr-header-h)); overflow: hidden; }
 .header-tags { display: flex; gap: 8px; align-items: center; }
 .review-notice { margin-bottom: 12px; }
-.queue-card { margin-bottom: 14px; flex-shrink: 0; }
+.queue-card { margin-bottom: 0; flex-shrink: 0; }
+.queue-card.resizable { overflow-y: auto; }
 .queue-card :deep(.el-card__body) { padding: 10px 14px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
 .queue-pager { display: flex; justify-content: flex-end; margin-top: 8px; }
 .review-split { flex: 1; display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; min-height: 0; }
-.pane { min-height: 0; }
-.pane-toolbar { padding: 8px 14px; border-bottom: 1px solid var(--mr-line); display: flex; align-items: center; justify-content: space-between; }
-.pane-title { font-weight: 600; }
+.pane { min-height: 0; display: flex; flex-direction: column; }
+.pane-toolbar { padding: 8px 14px; border-bottom: 1px solid var(--mr-line); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+.pane-head-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pane-title { font-weight: 600; flex-shrink: 0; }
 .source-hint { font-size: 11px; color: var(--mr-text-3); font-family: monospace; }
+.expand-btn { flex-shrink: 0; margin-left: 8px; }
 .preview-body { flex: 1; min-height: 0; background: #eef1f6; }
+/* AsyncPanel 根容器撑成 flex 列后，result-body 的滚动才真正生效，长 JSON 不会被裁掉 */
+.pane :deep(.async-panel) { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .page-link {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 14px; background: #eef4ff; border-bottom: 1px solid #d5e5ff;
-  color: #1e40af; font-size: 12px;
+  color: #1e40af; font-size: 12px; flex-shrink: 0;
 }
 .page-link-text { flex: 1; min-width: 200px; color: var(--mr-text-2); }
 .page-link-tables { color: var(--mr-st-warning); }
-.result-tabs { width: 100%; }
+.result-tabs { flex: 1; min-width: 0; }
 .result-tabs :deep(.el-tabs__header) { margin: 0; }
 .result-body { flex: 1; overflow-y: auto; padding: 14px; min-height: 0; }
 .result-pre { font-family: var(--mr-font); font-size: 13px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; margin: 0; max-width: 100%; }
@@ -311,10 +391,53 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 .quality-value { font-size: 22px; font-weight: 700; color: var(--mr-primary); }
 .quality-label { font-size: 12px; color: var(--mr-text-2); }
 .hint-text { font-size: 12px; color: var(--mr-text-2); line-height: 1.8; }
-.meta-bar { display: flex; gap: 14px; padding: 10px 14px; border-top: 1px solid var(--mr-line); font-size: 12px; color: var(--mr-text-2); flex-wrap: wrap; }
+.meta-bar { display: flex; gap: 14px; padding: 10px 14px; border-top: 1px solid var(--mr-line); font-size: 12px; color: var(--mr-text-2); flex-wrap: wrap; flex-shrink: 0; }
 .mono { font-family: monospace; font-size: 12px; }
-.action-bar { display: flex; gap: 10px; padding: 12px 14px 4px; border-top: 1px solid var(--mr-line); background: #fafbfe; flex-wrap: wrap; }
-.action-hint { padding: 0 14px 10px; background: #fafbfe; }
+.action-bar { display: flex; gap: 10px; padding: 12px 14px 4px; border-top: 1px solid var(--mr-line); background: #fafbfe; flex-wrap: wrap; flex-shrink: 0; }
+.action-hint { padding: 0 14px 10px; background: #fafbfe; flex-shrink: 0; }
+
+/* 上下拖动分隔条：只调整队列卡片高度，对比区自动拿剩余空间 */
+.split-toolbar { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin: 8px 0; }
+.v-resizer {
+  flex: 1; min-width: 0; height: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  cursor: row-resize; user-select: none; border: 1px solid var(--mr-line); border-radius: 4px;
+  background: #f1f5fb; color: var(--mr-text-3); font-size: 11px;
+}
+.v-resizer:hover { background: #e3ecfa; color: var(--mr-primary); border-color: #b9cdf0; }
+.v-resizer.disabled { cursor: default; }
+.v-resizer-grip { letter-spacing: 2px; font-weight: 700; }
+.both-expand-btn { flex-shrink: 0; }
+/* 对照放大时工具条常驻顶部，保证「退出对照放大」始终可见可点 */
+.split-toolbar.on-top {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 2002; margin: 0;
+  padding: 8px 20px; box-sizing: border-box; background: #fff;
+  border-bottom: 1px solid var(--mr-line); box-shadow: 0 2px 10px rgba(15, 43, 82, .12);
+}
+
+/* 滚动条滑块统一样式见 styles/index.css（七个页面全局生效） */
+
+/* 放大查看：外层容器脱离栅格占满视口，内部仍是同一组件实例（PDF iframe 不重建） */
+.pane-backdrop { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 43, 82, .42); }
+.pane.expanded {
+  position: fixed; inset: 20px; z-index: 2001; margin: 0;
+  display: flex; flex-direction: column;
+  box-shadow: 0 18px 48px rgba(15, 43, 82, .3); border-radius: 8px;
+}
+.pane.expanded :deep(.el-card__body) { flex: 1 1 auto; min-height: 0; }
+.pane.expanded .result-pre { font-size: 14px; line-height: 1.9; }
+
+/* 对照放大：左右两栏同时占满视口并保持并排，原文与解析结果同屏对比 */
+.review-split.expanded-both {
+  position: fixed; inset: 52px 20px 20px; z-index: 2001; margin: 0; box-sizing: border-box;
+  grid-template-columns: 1fr 1.2fr; gap: 16px;
+  box-shadow: 0 18px 48px rgba(15, 43, 82, .3); border-radius: 8px;
+  background: var(--mr-bg, #fff); padding: 8px;
+}
+.review-split.expanded-both .result-pre { font-size: 14px; line-height: 1.9; }
+@media (max-width: 768px) {
+  .pane.expanded { inset: 8px; }
+  .review-split.expanded-both { inset: 44px 8px 8px; gap: 8px; padding: 4px; grid-template-columns: 1fr 1fr; }
+}
 @media (max-width: 1366px) {
   .review-split { grid-template-columns: 1fr 1fr; }
   .quality-grid { grid-template-columns: repeat(2, 1fr); }

@@ -227,3 +227,27 @@ body {
   .card-grid { gap: 12px; }
   .mr-pro-search { gap: 8px; }
 }
+
+/* ───────── 全局可拖动滚动条滑块 ─────────
+ * 文件 / 记录较多时，列表、详情抽屉、结果区与页面主内容区都能直接抓住滑块滑动浏览。
+ * 统一作用于七个页面的所有滚动容器（含 el-table、el-drawer、长 JSON / OCR 结果区）。
+ * 滑块设 min-height，超长列表里也不会缩成一条细线，便于抓取与拖拽。 */
+html { scrollbar-color: #b9c9e2 #f2f5fa; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: #f2f5fa; border-radius: 6px; }
+::-webkit-scrollbar-thumb {
+  background: #b9c9e2; background-clip: padding-box;
+  border: 3px solid transparent; border-radius: 6px; min-height: 48px;
+}
+::-webkit-scrollbar-thumb:hover { background: #8aa8d4; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:active { background: #6d94c8; background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: #f2f5fa; }
+/* Element Plus 自带 6px 细滚动条，用更高特异性覆盖，表格 / 抽屉里滑块同样好抓握 */
+.el-table__body-wrapper::-webkit-scrollbar,
+.el-scrollbar__wrap::-webkit-scrollbar,
+.el-drawer__body::-webkit-scrollbar { width: 12px; height: 12px; }
+/* Element Plus 自定义滚动条默认 hover 才出现且很细，改为常显、加粗、可抓握 */
+.el-scrollbar__bar.is-vertical { width: 12px; opacity: 1; }
+.el-scrollbar__bar.is-horizontal { height: 12px; opacity: 1; }
+.el-scrollbar__thumb { background-color: #b9c9e2 !important; border-radius: 6px; }
+.el-scrollbar__thumb:hover { background-color: #8aa8d4 !important; }
