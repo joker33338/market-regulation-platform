@@ -34,6 +34,7 @@
 | **P2** | `SearchRequest` 扩展 `kb_version` / `issuing_authority` / `effective_status` | 法规检索：版本 / 发布机关 / 生效状态筛选 | 三个筛选器已移除并说明原因；请求体严格 `{query,mode,limit}` | 需在 **契约层**新增字段并放宽 422 校验；返回结构同时提供法规来源、版本、效力日期等可靠字段，否则前端不得推断展示 |
 | **P2** | `GET /api/documents` 增加 `date_from` / `date_to` / `sort_by` / `order` | 文档管理：时间区间与任意排序 | 页面已明确不提供，也不多发字段 | 需与现有 `page/page_size/keyword/status/doc_type` 兼容，额外字段不得 422 |
 | **P2** | 首页六项已移除指标的数据源 | 首页统计扩展 | 页面明确「需后端补齐接口后方可恢复」 | 需先定义清晰统计口径，避免把 uploads / tasks / parsed_documents 混为一谈 |
+| **P1** | `DELETE /api/documents/{file_id}`（可选 `POST /api/documents/batch-delete`） | 文档管理：单行删除、多选批量删除 | 多选与批量下载已可用；删除按钮按**运行期方法级门控**禁用并说明原因，绝不本地隐藏行假删除 | 需在 OpenAPI 明确声明 DELETE 方法、认证与 owner 隔离、幂等键、软删除/物理删除语义、关联解析任务与原始字节的处置、失败错误码（409/403/404）；前端在 `/api/openapi.json` 检测到该方法后自动解锁，并只按真实回执刷新列表 |
 
 **验收要求（每个接口）**：OpenAPI 中给出路径、请求/响应 schema、错误码、认证要求、分页规则与 owner 隔离；写操作必须能在隔离测试数据上完成，且失败时前端能显示真实错误而非成功提示。
 
