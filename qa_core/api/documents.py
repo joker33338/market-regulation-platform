@@ -1,6 +1,7 @@
 """现有业务服务的权限隔离 HTTP 查询适配。"""
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+from .document_query import select_documents, validate_window
 import hashlib
 from pathlib import Path
 from typing import Literal
@@ -22,9 +23,14 @@ def register_documents(app, service, config, owner, reader):
     @guarded
     def documents(page: int = pagination, page_size: int = size,
                   keyword: str = Query("", max_length=200), status: str | None = Query(None, max_length=40),
-                  doc_type: Literal["pdf", "docx", "image"] | None = None, identity=Depends(owner)):
+                  doc_type: Literal["pdf", "docx", "image"] | None = None,
+                  date_from: datetime | None = None, date_to: datetime | None = None,
+                  sort_by: Literal["uploaded_at", "file_name", "size_bytes", "status"] = "uploaded_at",
+                  order: Literal["asc", "desc"] = "desc", identity=Depends(owner)):
+        validate_window(date_from, date_to)
         rows = [row for row in reader.documents(identity) if keyword.casefold() in row["file_name"].casefold()
                 and (not status or row["status"] == status) and (not doc_type or row["doc_type"] == doc_type)]
+        rows = select_documents(rows, date_from, date_to, sort_by, order)
         return page_of(rows, page, page_size, "owner_upload_metadata+sqlite.parse_tasks")
 
     @router.get("/api/documents/{file_id}", response_model=DocumentInfo)
