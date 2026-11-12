@@ -154,8 +154,7 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
         return JSONResponse({"error": {"code": "invalid_request"}}, status_code=422)
 
     async def authenticated(request: Request, credentials=Security(HTTPBearer(auto_error=False))):
-        authorization = request.headers.get("authorization", "")
-        token = authorization[7:] if authorization.startswith("Bearer ") else ""
+        token = credentials.credentials if credentials is not None else ''
         try:
             identity=registry.resolve(token)
         except MinerUError as error:

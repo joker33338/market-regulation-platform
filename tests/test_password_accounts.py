@@ -87,6 +87,7 @@ class PasswordAccountTests(unittest.TestCase):
 
     def test_logout_expiry_and_corrupt_storage_fail_closed(self):
         auth=self.auth()
+        self.assertEqual(self.client.get('/api/auth/me',headers={'Authorization':auth['Authorization'].replace('Bearer ','bearer ',1)}).status_code,200)
         self.assertEqual(self.client.post('/api/auth/logout',headers=auth).status_code,200)
         self.assertEqual(self.client.get('/api/auth/me',headers=auth).status_code,401)
         auth=self.auth()
