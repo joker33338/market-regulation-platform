@@ -21,6 +21,14 @@ class DocumentDeletion(BaseModel):
     disposition: DeletionDisposition
 
 
+class MachineError(BaseModel):
+    code: str
+
+
+class DocumentDeletionError(BaseModel):
+    error: MachineError
+
+
 def register_document_delete(app,principal,reader):
     router=APIRouter(tags=['documents'],dependencies=[Depends(principal)])
 
@@ -36,7 +44,11 @@ def register_document_delete(app,principal,reader):
 
     app.state.document_delete_references=references
 
-    @router.delete('/api/documents/{file_id}',response_model=DocumentDeletion,
+    errors={status:{'model':DocumentDeletionError,'description':description} for status,description in {
+        401:'缺失或失效凭证',403:'未获显式删除授权或跨owner',404:'不存在或已删除',
+        409:'任务、证据链、版本引用或生命周期锁冲突',422:'file_id格式非法',503:'存储或引用核查不可用'}.items()}
+
+    @router.delete('/api/documents/{file_id}',response_model=DocumentDeletion,responses=errors,
         description='显式ADMIN与本人owner删除范围授权；仅未形成解析/审核/入库证据链的上传可软删除。重复删除404；不销毁原件或关联记录。')
     @guarded
     def remove(file_id: str = Path(pattern='^[a-f0-9]{32}$'),identity=Depends(principal)):
