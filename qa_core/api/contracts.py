@@ -58,6 +58,20 @@ def annotate_legacy(app):
     def openapi():
         schema = default_openapi()
         schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)
+        for route in app.routes:
+            dependant=getattr(route,'dependant',None)
+            dependencies=getattr(dependant,'dependencies',())
+            if not any(getattr(item.call,'__name__','')=='owner' for item in dependencies):
+                continue
+            for method in getattr(route,'methods',()):
+                operation=schema.get('paths',{}).get(route.path,{}).get(method.lower())
+                if operation is None:
+                    continue
+                parameters=operation.setdefault('parameters',[])
+                if not any(item.get('name')=='owner_id' and item.get('in')=='query' for item in parameters):
+                    parameters.append({'name':'owner_id','in':'query','required':False,
+                        'schema':{'type':'string','minLength':1,'maxLength':128,'pattern':r'^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$'},
+                        'description':'仅ADMIN可显式选择业务owner；其他角色传入返回403。管理员查询默认全局，上传和创建任务默认个人owner。'})
         schema["info"]["version"] = "0.2.3-dev"
         schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-4"
         return schema

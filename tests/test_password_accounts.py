@@ -115,6 +115,9 @@ class PasswordAccountTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/parse/files/'+fid+'/source',headers=admin).status_code,200)
         self.assertEqual(self.f.service.repository.get(task['task_id'],'alice')['owner'],'alice')
         self.assertEqual(self.client.post('/api/parse/files?file_name=synthetic.pdf&owner_id=bob',content=self.f.data,headers=self.f.auth).status_code,403)
+        schema=self.client.get('/api/openapi.json',headers=admin).json()
+        self.assertTrue(any(item['name']=='owner_id' and item['in']=='query' for item in schema['paths']['/api/parse/tasks']['post']['parameters']))
+        self.assertEqual(self.client.post('/api/parse/files?file_name=synthetic.pdf&owner_id=bob',content=self.f.data,headers=admin).status_code,201)
 
     def test_password_only_mode_and_no_automatic_legacy_owner_claim(self):
         admin=self.auth()
