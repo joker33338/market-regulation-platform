@@ -5,6 +5,8 @@
 > 依据：后端交接《MySQL 审核台账批次》+ `docs/integration/frontend-openapi-v023.json`（`0.2.3-dev`、`frontend-api-v0.2.3-draft-1`、29 路径）+ 8180 运行契约实测。
 > 本轮只改前端；未改后端源码、数据库、Docker 镜像、正式 8180 容器、数据卷，未 Push / Merge / 部署，未宣称 QA PASS。
 > C01 契约复核修正（2026-11-12，见 §9）：业务源码提交 `03af02cedc84fce8b19e169e49c6bb456ef17371`；台账事件改从 `event.request` 读取，幂等重试改为冻结请求快照。状态仍为 `ADAPTATION_PREPARED / NOT_LIVE_VERIFIED`。
+>
+> **【口径更新提示 · 2026-11-12】本文是 draft-1 / 29 路径阶段的历史交付记录，以下原文保留当时事实，不再作为当前契约依据。** 当前依据为 `frontend-openapi-v023-draft2.json`（`frontend-api-v0.2.3-draft-2`、**30 路径**）：新增 `GET /api/auth/me`，`principal_id` 与 `owner_id` 分离，写授权改为后端按 `REVIEWER` + `review_owner_scopes` 逐请求判定；本文中的「Token→owner 决定操作者」「writers 名单」「29 路径」等描述已被取代。当前适配说明见 `docs/frontend-v023-rbac-adaptation-2026-11-12.md`。
 
 ## 0. 一句话结论
 
