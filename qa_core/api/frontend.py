@@ -29,6 +29,8 @@ def register_frontend(app, service, config, owner, reader=None, principal=None):
     register_monitoring(app, service, config, owner, reader, principal)
     from .resources import register_resources
     register_resources(app, principal)
+    from .operational_logs import register_operational_logs
+    register_operational_logs(app, config, principal)
     from .contracts import annotate_legacy
     annotate_legacy(app)
     app.state.frontend_reader = reader
