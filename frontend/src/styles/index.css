@@ -251,3 +251,43 @@ html { scrollbar-color: #b9c9e2 #f2f5fa; }
 .el-scrollbar__bar.is-horizontal { height: 12px; opacity: 1; }
 .el-scrollbar__thumb { background-color: #b9c9e2 !important; border-radius: 6px; }
 .el-scrollbar__thumb:hover { background-color: #8aa8d4 !important; }
+
+/* ───────── 注释性文字默认收起，点击展开 ─────────
+ * 页面上的口径说明、接口提示、禁用原因等长文本默认只显示一个小入口，
+ * 点击展开原文，再点收起；刷新或切换页面后恢复默认收起。
+ * 覆盖 el-alert 描述与各页 hint 类文本；错误提示（el-alert--error）以及
+ * 含按钮 / 链接 / 输入框的说明块不折叠，避免把「重试」「刷新」等操作入口一起藏掉。
+ * 交互由 utils/noteToggle.ts 的事件委托实现，不改页面模板，Vue 重渲染后仍生效。 */
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__description {
+  display: none;
+}
+#app .el-alert.is-note-open .el-alert__description { display: block; }
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__title {
+  cursor: pointer;
+}
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__title::after {
+  content: ' · 说明 ▾';
+  font-size: 11px; font-weight: 400; color: var(--mr-text-3); white-space: nowrap;
+}
+#app .el-alert.is-note-open .el-alert__title::after { content: ' · 收起 ▴'; }
+
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)) {
+  cursor: pointer;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)):not(.is-note-open) {
+  font-size: 0; line-height: 0; color: transparent;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)):not(.is-note-open) > * {
+  display: none;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input))::before {
+  content: '说明 ▾';
+  display: inline-block; margin-right: 4px; padding: 1px 6px;
+  font-size: 11px; line-height: 1.5; font-weight: 400; letter-spacing: 0;
+  color: var(--mr-text-3); background: #f7f9fc;
+  border: 1px solid var(--mr-line); border-radius: 4px;
+  vertical-align: middle;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)).is-note-open::before {
+  content: '收起 ▴';
+}
