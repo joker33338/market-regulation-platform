@@ -43,7 +43,9 @@ from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, 
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
 
 def register_tasks(app, service, config, owner, reader):
-    router = APIRouter(tags=["tasks"], dependencies=[Depends(owner)])
+    from .document_delete import DocumentDeletionError
+    router = APIRouter(tags=["tasks"], dependencies=[Depends(owner)],
+                       responses={code:{'model':DocumentDeletionError} for code in (401,403,404,422,503)})
     pagination = Query(default=1, ge=1)
     size = Query(default=20, ge=1, le=100)
 

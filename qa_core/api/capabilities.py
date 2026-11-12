@@ -54,7 +54,9 @@ class CapabilitiesResponse(BaseModel):
 
 
 def register_capabilities(app,principal):
-    @app.get('/api/system/capabilities',tags=['monitoring'],response_model=CapabilitiesResponse)
+    from .document_delete import DocumentDeletionError
+    @app.get('/api/system/capabilities',tags=['monitoring'],response_model=CapabilitiesResponse,
+             responses={code:{'model':DocumentDeletionError} for code in (401,403,503)})
     def capabilities(identity=Depends(principal)):
         return {'contract_version':'frontend-api-v0.2.3-draft-4','admin_policy':'all_permissions',
                 'identity':principal_info(identity),

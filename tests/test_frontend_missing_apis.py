@@ -64,3 +64,14 @@ class MissingAPITests(unittest.TestCase):
         response=self.client.get('/api/system/api-logs',headers=self.f.auth)
         self.assertEqual(response.status_code,503)
         self.assertNotIn('sensitive',response.text)
+
+    def test_unconfirmed_actor_is_not_falsely_attributed_and_admin_can_inspect(self):
+        self.assertEqual(self.client.get('/api/documents').status_code,401)
+        own=self.client.get('/api/system/error-logs',headers=self.f.auth).json()
+        self.assertEqual(own['list'],[])
+        self.f.app.state.auth_registry.replace({'a'*32:dict(principal_id='admin-observer',owner_id='alice',
+            roles=['ADMIN'],review_owner_scopes=[],credential_status='active')})
+        result=self.client.get('/api/system/error-logs',headers=self.f.auth)
+        self.assertEqual(result.status_code,200,result.text)
+        event=next(row for row in result.json()['list'] if row['route']=='/api/documents' and row['status_code']==401)
+        self.assertIsNone(event['principal_id']);self.assertFalse(event['actor_confirmed'])

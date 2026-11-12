@@ -21,7 +21,8 @@ def utc_now():
 class OperationalLog(BaseModel):
     event_id: str
     timestamp: str
-    principal_id: str
+    principal_id: str | None
+    actor_confirmed: bool=True
     method: str
     route: str
     status_code: int
@@ -77,24 +78,28 @@ class OperationalJournal:
 def register_operational_logs(app, config, principal):
     journal=OperationalJournal(config.result_dir)
     app.state.operational_journal=journal
-    router=APIRouter(tags=['monitoring'],dependencies=[Depends(principal)])
+    from .document_delete import DocumentDeletionError
+    router=APIRouter(tags=['monitoring'],dependencies=[Depends(principal)],
+                     responses={code:{'model':DocumentDeletionError} for code in (401,403,422,503)})
 
     @app.middleware('http')
     async def record(request, call_next):
         started=time.perf_counter()
         response=await call_next(request)
         identity=getattr(request.state,'principal',None)
-        if identity and request.url.path.startswith('/api/'):
-            route=getattr(request.scope.get('route'),'path',None)
+        if request.url.path.startswith('/api/'):
+            route=getattr(request.scope.get('route'),'path',None) or 'unmatched_api'
             # 只允许路由模板；未匹配请求不能把任意用户路径写进日志。
             if route:
-                item={'event_id':uuid4().hex,'timestamp':utc_now(),'principal_id':identity.principal_id,
-                      'method':request.method,'route':route,'status_code':response.status_code,
+                item={'event_id':uuid4().hex,'timestamp':utc_now(),'principal_id':identity.principal_id if identity else None,
+                      'actor_confirmed':identity is not None,
+                      'method':request.method if request.method in {'GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'} else 'OTHER',
+                      'route':route,'status_code':response.status_code,
                       'duration_ms':round((time.perf_counter()-started)*1000,3),
                       'level':'error' if response.status_code>=500 else 'warning' if response.status_code>=400 else 'info'}
                 try:
                     import asyncio
-                    await asyncio.to_thread(journal.append,identity.principal_id,item)
+                    await asyncio.to_thread(journal.append,identity.principal_id if identity else '_unconfirmed_',item)
                 except Exception:
                     # 业务回执不能被日志故障改写；读取时明确暴露不可用状态。
                     app.state.operational_log_failed=True
