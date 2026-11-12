@@ -50,7 +50,16 @@
       <template #header>
         <div class="card-head">
           <span>本次会话真实上传 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">来自 POST /api/parse/files 的真实响应</span>
+          <div class="card-actions">
+            <span class="card-sub">来自 POST /api/parse/files 的真实响应 · 创建成功后自动移出待创建列表</span>
+            <el-tooltip :disabled="bulkCreatable" :content="bulkHint" placement="top">
+              <span>
+                <el-button size="small" type="primary" :loading="bulkSubmitting" :disabled="!bulkCreatable" @click="createTasksForAll">
+                  一键解析全部（{{ realUploads.length }}）
+                </el-button>
+              </span>
+            </el-tooltip>
+          </div>
         </div>
       </template>
       <el-table :data="realUploads" size="small" max-height="200">
@@ -64,18 +73,24 @@
         <el-table-column prop="at" label="上传时间" width="160" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text size="small" type="primary" :loading="submittingId === row.fileId" :disabled="!hasAuth || submittingId !== ''" @click="createTaskFor(row)">
+            <el-button text size="small" type="primary" :loading="submittingId === row.fileId" :disabled="!hasAuth || submittingId !== '' || bulkSubmitting" @click="createTaskFor(row)">
               创建解析任务
             </el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-alert v-if="lastTask" type="success" :closable="false" style="margin-top: 12px"
-        :title="`解析任务已创建：${lastTask.task_id}（状态 ${lastTask.status}）— 可到智能解析中心查看真实进度`" />
       <div v-if="!hasAuth" class="mr-disabled-hint" style="margin-top: 8px">
         未配置 API Token：请在系统监控页配置后，方可调用上传与创建任务接口。
       </div>
     </el-card>
+
+    <!-- 创建回执放在卡片外：待创建列表清空后仍可见，避免误以为任务没有创建成功 -->
+    <div v-if="lastTask" class="created-task-note">
+      <el-alert type="success" :closable="false"
+        :title="`解析任务已创建：${lastTask.task_id}（状态 ${lastTask.status}）— 本次会话累计创建 ${createdTaskCount} 个`"
+        description="收到后端真实回执后，创建成功的文件已从上方「本次会话真实上传」待创建列表移除；同一上传项始终复用同一 Idempotency-Key，重复点击或网络重试不会重复建任务。确需重跑请使用下方文档列表的「重新解析」（这是显式的新任务）。" />
+      <el-button text size="small" type="primary" @click="gotoTask(lastTask.task_id)">到智能解析中心查看真实进度 →</el-button>
+    </div>
 
     <!-- 文档列表：真实 GET /api/documents，MrProTable 受控模式 -->
     <el-card shadow="never" style="margin-top: 16px">
@@ -206,7 +221,7 @@ import MrProTable, { type MrColumn, type MrQuery } from '@/components/MrProTable
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { hasToken } from '@/api/client'
-import { apiErrorHint, notifyApiError } from '@/api/errors'
+import { apiErrorHint, notifyApiError, toApiError } from '@/api/errors'
 import { contractState, contractLabel, hasV023DocumentFilters } from '@/api/dataSource'
 import { downloadSourceFile } from '@/api/documentFiles'
 import { getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
@@ -313,6 +328,7 @@ function engineOf(task: ParseTask): string {
 const downloadingId = ref('')
 const submittingId = ref('')
 const lastTask = ref<ParseTask | null>(null)
+const createdTaskCount = ref(0)
 
 async function download(row: Record<string, unknown>) {
   const id = String(row.file_id || '')
@@ -334,8 +350,10 @@ async function reparse(row: Record<string, unknown>) {
   if (!id || !hasAuth.value || submittingId.value) return
   submittingId.value = id
   try {
+    // 「重新解析」是用户显式发起的新任务，每次点按都用新键；请求期间由 submittingId 防连点
     const task = await createParseTask({ file_ids: [id] }, crypto.randomUUID())
     lastTask.value = task
+    createdTaskCount.value += 1
     ElMessage.success(`已创建解析任务 ${task.task_id}`)
     void list.load()
   } catch (err) {
@@ -365,11 +383,34 @@ function copySha(value: string) {
 
 /* ───────── 上传（复用旧接口，结果只以后端响应为准） ───────── */
 interface QueueItem { uid: string; name: string; size: number; percent: number; error: boolean; message?: string }
-interface RealUpload { fileId: string; name: string; sha256: string; bytes: number; at: string }
+interface RealUpload {
+  fileId: string; name: string; sha256: string; bytes: number; at: string
+  /** 该上传项在整个会话里复用同一幂等键：同键同请求由后端返回原任务，不会重复创建 */
+  idempotencyKey: string
+}
 
 const uploadQueue = ref<QueueItem[]>([])
 const realUploads = ref<RealUpload[]>([])
 const uploadedHashes = new Set<string>()
+
+/* ───────── 一键解析全部：一次 POST 提交多个 file_id（后端单任务上限 20） ───────── */
+const bulkSubmitting = ref(false)
+/** 待创建列表不变时复用同一键与同一 body；列表变化（新增/移除文件）才作为新操作换键 */
+const bulkRequest = ref<{ signature: string; key: string } | null>(null)
+const bulkCreatable = computed(() =>
+  hasAuth.value && realUploads.value.length > 0 &&
+  realUploads.value.length <= MAX_FILES_PER_TASK &&
+  !submittingId.value && !bulkSubmitting.value
+)
+const bulkHint = computed(() => {
+  if (!hasAuth.value) return '请先在系统监控页配置 API Token'
+  if (!realUploads.value.length) return '暂无待创建解析任务的上传文件'
+  if (realUploads.value.length > MAX_FILES_PER_TASK) {
+    return `待创建 ${realUploads.value.length} 个文件，超过单任务上限 ${MAX_FILES_PER_TASK} 个；请先逐个创建或减少待创建项`
+  }
+  if (submittingId.value || bulkSubmitting.value) return '正在创建解析任务，请稍候'
+  return ''
+})
 const uploadDone = computed(() => uploadQueue.value.filter((i) => i.percent >= 100 || i.error).length)
 const totalQueueSize = computed(() => uploadQueue.value.reduce((s, i) => s + i.size, 0))
 
@@ -440,7 +481,8 @@ async function doUpload(options: UploadRequestOptions) {
     if (localHash && localHash !== res.sha256) item.message = '提示：前端计算值与后端返回值不一致，请核对文件内容'
     realUploads.value.unshift({
       fileId: res.file_id, name: file.name, sha256: res.sha256, bytes: res.bytes,
-      at: new Date().toLocaleString('zh-CN')
+      at: new Date().toLocaleString('zh-CN'),
+      idempotencyKey: crypto.randomUUID()
     })
     ElMessage.success(`${file.name} 上传成功，SHA256 由后端返回`)
     void list.load()
@@ -450,18 +492,59 @@ async function doUpload(options: UploadRequestOptions) {
   }
 }
 
+/** 409 = 同键异请求；其余按统一错误模型提示。失败一律保留待创建项，允许同键重试 */
+function reportCreateFailure(err: unknown, fallback: string) {
+  const e = toApiError(err)
+  if (e.status === 409) {
+    ElMessage.error('创建被拒绝（409）：同一幂等键对应了不同请求，已刷新文档列表，请确认后再试。')
+    void list.load()
+  } else {
+    notifyApiError(err, fallback)
+  }
+}
+
 async function createTaskFor(row: RealUpload) {
-  if (submittingId.value || !hasAuth.value) return
+  if (submittingId.value || bulkSubmitting.value || !hasAuth.value) return
   submittingId.value = row.fileId
   try {
-    const task = await createParseTask({ file_ids: [row.fileId] }, crypto.randomUUID())
+    // 同一上传项固定同一键与同一 body：后端按 (owner, Idempotency-Key) + 请求指纹幂等，
+    // 连点或网络重试都会返回原任务，不会新建第二条（旧实现每次随机键导致重复建任务）。
+    const task = await createParseTask({ file_ids: [row.fileId] }, row.idempotencyKey)
     lastTask.value = task
+    createdTaskCount.value += 1
+    // 只有拿到后端真实回执才移出待创建列表，不在本地伪造「已完成」
+    realUploads.value = realUploads.value.filter((i) => i.fileId !== row.fileId)
     ElMessage.success(`解析任务已创建：${task.task_id}`)
     void list.load()
   } catch (err) {
-    notifyApiError(err, '创建解析任务失败')
+    reportCreateFailure(err, '创建解析任务失败')
   } finally {
     submittingId.value = ''
+  }
+}
+
+async function createTasksForAll() {
+  if (!bulkCreatable.value) return
+  const ids = realUploads.value.map((r) => r.fileId)
+  const signature = JSON.stringify(ids)
+  const existing = bulkRequest.value
+  const key = existing && existing.signature === signature ? existing.key : crypto.randomUUID()
+  bulkRequest.value = { signature, key } // 列表不变则重试沿用同键同 body
+  bulkSubmitting.value = true
+  try {
+    // 后端 POST /api/parse/tasks 支持一次提交 1–20 个 file_id，故整批只需一个真实任务
+    const task = await createParseTask({ file_ids: ids }, key)
+    lastTask.value = task
+    createdTaskCount.value += 1
+    const done = new Set(ids)
+    realUploads.value = realUploads.value.filter((r) => !done.has(r.fileId))
+    bulkRequest.value = null
+    ElMessage.success(`已为 ${ids.length} 个文件创建解析任务：${task.task_id}`)
+    void list.load()
+  } catch (err) {
+    reportCreateFailure(err, '一键解析失败')
+  } finally {
+    bulkSubmitting.value = false
   }
 }
 </script>
@@ -471,7 +554,9 @@ async function createTaskFor(row: RealUpload) {
 .contract-note { margin-bottom: 12px; }
 .upload-card :deep(.el-upload-dragger) { padding: 24px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.card-actions { display: flex; align-items: center; gap: 12px; font-weight: 400; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
+.created-task-note { margin-top: 16px; }
 .upload-queue { margin-top: 16px; border-top: 1px dashed var(--mr-line); padding-top: 12px; }
 .queue-summary { font-size: 13px; color: var(--mr-text-2); margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
 .queue-item { display: flex; align-items: center; gap: 12px; margin: 6px 0; flex-wrap: wrap; }

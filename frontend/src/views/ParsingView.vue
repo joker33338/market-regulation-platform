@@ -71,7 +71,7 @@
       <template #header>
         <div class="card-head-title">
           <span>创建解析任务 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">POST /api/parse/tasks · 必带 Idempotency-Key · 幂等防重复提交</span>
+          <span class="card-sub">POST /api/parse/tasks · 必带 Idempotency-Key · 同一请求沿用同键，创建成功后清空输入框</span>
         </div>
       </template>
       <div class="create-row">
@@ -82,7 +82,7 @@
       <div class="mr-disabled-hint" style="margin-top: 8px">
         <template v-if="!hasAuth">未配置 API Token，请在系统监控页配置。</template>
         <template v-else-if="!fileIdsValid">请填写 1–20 个合法的 32 位十六进制 file_id（当前 {{ parsedFileIds.length }} 个）。</template>
-        <template v-else>请求体仅含 file_ids，引擎选择、质量评估与 MinerU 回退全部由后端决定；页面刷新只查询任务，不会重新创建。</template>
+        <template v-else>请求体仅含 file_ids，引擎选择、质量评估与 MinerU 回退全部由后端决定；创建成功后输入框自动清空，结果未确认的重试沿用同一幂等键，不会重复创建；页面刷新只查询任务。</template>
       </div>
       <el-alert v-if="lastCreated" type="success" :closable="false" style="margin-top: 12px"
         :title="`任务已由后端创建：${lastCreated.task_id}（状态 ${lastCreated.status}）`" />
@@ -325,14 +325,23 @@ const lastCreated = ref<ParseTask | null>(null)
 const parsedFileIds = computed(() => fileIdsInput.value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))
 const fileIdsValid = computed(() => parsedFileIds.value.length > 0 && parsedFileIds.value.length <= 20 && parsedFileIds.value.every((id) => /^[0-9a-fA-F]{32}$/.test(id)))
 const canCreate = computed(() => hasAuth.value && fileIdsValid.value && !submitting.value)
+/** 同一组 file_id 的未确认请求复用同一键；输入变化或创建成功后换键作为新操作 */
+const pendingRequest = ref<{ signature: string; key: string } | null>(null)
 
 async function submitTask() {
   if (!canCreate.value || submitting.value) return
+  const ids = [...parsedFileIds.value]
+  const signature = JSON.stringify(ids)
+  const existing = pendingRequest.value
+  const key = existing && existing.signature === signature ? existing.key : crypto.randomUUID()
+  pendingRequest.value = { signature, key }
   submitting.value = true
   try {
-    const task = await createParseTask({ file_ids: parsedFileIds.value }, crypto.randomUUID())
+    const task = await createParseTask({ file_ids: ids }, key)
     lastCreated.value = task
     realTaskId.value = task.task_id
+    pendingRequest.value = null
+    fileIdsInput.value = '' // 已创建则清空输入，避免连点重复提交；重新填写视为显式新任务
     ElMessage.success(`解析任务已创建：${task.task_id}`)
     void list.load()
     await queryRealTask()
