@@ -299,7 +299,7 @@ class Database:
                      {"v": version}).close()
 
     # 发布投影、ACTIVE 指针和历史记录必须同事务完成，失败时共同回滚。
-    def publish(self, version: str, *, rollback: bool = False):
+    def publish(self, version: str, *, rollback: bool = False, expected_active=..., event_id=None):
         from uuid import uuid4
         self.verify_schema()
         with self.transaction():
@@ -308,7 +308,11 @@ class Database:
                 self.execute("LOCK TABLE law_chunks IN SHARE ROW EXCLUSIVE MODE").close()
             target = self.version(version)
             active = self.active_version()
+            if expected_active is not ... and active != expected_active:
+                raise IngestionError('ACTIVE版本与请求期望不一致。')
             if active == version:
+                if event_id is not None:
+                    raise IngestionError('目标已经是ACTIVE，未创建新的发布事件。')
                 return
             if target["status"] not in ({"ARCHIVED"} if rollback else {"STAGED"}):
                 raise IngestionError("目标不是可发布候选版或可回滚历史版。")
@@ -339,7 +343,7 @@ class Database:
             self.execute("""INSERT INTO mr_active(singleton,kb_version) VALUES(1,:v)
                 ON CONFLICT(singleton) DO UPDATE SET kb_version=excluded.kb_version""", {"v": version}).close()
             self.execute("""INSERT INTO mr_release_history(event_id,from_version,to_version,action,created_at)
-                VALUES (:id,:f,:t,:a,:now)""", {"id": uuid4().hex, "f": active, "t": version,
+                VALUES (:id,:f,:t,:a,:now)""", {"id": event_id or uuid4().hex, "f": active, "t": version,
                 "a": "rollback" if rollback else "publish", "now": utc_now()}).close()
 
     def list_versions(self) -> list[dict]:

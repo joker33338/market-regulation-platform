@@ -31,6 +31,10 @@ def register_frontend(app, service, config, owner, reader=None, principal=None):
     register_resources(app, principal)
     from .operational_logs import register_operational_logs
     register_operational_logs(app, config, principal)
+    from .ingestion import register_ingestion
+    register_ingestion(app, principal, reader, config)
+    from .capabilities import register_capabilities
+    register_capabilities(app, principal)
     from .contracts import annotate_legacy
     annotate_legacy(app)
     app.state.frontend_reader = reader

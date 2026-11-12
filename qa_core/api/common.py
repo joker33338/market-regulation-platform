@@ -223,18 +223,26 @@ class FrontendReader:
         database = self.kb_factory()
         try:
             with database.transaction(read_only=True):
-                active = database.active_version()
+                active = body.kb_version or database.active_version()
                 if not active:
                     return {"status": "unpublished", "kb_version": None, "mode": body.mode,
                             "list": [], "count": 0}
                 if body.mode == "keyword":
-                    hits = keyword_search(database, body.query, body.limit)
+                    try:
+                        hits = keyword_search(database, body.query, body.limit,**{
+                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None})
+                    except IngestionError:
+                        raise MinerUError('search_version_unavailable',409) from None
             if body.mode == "hybrid":
                 if not self._search_lock.acquire(blocking=False):
                     raise MinerUError("search_busy", 429)
                 try:
                     self._embeddings = self._embeddings or self.embeddings_factory()
-                    hits = retrieve(database, self._embeddings, body.query, body.limit)
+                    try:
+                        hits = retrieve(database, self._embeddings, body.query, body.limit,**{
+                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None})
+                    except IngestionError:
+                        raise MinerUError('search_version_or_model_mismatch',409) from None
                 finally:
                     self._search_lock.release()
                 # retrieve 在其只读快照内绑定 ACTIVE；版本在两次查询间切换时以命中为准。
@@ -244,12 +252,19 @@ class FrontendReader:
                 metadata = hit["metadata"]
                 if isinstance(metadata, str):
                     metadata = json.loads(metadata)
+                document_metadata=hit.get('document_metadata') or {}
+                if isinstance(document_metadata,str):
+                    document_metadata=json.loads(document_metadata)
+                # 公开来源只合并已有事实字段，不暴露私密审核绑定或完整原始证据副本。
+                metadata={**{key:document_metadata[key] for key in ('law_id','issuing_authority','effective_status','effective_date','issuing_date') if key in document_metadata},**metadata}
+                metadata.pop('api_review_reference',None)
                 rows.append({"chunk_id": hit["chunk_id"], "doc_version_id": hit["doc_version_id"],
                              "regulation_name": hit["law_name"], "article_no": hit["article_no"],
                              "article_text": hit["content"], "chapter": hit["chapter"],
                              "kb_version": hit["kb_version"], "raw_score": hit.get("rrf_score", hit.get("score")),
                              "score_kind": "rrf" if "rrf_score" in hit else "keyword_match",
                              "source": safe(metadata)})
-            return {"status": "ready", "kb_version": active, "mode": body.mode, "list": rows, "count": len(rows)}
+            return {"status": "ready", "kb_version": active, "mode": body.mode, "list": rows, "count": len(rows),
+                    'applied_filters':{key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None}}
         finally:
             database.close()

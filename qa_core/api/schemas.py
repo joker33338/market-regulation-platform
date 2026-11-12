@@ -40,6 +40,9 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     mode: Literal["keyword", "hybrid"] = "keyword"
     limit: int = Field(default=8, ge=1, le=50)
+    kb_version: str | None = Field(default=None,min_length=1,max_length=128)
+    issuing_authority: str | None = Field(default=None,min_length=1,max_length=200)
+    effective_status: str | None = Field(default=None,min_length=1,max_length=80)
 
 
 class SearchResponse(BaseModel):
@@ -49,6 +52,7 @@ class SearchResponse(BaseModel):
     list: list[dict[str, Any]]
     count: int
     source: str = "public"
+    applied_filters: dict[str,str] = Field(default_factory=dict)
 
 
 class ReviewDetail(BaseModel):
