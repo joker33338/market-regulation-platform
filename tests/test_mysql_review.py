@@ -119,11 +119,24 @@ class MySQLReviewTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/system/audit-logs').status_code,401)
         self.assertEqual(self.client.get('/api/system/audit-logs?page=0',headers=self.fixture.auth).status_code,422)
 
+    def test_mysql_outage_fails_closed_without_breaking_read_api(self):
+        import copy
+        original=copy.deepcopy(self.source)
+        self.ledger.config.update(host='127.0.0.1',port=1)
+        detail=self.client.get(f'/api/review/{self.pid}',headers=self.fixture.auth)
+        self.assertEqual(detail.status_code,200)
+        self.assertFalse(detail.json()['review_write_supported'])
+        self.assertFalse(detail.json()['review_ledger']['available'])
+        self.assertEqual(self.post('approve').status_code,503)
+        self.assertEqual(self.client.get('/api/parse/info',headers=self.fixture.auth).status_code,200)
+        self.assertEqual(self.source,original)
+
     def test_runtime_account_cannot_rewrite_audit(self):
         import pymysql
-        with self.assertRaises(pymysql.err.OperationalError):
-            with self.ledger.connection() as connection, connection.cursor() as cursor:
-                cursor.execute('UPDATE review_events SET version=version WHERE 1=0')
+        for statement in ('UPDATE review_events SET version=version WHERE 1=0', 'DELETE FROM review_events WHERE 1=0'):
+            with self.subTest(statement=statement), self.assertRaises(pymysql.err.OperationalError):
+                with self.ledger.connection() as connection, connection.cursor() as cursor:
+                    cursor.execute(statement)
 
 
 if __name__=='__main__':
