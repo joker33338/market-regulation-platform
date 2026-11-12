@@ -1,5 +1,7 @@
 # v0.2.2 后端接口缺口与交付边界
 
+2026-11-12 增补：v0.2.3 已实现显式授权的文档软删除候选；自测完成，状态 BACKEND_API_PARTIAL，待独立 QA，正式 8180 未更新。最新范围与未覆盖项见 [文档删除交接](document-delete-v023-handoff.md)；以下为 v0.2.2 历史边界。
+
 审计依据：维护基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc` 实际 FastAPI factory、全仓路由扫描、现有 Vue 七页面及 apiCapabilities/parse/documentFiles 适配层。仓库仅一个 FastAPI factory，无其他 APIRouter。原基线 9 个 API，匿名 OpenAPI 关闭；已有根路径上传工作台。
 
 ## 原有缺口及处理顺序

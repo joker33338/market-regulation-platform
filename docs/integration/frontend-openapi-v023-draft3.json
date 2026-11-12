@@ -3500,38 +3500,12 @@
               }
             }
           },
-          "422": {
-            "description": "认证、权限、门禁、限流或服务不可用",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError",
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
           "401": {
             "description": "认证、权限、门禁、限流或服务不可用",
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -3558,6 +3532,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -3584,6 +3559,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -3610,6 +3586,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -3631,11 +3608,12 @@
               }
             }
           },
-          "429": {
+          "422": {
             "description": "认证、权限、门禁、限流或服务不可用",
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -3658,6 +3636,33 @@
             }
           },
           "503": {
+            "description": "认证、权限、门禁、限流或服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDeletionError",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
             "description": "认证、权限、门禁、限流或服务不可用",
             "content": {
               "application/json": {
@@ -7940,6 +7945,18 @@
         ],
         "title": "DocumentDeletion"
       },
+      "DocumentDeletionError": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/MachineError"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "DocumentDeletionError"
+      },
       "DocumentInfo": {
         "properties": {
           "file_id": {
@@ -8112,6 +8129,19 @@
           "source"
         ],
         "title": "ListResponse"
+      },
+      "MachineError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "MachineError"
       },
       "ParseFile": {
         "properties": {

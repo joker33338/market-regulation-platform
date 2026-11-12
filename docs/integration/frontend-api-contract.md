@@ -1,5 +1,7 @@
 # v0.2.2 前后端 API 契约
 
+后续 v0.2.3 文档删除候选使用独立 `frontend-openapi-v023-draft3.json`（frontend-api-v0.2.3-draft-3），详细授权、软删除语义及错误码见 [文档删除交接](document-delete-v023-handoff.md)。本页 v0.2.2 冻结内容不代表当前开发候选或已部署能力。
+
 契约版本：`frontend-api-v0.2.2-1`。下列新增接口已实现；合成测试通过，独立前端及 QA 待验收。
 
 开发基线：`5dd44b97710db0d3bdb84bcec6e1624dd70205dc`，包含维护提交及 v0.2.1 已验收业务源码 `c91547d393ca6b049e216c0051e25271d06d7359`。历史 QA PASS 不代表本轮接口或独立前端联调已通过。
