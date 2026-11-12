@@ -4,6 +4,7 @@
 > 前端业务源码提交：`3b7b62f6373509ee5da2bbccb89bca67e54583ee`（原分支 `feat/frontend-api-v0.2.2`，仅本地提交）
 > 依据：后端交接《MySQL 审核台账批次》+ `docs/integration/frontend-openapi-v023.json`（`0.2.3-dev`、`frontend-api-v0.2.3-draft-1`、29 路径）+ 8180 运行契约实测。
 > 本轮只改前端；未改后端源码、数据库、Docker 镜像、正式 8180 容器、数据卷，未 Push / Merge / 部署，未宣称 QA PASS。
+> C01 契约复核修正（2026-11-12，见 §9）：业务源码提交 `03af02cedc84fce8b19e169e49c6bb456ef17371`；台账事件改从 `event.request` 读取，幂等重试改为冻结请求快照。状态仍为 `ADAPTATION_PREPARED / NOT_LIVE_VERIFIED`。
 
 ## 0. 一句话结论
 
@@ -48,7 +49,7 @@
 | `src/views/DashboardView.vue` | `parsed_documents` 不可用时展示后端真实 `reason`，不做 0 填充 |
 | `src/config/release.ts` | 文案口径改为「当前运行期契约」 |
 
-**写入交互细节**：每次打开弹窗生成一个 `Idempotency-Key`，失败重试沿用同键同 body（避免自造同键异请求 409）；409 时刷新详情并换新键；`base_result_id` 恒等于路径 `parse_id`，`expected_version` 取详情 `review_ledger.version`；修订正文不做 `trim`，保留前导空格与换行；成功与否只认后端回执 `write_performed === true`，随后刷新详情与事件；回执中的 `original_result_modified / publish_authorized / reparse_task_created` 如实展示，不暗示已发布或已创建任务。
+**写入交互细节（经 FRONTEND-V023-C01 复核后修正，见 §9）**：首次提交时冻结 `action / parse_id / body / Idempotency-Key` 完整快照；同一次结果未确认的重试逐字节复用该快照（同键同请求），用户主动修改正文/理由/页码或详情刷新导致版本变化则换键作为新操作；409 时清空快照、刷新详情并换新键；503 与通信故障不再断言「本次未执行写入」，改为提示结果未确认并以同键同请求重试取回后端原回执。`base_result_id` 恒等于路径 `parse_id`，`expected_version` 取详情 `review_ledger.version`；修订正文不做 `trim`，保留前导空格与换行；成功与否只认后端回执 `write_performed === true`，随后刷新详情与事件；回执中的 `original_result_modified / publish_authorized / reparse_task_created` 如实展示，不暗示已发布或已创建任务。
 
 ## 4. 真实 API 映射（本轮新增对接）
 
@@ -97,3 +98,41 @@
 ## 8. 边界
 
 后端源码、数据库结构与数据、正式镜像、8180 容器、数据卷、ACTIVE 版本、PostgreSQL 记录、已通过的 QA 历史报告均未改动；Token 只在内存 + `sessionStorage`，未硬编码、未打印、未入库；未 Push / Merge main / 打 Tag / 部署。
+
+## 9. FRONTEND-V023-C01 契约核对修正（2026-11-12）
+
+### 9.1 依据
+
+后端主仓库 `docs/integration/frontend-v023-contract-review.md` 对实际业务提交 `3b7b62f…` 做了源码审阅，指出一项**阻止联合前端验收**的不匹配：真实 `GET /api/review/{parse_id}/events` 返回「完整写入回执 + 必填 `request`」，`content / reason / page / span` 嵌套在 `request`（OpenAPI `ReviewAction`）内；前端当时把这三个字段定义为 `ReviewEvent` 顶层字段，并从 `row.content / row.reason / e.content` 读取，因此修订正文、理由、页码都不会正确显示。后端已补 `ReviewEvent / ReviewEventsResponse` 显式 Schema、将 `request` 设为必填，**实际 HTTP 层级未改变**，离线契约仍 29 路径。
+
+同一交接另提两处重试语义审阅建议：首次提交未冻结请求，失败后改正文或版本变化仍用旧键会触发 `idempotency_conflict`；503 不宜一概保证「本次未执行写入」。
+
+### 9.2 本轮修正（仅前端，3 个文件）
+
+| 文件 | 修正 |
+|---|---|
+| `src/api/types.ts` | `ReviewEvent` 改为后端真实结构：`request: ReviewActionBody` 必填；删去错误的顶层 `content / reason / page` 与 `[key: string]: unknown` 索引签名（避免掩盖层级漂移）；补齐回执字段定义 |
+| `src/api/reviewWrite.ts` | 导出 `ReviewActionName`、`postReviewAction`、`makeReviewActionBody`；body 构造收敛到唯一函数，四个便捷封装改为调用它；`getReviewEvents` 明确**原样返回**、不做扁平映射，注释标明正文只从 `request` 读取 |
+| `src/views/ReviewView.vue` | 事件表新增「页码」列，理由/正文列改读 `row.request.content / row.request.reason`；`latestRevision` 只认 `e.request.content`，修订框展示 `request.page` 并标注来源；四个写动作改走冻结快照；弹窗新增「结果未确认：同键同请求重试」提示 |
+
+**重试语义**：`PendingWrite` 保存 `signature / action / parseId / body / key`，`signature` 覆盖全部可编辑输入 + `parse_id` + `expected_version`。首次提交构造 body 后冻结；内容与版本未变时复用同一键与同一 body 重发；任一变化即换键作为新操作。409 清空快照并刷新详情；503 / 500 / 502 / 504 / 网络不可达统一提示「结果未确认，可能已提交但响应丢失，请用同键同请求重试」，不再据错误码推断绝对未写入。关闭弹窗、写入成功均清空快照。修订正文仍不 `trim`、不使用 `v-html`，不指定 `operator`。
+
+### 9.3 验证
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | 退出 0 |
+| `npm run build` | 退出 0；`index-3e78e1a8.js`、`ReviewView-9b1bef85.js`、`reviewWrite-82989423.js`（仅有既有 chunk >500 kB 告警） |
+| 源码静态核查 | `git diff --check` 无错误；全量 `src` 已无事件顶层 `content/reason/page` 读取；`getReviewEvents` 不做扁平映射；新增内容未出现硬编码凭证、DSN、MinerU Key 或机器绝对路径 |
+| 4173 独立预览 | 已在监听；`/` 服务新 dist（`/assets/index-3e78e1a8.js` → 200）；`/api/openapi.json` 未带凭证返回 401，说明代理仍指向 8180 |
+| 正式 8180 | 未重启、未改镜像、未切版本；仍 `0.2.2-api-candidate` / 22 路径，四写按钮继续禁用，台账事件页签不渲染 |
+| **未执行** | 未在真实 v0.2.3 服务上正向调用事件/写入接口；未做浏览器写链路验收；正向门控、事件正文与幂等恢复仍待 QA 隔离实例 |
+
+本轮修正依据**后端源码契约与静态审阅**，不是浏览器联验结论；不把 `typecheck / build` 通过等同于 QA PASS。
+
+### 9.4 交接与状态
+
+- 前端业务源码提交：`03af02cedc84fce8b19e169e49c6bb456ef17371`；**本轮最终前端完整 SHA = 本文档提交后的仓库 HEAD**（见交接消息）。Agent C 集成时以该 HEAD 记录前端 revision，不要混用旧 `63bbcc0` / `3b7b62f` 的测试结论。
+- 后续仍按后端交接 §4：后端开发分支集成 → 类型检查/构建 → 基于新的前后端冻结源码生成**新唯一候选标签**（不覆盖旧候选）→ QA 用获准隔离数据验收正向双门控、四写动作、事件 `request` 正文/理由/页码、幂等同键同请求与同键异请求 409、503 后恢复及权限隔离。
+- 正式建库、`writers` 名单与 runtime 切换仍须用户最终授权；当前建议 `writers` 为空，不创建正式 `market_review`、不切换 8180。
+- 状态仍为 `ADAPTATION_PREPARED / NOT_LIVE_VERIFIED`，不是 `READY_FOR_FINAL_QA`，更不是 v0.2.3 前端正式交付完成。
