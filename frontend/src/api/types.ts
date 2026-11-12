@@ -349,20 +349,30 @@ export interface ReviewReceipt {
   reparse_task_created: boolean
 }
 
-/** GET /api/review/{parse_id}/events 的真实追加事件；修订正文按不可信纯文本渲染 */
+/**
+ * GET /api/review/{parse_id}/events 的真实追加事件（后端 OpenAPI 显式 ReviewEvent Schema）。
+ *
+ * 真实结构 = 完整写入回执 + 必填 request（ReviewAction，与写请求 body 同构）。
+ * 正文 content / 理由 reason / 页码 page / span 只在 request 内，顶层没有这些字段。
+ * 前端不做扁平映射、不从顶层猜字段、不伪造修订；修订正文一律按不可信纯文本渲染。
+ */
 export interface ReviewEvent {
   event_id: string
   parse_id: string
+  base_result_id: string
   action: string
   operator: string
   timestamp: string
   version: number
-  status?: string
-  revision_id?: string | null
-  reason?: string | null
-  page?: number | null
-  content?: string | null
-  [key: string]: unknown
+  status: string
+  revision_id: string | null
+  before: Record<string, unknown>
+  write_performed: boolean
+  original_result_modified: boolean
+  publish_authorized: boolean
+  reparse_task_created: boolean
+  /** 必填：本次真实请求快照，正文 / 理由 / 页码只从此处读取 */
+  request: ReviewActionBody
 }
 
 /** GET /api/system/resources：仅 API 进程真实指标，不是宿主机/GPU/利用率 */

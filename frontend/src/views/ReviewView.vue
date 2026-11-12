@@ -157,13 +157,16 @@
                   <el-table-column prop="status" label="台账状态" width="130" />
                   <el-table-column prop="operator" label="操作者" width="130" />
                   <el-table-column label="时间" width="170"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+                  <el-table-column label="页码" width="80">
+                    <template #default="{ row }">{{ row.request?.page ?? '—' }}</template>
+                  </el-table-column>
                   <el-table-column label="理由 / 修订正文" min-width="240" show-overflow-tooltip>
-                    <template #default="{ row }"><span>{{ row.content || row.reason || '—' }}</span></template>
+                    <template #default="{ row }"><span>{{ row.request?.content || row.request?.reason || '—' }}</span></template>
                   </el-table-column>
                 </el-table>
                 <div v-if="latestRevision" class="revision-box">
-                  <div class="revision-head">最近人工修订（不可信文本，仅纯文本展示，不执行 HTML）</div>
-                  <pre class="result-pre">{{ latestRevision.content }}</pre>
+                  <div class="revision-head">最近人工修订（第 {{ latestRevision.request.page ?? '—' }} 页 · 来源 event.request · 不可信文本，仅纯文本展示，不执行 HTML）</div>
+                  <pre class="result-pre">{{ latestRevision.request.content }}</pre>
                 </div>
               </AsyncPanel>
               <el-alert v-if="lastReceipt" type="success" :closable="false" style="margin-top: 12px"
@@ -216,7 +219,10 @@
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="620px" :close-on-click-modal="false" @closed="resetDialog">
       <el-alert type="info" :closable="false" style="margin-bottom: 12px"
         :title="`台账版本 ${expectedVersion} · ${currentParseId}`"
-        description="提交会带 Idempotency-Key 与 expected_version。操作者由会话凭证对应的 owner 决定，客户端不指定；审核通过不授予发布权限、不自动创建解析任务，原始解析结果与原件保持只读。" />
+        description="提交会带 Idempotency-Key 与 expected_version。操作者由会话凭证对应的 owner 决定，客户端不指定；审核通过不授予发布权限、不自动创建解析任务，原始解析结果与原件保持只读。结果未确认的重试沿用同一键与同一请求；内容或台账版本变化会换键作为新操作。" />
+      <el-alert v-if="retryingSameRequest" type="warning" :closable="false" style="margin-bottom: 12px"
+        title="结果未确认：同键同请求重试"
+        description="本次提交的内容与台账版本未改变，将沿用同一 Idempotency-Key 与同一请求重发，以取回后端原回执；不据错误码断定没有写入。若修改正文、理由、页码，或详情刷新后台账版本变化，则作为新操作生成新键。" />
       <el-form class="action-form" label-width="96px">
         <el-form-item v-if="activeAction === 'approve'" label="备注（可选）">
           <el-input v-model="form.reason" type="textarea" :rows="3" maxlength="2000" show-word-limit placeholder="可留空，前端不会生成假备注" />
@@ -268,11 +274,12 @@ import {
   contractState, contractLabel, hasV023ReviewWriteRoutes, hasV023ReviewEvents
 } from '@/api/dataSource'
 import {
-  approveReview, rejectReview, markReviewError, saveReviewRevision,
-  getReviewEvents, newIdempotencyKey
+  postReviewAction, makeReviewActionBody, getReviewEvents, newIdempotencyKey,
+  type ReviewActionName
 } from '@/api/reviewWrite'
 import type {
-  ReviewDetail, ReviewQueue, ReviewQueueItem, ReviewEvent, ReviewReceipt, ListResponse
+  ReviewDetail, ReviewQueue, ReviewQueueItem, ReviewEvent, ReviewReceipt,
+  ReviewActionBody, ListResponse
 } from '@/api/types'
 
 /**
@@ -283,6 +290,8 @@ import type {
  * - 写操作（v0.2.3）：双门控 = 运行期 OpenAPI 含 4 条写路径 + 详情 review_write_supported / review_ledger.available
  *   正式 8180 当前仍是 0.2.2-api-candidate / 22 路径，第一道门控必然不通过，按钮保持禁用。
  * - 提交必带 Idempotency-Key 与 expected_version；409/403/401/422/503 分别给出明确提示，不隐藏错误。
+ * - 首次提交冻结 action / parse_id / body 快照：结果未确认时同键同请求重试；主动改内容或版本变化换键作为新操作。
+ * - 台账事件的正文/理由/页码只从必填的 event.request 读取（后端 OpenAPI ReviewEvent），不从顶层猜测、不伪造修订。
  * - 成功与否以后端回执 write_performed 为准，前端不改本地状态、不伪造事件。
  * - Markdown / 表格 / 人工修订一律纯文本，不使用 v-html，不执行不可信 HTML。
  */
@@ -348,7 +357,7 @@ const detail = useAsyncData<ReviewDetail>(
 // 尚未选择队列记录时显示明确空态，而非无限 loading
 detail.state.value = 'empty'
 
-type ReviewActionKey = 'approve' | 'reject' | 'mark-error' | 'save-revision'
+type ReviewActionKey = ReviewActionName
 const actions = [
   { key: 'approve', label: '审核通过', type: 'success' },
   { key: 'reject', label: '退回重新解析', type: 'warning' },
@@ -407,8 +416,11 @@ const events = useAsyncData<ListResponse<ReviewEvent>>(
   { immediate: false }
 )
 events.state.value = 'empty'
+/** 后端事件 = 完整回执 + 必填 request；修订正文只从 request 读取，顶层不存在该字段 */
 const latestRevision = computed(() =>
-  (events.data.value?.list || []).find((e) => e.action === 'save-revision' && typeof e.content === 'string') || null
+  (events.data.value?.list || []).find(
+    (e) => e.action === 'save-revision' && typeof e.request?.content === 'string'
+  ) || null
 )
 const lastReceipt = ref<ReviewReceipt | null>(null)
 
@@ -419,9 +431,39 @@ watch(resultTab, (tab) => {
 /* ───────── 写入确认弹窗 ───────── */
 const dialogVisible = ref(false)
 const activeAction = ref<ReviewActionKey>('approve')
-const idempotencyKey = ref('')
 const submitError = ref('')
 const form = reactive({ reason: '', page: 1, span: '', content: '' })
+
+/**
+ * 首次提交冻结的完整请求快照。
+ * 写入结果未确认（网络中断 / 503 / 未知错误）时，重试必须逐字节复用同一个 body 与同一个键；
+ * 用户主动改正文/理由/页码，或详情刷新导致 expected_version 变化时，签名不同 →
+ * 换键并作为新操作，避免后端返回正确的 idempotency_conflict。
+ */
+interface PendingWrite {
+  signature: string
+  action: ReviewActionKey
+  parseId: string
+  body: ReviewActionBody
+  key: string
+}
+const pendingWrite = ref<PendingWrite | null>(null)
+
+/** 覆盖本次操作全部可编辑输入 + 对象 + 台账版本；任一变化都视为新操作 */
+function currentSignature(action: ReviewActionKey, parseId: string, version: number): string {
+  return JSON.stringify({
+    action, parseId, version,
+    reason: form.reason, page: form.page, span: form.span, content: form.content
+  })
+}
+
+/** 内容与版本均未改变时，弹窗明确提示这是同键同请求重试，而非一次新写入 */
+const retryingSameRequest = computed(() => {
+  const p = pendingWrite.value
+  if (!p || !dialogVisible.value) return false
+  return p.signature === currentSignature(activeAction.value, currentParseId.value, expectedVersion.value)
+})
+
 const dialogTitle = computed(() => ({
   approve: '确认审核通过', reject: '确认退回重新解析',
   'mark-error': '确认标记识别错误', 'save-revision': '确认保存人工修订'
@@ -439,11 +481,12 @@ function resetDialog() {
   form.span = ''
   form.content = ''
   form.page = currentPage.value
+  pendingWrite.value = null // 关闭弹窗即结束这一次操作
 }
 function openAction(key: ReviewActionKey) {
   if (!canWrite.value) return
   activeAction.value = key
-  idempotencyKey.value = newIdempotencyKey() // 一次操作一个键，失败重试沿用同键同 body
+  pendingWrite.value = null
   submitError.value = ''
   form.reason = ''
   form.span = ''
@@ -456,21 +499,29 @@ async function submitAction() {
   if (!canWrite.value || !formValid.value) return
   busy.value = true
   submitError.value = ''
+  const action = activeAction.value
   const parseId = currentParseId.value
   const version = expectedVersion.value
-  const key = idempotencyKey.value
-  try {
-    let receipt: ReviewReceipt
-    if (activeAction.value === 'approve') {
-      receipt = await approveReview(parseId, version, key, form.reason || undefined)
-    } else if (activeAction.value === 'reject') {
-      receipt = await rejectReview(parseId, version, form.reason, key)
-    } else if (activeAction.value === 'mark-error') {
-      receipt = await markReviewError(parseId, version, form.reason, form.page, form.span || undefined, key)
-    } else {
-      // content 原样提交：前导空格与换行是人工正文的一部分，不做 trim
-      receipt = await saveReviewRevision(parseId, version, form.page, form.content, key)
+  const signature = currentSignature(action, parseId, version)
+
+  let pending = pendingWrite.value
+  if (!pending || pending.signature !== signature) {
+    // 新操作：构造一次 body 快照后冻结；重试不再读取 form / expectedVersion
+    pending = {
+      signature, action, parseId,
+      body: makeReviewActionBody(action, parseId, version, {
+        reason: form.reason, page: form.page, span: form.span, content: form.content
+      }),
+      key: newIdempotencyKey()
     }
+    pendingWrite.value = pending
+  }
+  const snapshot = pending // 本次发送严格固定，不受后续状态刷新影响
+
+  try {
+    const receipt: ReviewReceipt = await postReviewAction(
+      snapshot.parseId, snapshot.action, snapshot.body, snapshot.key
+    )
     if (!receipt || receipt.write_performed !== true) {
       const hint = '后端回执未确认写入（write_performed 非 true），前端不判定为成功。'
       submitError.value = hint
@@ -478,6 +529,7 @@ async function submitAction() {
       return
     }
     lastReceipt.value = receipt
+    pendingWrite.value = null
     dialogVisible.value = false
     ElMessage.success(`审核写入成功：${receipt.action} · 台账 v${receipt.version}（event_id ${receipt.event_id.slice(0, 8)}…）`)
     await Promise.all([
@@ -489,7 +541,7 @@ async function submitAction() {
     let hint = e.hint
     if (e.status === 409) {
       hint = '写入被拒绝（409）：台账版本或原始结果已变化，或同一幂等键复用了不同请求。已刷新详情，请确认后重试。'
-      idempotencyKey.value = newIdempotencyKey()
+      pendingWrite.value = null // 版本/对象已变，下次提交按新操作换键
       void detail.load()
     } else if (e.status === 403) {
       hint = '无权写入（403）：当前会话凭证对应的 owner 未被配置为审核写入者。'
@@ -498,7 +550,9 @@ async function submitAction() {
     } else if (e.status === 422) {
       hint = '参数被拒绝（422）：请检查必填理由、页码是否对应真实 page_number，以及是否传入契约外字段。'
     } else if (e.status === 503) {
-      hint = '审核台账未配置或存储暂不可用（503），本次未执行写入。'
+      hint = '审核台账未配置或存储暂不可用（503）：本次写入结果未确认，不能断定没有写入。请保持内容与台账版本不变，直接点「确认提交」用同一幂等键与同一请求重试，以取回后端原回执。'
+    } else if (e.status === 0 || e.status === 500 || e.status === 502 || e.status === 504) {
+      hint = `${e.hint}；写入结果未确认，可能已提交但响应丢失。请保持内容与台账版本不变，用同一幂等键与同一请求重试，不要据错误码断定没有写入。`
     }
     submitError.value = hint
     ElMessage.error(hint)

@@ -22,7 +22,7 @@ function signalOf(signal?: AbortSignal) {
   return signal ? { signal } : {}
 }
 
-/** 每次打开操作弹窗生成一个键；失败重试沿用同一键与同一 body，避免误触发同键异请求 409 */
+/** 每个「新操作」生成一个键；同一次结果未确认的重试沿用同一键与同一 body */
 export function newIdempotencyKey(): string {
   try {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -34,11 +34,17 @@ export function newIdempotencyKey(): string {
   return `mrp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`
 }
 
-type ActionName = 'approve' | 'reject' | 'mark-error' | 'save-revision'
+export type ReviewActionName = 'approve' | 'reject' | 'mark-error' | 'save-revision'
 
-function postReviewAction(
+/**
+ * 统一写入出口：调用方传入「已冻结」的 body 快照。
+ * 写入结果未确认时，重试必须复用同一 action / parseId / body / Idempotency-Key，
+ * 否则后端按同键异请求返回 409 idempotency_conflict。
+ * body 由调用方在首次提交时构造一次，后续不从可编辑表单重新读取。
+ */
+export function postReviewAction(
   parseId: string,
-  action: ActionName,
+  action: ReviewActionName,
   body: ReviewActionBody,
   idempotencyKey: string,
   signal?: AbortSignal
@@ -51,6 +57,41 @@ function postReviewAction(
     .then((r) => r.data)
 }
 
+/** 首次提交时从可编辑表单取一次值；构造出 body 快照后，重试不再读取表单 */
+export interface ReviewActionInput {
+  reason?: string
+  page?: number
+  span?: string
+  content?: string
+}
+
+/**
+ * 按 action 构造契约允许的 body 快照（唯一构造点）。
+ * 不传契约外字段、不指定 operator；修订正文原样保留前导空格与换行，不 trim。
+ * 结果未确认的重试必须复用返回的同一个对象，避免同键异请求 409。
+ */
+export function makeReviewActionBody(
+  action: ReviewActionName,
+  parseId: string,
+  expectedVersion: number,
+  input: ReviewActionInput
+): ReviewActionBody {
+  const body: ReviewActionBody = { base_result_id: parseId, expected_version: expectedVersion }
+  if (action === 'approve') {
+    if (input.reason) body.reason = input.reason // 可选备注，空串不发送
+  } else if (action === 'reject') {
+    if (input.reason !== undefined) body.reason = input.reason // 必填，由表单校验保证非空
+  } else if (action === 'mark-error') {
+    if (input.reason !== undefined) body.reason = input.reason
+    if (input.page !== undefined) body.page = input.page
+    if (input.span) body.span = input.span
+  } else {
+    if (input.page !== undefined) body.page = input.page
+    if (input.content !== undefined) body.content = input.content
+  }
+  return body
+}
+
 /** POST /api/review/{parse_id}/approve —— reason 可选；只记录通过，不授予发布权限 */
 export function approveReview(
   parseId: string,
@@ -59,8 +100,7 @@ export function approveReview(
   reason?: string,
   signal?: AbortSignal
 ): Promise<ReviewReceipt> {
-  const body: ReviewActionBody = { base_result_id: parseId, expected_version: expectedVersion }
-  if (reason) body.reason = reason
+  const body = makeReviewActionBody('approve', parseId, expectedVersion, { reason })
   return postReviewAction(parseId, 'approve', body, idempotencyKey, signal)
 }
 
@@ -72,11 +112,8 @@ export function rejectReview(
   idempotencyKey: string,
   signal?: AbortSignal
 ): Promise<ReviewReceipt> {
-  return postReviewAction(
-    parseId, 'reject',
-    { base_result_id: parseId, expected_version: expectedVersion, reason },
-    idempotencyKey, signal
-  )
+  const body = makeReviewActionBody('reject', parseId, expectedVersion, { reason })
+  return postReviewAction(parseId, 'reject', body, idempotencyKey, signal)
 }
 
 /** POST /api/review/{parse_id}/mark-error —— reason、page 必填；span 可选 */
@@ -89,10 +126,7 @@ export function markReviewError(
   idempotencyKey: string,
   signal?: AbortSignal
 ): Promise<ReviewReceipt> {
-  const body: ReviewActionBody = {
-    base_result_id: parseId, expected_version: expectedVersion, reason, page
-  }
-  if (span) body.span = span
+  const body = makeReviewActionBody('mark-error', parseId, expectedVersion, { reason, page, span })
   return postReviewAction(parseId, 'mark-error', body, idempotencyKey, signal)
 }
 
@@ -105,14 +139,15 @@ export function saveReviewRevision(
   idempotencyKey: string,
   signal?: AbortSignal
 ): Promise<ReviewReceipt> {
-  return postReviewAction(
-    parseId, 'save-revision',
-    { base_result_id: parseId, expected_version: expectedVersion, page, content },
-    idempotencyKey, signal
-  )
+  const body = makeReviewActionBody('save-revision', parseId, expectedVersion, { page, content })
+  return postReviewAction(parseId, 'save-revision', body, idempotencyKey, signal)
 }
 
-/** GET /api/review/{parse_id}/events —— 本对象真实追加事件，owner 隔离 */
+/**
+ * GET /api/review/{parse_id}/events —— 本对象真实追加事件，owner 隔离。
+ * 原样返回后端结构：body 外层是完整回执，content/reason/page/span 在必填的
+ * event.request 内。这里刻意不做扁平映射，避免掩盖层级差异或伪造修订来源。
+ */
 export function getReviewEvents(
   parseId: string,
   q: { page: number; pageSize: number },
