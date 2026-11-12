@@ -1,5 +1,7 @@
 # v0.2.2 后端接口缺口与交付边界
 
+2026-11-12 draft-4 更新：账号密码与角色管理、任务/API/错误日志、入库预检/批次/版本检查/发布回滚、已发布历史版本及来源筛选已实现并隔离自测。ADMIN 按用户最新要求具有全部业务权限，旧文档的 ADMIN 限制不适用于新候选。正式 8180 未更新，前端仍需接新 UI；人工修订导出、表格/案例正式入库、宿主机全量监控和缺少可靠口径的扩展指标没有冒充完成。详见 [当前接入包](frontend-v023-draft4-backend-handoff.md)。
+
 2026-11-12 增补：v0.2.3 已实现显式授权的文档软删除候选；自测完成，状态 BACKEND_API_PARTIAL，待独立 QA，正式 8180 未更新。最新范围与未覆盖项见 [文档删除交接](document-delete-v023-handoff.md)；以下为 v0.2.2 历史边界。
 
 审计依据：维护基线 `5dd44b97710db0d3bdb84bcec6e1624dd70205dc` 实际 FastAPI factory、全仓路由扫描、现有 Vue 七页面及 apiCapabilities/parse/documentFiles 适配层。仓库仅一个 FastAPI factory，无其他 APIRouter。原基线 9 个 API，匿名 OpenAPI 关闭；已有根路径上传工作台。

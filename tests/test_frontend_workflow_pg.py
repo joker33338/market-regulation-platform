@@ -43,7 +43,10 @@ class FrontendWorkflowPGTests(unittest.TestCase):
             cursor.execute('CREATE ROLE frontend_api_test LOGIN')
             cursor.execute('GRANT USAGE ON SCHEMA public,document_review TO frontend_api_test')
             cursor.execute('GRANT SELECT ON ALL TABLES IN SCHEMA document_review TO frontend_api_test')
-            cursor.execute('GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO frontend_api_test')
+            cursor.execute('GRANT SELECT ON ALL TABLES IN SCHEMA public TO frontend_api_test')
+            cursor.execute('GRANT INSERT,UPDATE ON mr_kb_versions,mr_kb_documents,mr_active TO frontend_api_test')
+            cursor.execute('GRANT INSERT ON mr_document_versions,mr_chunks,mr_release_history TO frontend_api_test')
+            cursor.execute('GRANT INSERT,DELETE ON law_chunks,mr_active_chunk_map TO frontend_api_test')
             cursor.execute('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO frontend_api_test')
 
     def test_password_admin_review_build_publish_search_and_rollback(self):
@@ -76,6 +79,9 @@ class FrontendWorkflowPGTests(unittest.TestCase):
         response=fixture.client.post('/api/auth/login',json={'username':'workflow-admin','password':password})
         self.assertEqual(response.status_code,200,response.text)
         fixture.f.auth={'Authorization':'Bearer '+response.json()['access_token']}
+        with psycopg2.connect(self.runtime) as connection,connection.cursor() as cursor:
+            cursor.execute("SELECT has_table_privilege(current_user,'document_review.documents','UPDATE'),has_table_privilege(current_user,'public.mr_release_history','UPDATE'),has_table_privilege(current_user,'public.mr_release_history','DELETE'),has_schema_privilege(current_user,'public','CREATE')")
+            self.assertEqual(cursor.fetchone(),(False,False,False,False))
         source_before=reader.review.detail('alice',row['parse_id'])
         response=fixture.client.post('/api/review/'+row['parse_id']+'/approve',headers={**fixture.f.auth,'Idempotency-Key':uuid4().hex},
             json={'base_result_id':row['parse_id'],'expected_version':0})

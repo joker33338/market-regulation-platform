@@ -1,5 +1,7 @@
 # v0.2.2 前后端 API 契约
 
+2026-11-12 新候选：`frontend-api-v0.2.3-draft-4`、46 路径，新增密码账号、ADMIN 全权限、入库/发布和日志/筛选；见 [当前接入包](frontend-v023-draft4-backend-handoff.md) 与 `frontend-openapi-v023-draft4.json`。本页以下为历史 v0.2.2 内容，不代表新候选已部署。
+
 后续 v0.2.3 文档删除候选使用独立 `frontend-openapi-v023-draft3.json`（frontend-api-v0.2.3-draft-3），详细授权、软删除语义及错误码见 [文档删除交接](document-delete-v023-handoff.md)。本页 v0.2.2 冻结内容不代表当前开发候选或已部署能力。
 
 契约版本：`frontend-api-v0.2.2-1`。下列新增接口已实现；合成测试通过，独立前端及 QA 待验收。
