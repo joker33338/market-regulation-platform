@@ -49,6 +49,8 @@ GET /api/library/cases       -> 404
 GET /api/system/capabilities -> 404
 ```
 
+**交付前再次只读复核**：容器 healthy、镜像 ID、OCI revision、标签与 dist label 六项均未变化；带凭证 `GET /api/openapi.json` 仍为 200 / `0.2.2-api-candidate` / 22 路径 / 无 `x-contract-version` / OpenAPI 中 **0 条 `/api/library/*` 路径声明**；`laws`、`cases`、`capabilities` 抽样 GET 均 404。全程未切换镜像、未重启容器、未改动数据库与共享数据卷。
+
 **关键结论**：活动 8180 仍是 v0.2.2 冻结镜像，8 条 library 路由一条都没有加载。因此本轮两个新页面在默认预览下必须如实呈现「运行期未加载该接口 → 禁用 / 合法空态」，**不发请求、不摆演示数据、不伪造成功**。这也是本轮浏览器验证的重点。
 
 ## 3. 门控与真实性设计
@@ -66,16 +68,16 @@ GET /api/system/capabilities -> 404
 
 ## 4. 源码改动清单
 
-本轮 14 个前端文件（6 改 + 8 新）。其中两页共用骨架在 Phase 2 规范中转后做了一次结构重构：初版（`36b5a94`）用 `useAsyncData` + 派生 state 映射，最终版（`9038b15`）改为页面局部 `useLibraryQuery` + L1/L2 分层渲染，两次提交均保留在本地历史中，最终以 `9038b15` 为准。
+本轮 14 个前端文件（6 改 + 8 新）。其中两页共用骨架在 Phase 2 规范中转后做了一次结构重构，并在收口阶段追加一次最终修正：初版（`36b5a94`）用 `useAsyncData` + 派生 state 映射；重构版（`9038b15`）改为页面局部 `useLibraryQuery` + L1/L2 分层渲染；最终修正（`39429b3`）恢复 `canQuery` 门控、修正详情入口索引错位、收紧 `contractState = outdated` 边界并补齐 `data-lib-*` DOM 标记。三次提交均保留在本地历史中，**最终以 `39429b3` 为准**，全套验证与证据均在该最终态上重跑。
 
 | 层 | 文件 | 要点 |
 |---|---|---|
 | 契约 / 类型 | `api/types.ts` | 新增 draft-5 分节：`LibraryRecord / LibraryList / LibraryDetail / LibraryParts<T> / LibraryQuery`、章节 / 条款 / 引用 / 结构化详情类型；不改 `LoadState` 等既有定义 |
-| | `api/library.ts`（新，254 行） | 8 个 GET 封装、`LIBRARY_ROUTES`（8 条 method+path）、白名单参数构造（空值 `undefined` 不发送）、`doc_version_id` 来源校验；404 / 422 / 503 重抛为保留 `status + code` 的 `ApiError`，**仅作异常兜底，不参与页面状态映射** |
+| | `api/library.ts`（新，255 行） | 8 个 GET 封装、`LIBRARY_ROUTES`（8 条 method+path）、白名单参数构造（空值 `undefined` 不发送）、`doc_version_id` 来源校验；404 / 422 / 503 重抛为保留 `status + code` 的 `ApiError`，**仅作异常兜底，不参与页面状态映射** |
 | | `api/dataSource.ts` | `CONTRACT_ROUTES_V023_DRAFT5`、`hasLibraryRoute()` 方法级门控函数；`probeContract` hint 增加 draft-5 路由加载状态（不写死路径数）；清理「46 路径」硬编码 |
-| 页面 | `components/LibraryBrowser.vue`（新，803 行） | 两页共用骨架：8 条路由运行期状态表、筛选与分页、列表 → 页内主从详情 → 章节 / 条款 / 引用 → 条款正文；详情页不注册路由（避免刷新后跨身份残留）；原件走认证 Blob URL |
-| | `views/library/useLibraryQuery.ts`（新，205 行） | **页面局部状态机**：13 态自定义联合类型（不复用 `LoadState`）；`hasToken → probeContract → hasRuntimeMethod` 门控先行；按 `status + code` 精确映射（404 / 401 / 422 / 503 / 5xx），禁止用 `e.kind === 'outdated'` 判定契约状态；`L2_STATES` 白名单确保 `AsyncPanel` 只接 `loading / empty / ready` |
-| | `views/library/LibraryStatePanel.vue`（新，119 行） | L1 状态面板：门控态（warning 标签 + 禁用说明）、错误态（`el-alert type=error` 常显 + 返回上一级 / 返回列表）、`unpublished` 合法空态（info）、请求取消，各自独立分支；L2 才交 `AsyncPanel` |
+| 页面 | `components/LibraryBrowser.vue`（新，827 行） | 两页共用骨架：8 条路由运行期状态表、筛选与分页、列表 → 页内主从详情 → 章节 / 条款 / 引用 → 条款正文；详情页不注册路由（避免刷新后跨身份残留）；原件走认证 Blob URL |
+| | `views/library/useLibraryQuery.ts`（新，209 行） | **页面局部状态机**：13 态自定义联合类型（不复用 `LoadState`）；`hasToken → probeContract → hasRuntimeMethod` 门控先行；按 `status + code` 精确映射（404 / 401 / 422 / 503 / 5xx），禁止用 `e.kind === 'outdated'` 判定契约状态；`L2_STATES` 白名单确保 `AsyncPanel` 只接 `loading / empty / ready` |
+| | `views/library/LibraryStatePanel.vue`（新，122 行） | L1 状态面板：门控态（warning 标签 + 禁用说明）、错误态（`el-alert type=error` 常显 + 返回上一级 / 返回列表）、`unpublished` 合法空态（info）、请求取消，各自独立分支；L2 才交 `AsyncPanel` |
 | | `views/library/copy.ts`（新，75 行） | Phase 2 定稿文案集中管理：门控、unpublished、ready-空、404、422、503、OCR 未核验、字符范围、罚款十进制、NULL 字段 |
 | | `views/LawLibraryView.vue`、`views/CaseLibraryView.vue`（新） | 两个薄壳：`kind` 决定差异。法规库**整体不渲染** `violation` 控件，含章节 / 条款 / 条款正文；案例库多 `violation` 筛选、处罚依据引用与案例结构化字段 |
 | | `router/index.ts`、`layout/AppLayout.vue` | 新增 `/library/laws`（`LibraryLaws`）、`/library/cases`（`LibraryCases`）；两个菜单项挂在既有「法规知识库」子菜单下作第 3 / 4 项，不新增顶级菜单 |
@@ -89,14 +91,15 @@ GET /api/system/capabilities -> 404
 方法：4173 生产构建预览 + 无头 Edge 157 / CDP 9223，注入容器内既有会话凭证（仅内存 / sessionStorage，不落盘、不写入证据），**只发只读 GET**。脚本 `local/frontend-evidence/draft5-adaptation-check.mjs`，结论 `local/frontend-evidence/screenshots/draft5/draft5-adaptation-verification.json`。
 
 - `npm run typecheck` 退出 0；`npm run build` 退出 0（产物含 `LawLibraryView` / `CaseLibraryView` / `LibraryBrowser` / `useLibraryQuery` 相关 chunk；仅有既存 >500 kB chunk 告警，另作优化）。两项均由主理人独立复跑确认。
-- **结构重构后完整重跑**：typecheck / build / CDP 全套验证在最终版 `9038b15` 上重新执行一遍，结论一致。
-- **11 页面 / 19 项断言 19 通过、0 失败**，console 异常 **0 条**；**5 项如实标注 `NOT_VERIFIABLE`**。
+- **最终修正态完整重跑**：在 `39429b36abc4787cae1ac1efa81ce9d598e0db27` 上独立复跑 typecheck / build，重跑 11 页面 CDP 全套验证并刷新 4 张截图；验证 JSON 的 `sourceCommit` 字段直接绑定该 SHA。断言按成员定稿的最终 DOM 契约（`tr.lib-route-row` / `tr.lib-data-row` / `data-lib-layer` / `data-lib-section` / `data-lib-field`）升级，并从 19 项扩为 **23 项**（新增 L1 门控面板存在、门控态 L2 不渲染、无伪造详情区、8 行全为「未加载」）。
+- **11 页面 / 23 项断言 23 通过、0 失败**，console 异常 **0 条**，`/api/library/*` 请求 **0 条**；**5 项如实标注 `NOT_VERIFIABLE`**。
 
 | 验证项 | 结论 |
 |---|---|
 | 两页渲染、标题、导航新增两项正确归组 | 通过（含截图） |
 | 两页「运行期未加载该接口」门控提示 + 筛选 / 查询 / 刷新按钮全部禁用 | 通过 |
 | 8 条路由运行期状态表全为「未加载」 | 通过 |
+| L1 门控面板存在、L2 未渲染、详情区未伪造 | 通过（按 `data-lib-layer` / `data-lib-section` 判定） |
 | **网络层断言：`/api/library/*` 请求数 = 0** | 通过（未加载态不偷跑请求） |
 | 无业务假数据行、无 `el-skeleton` 假行、无 DEMO 徽章 | 通过 |
 | 法规库无 `violation` 控件、案例库有且仅 1 个 | 通过（按真实 DOM 控件判定，非文本匹配） |
@@ -105,9 +108,9 @@ GET /api/system/capabilities -> 404
 | `unpublished` 合法空态说明可读 | 通过 |
 | 既有 9 个页面（文档 / 检索 / 入库 / 首页 / 系统 / 解析 / 审核 / 账号 / 登录）无回归 | 通过（含 2 张回归截图） |
 
-**首次验证 3 项失败均已查清为验证脚本口径问题，非实现缺陷**：`tableRows=8` 是运行期接口状态表的合法静态行（不是业务假数据）；法规库出现的 "violation" 字样来自「法规库不渲染也不发送 violation 参数」说明文案（控件本身由 `v-if="isCase"` 隐藏）；OCR / Bearer 说明位于详情抽屉，旧实例下列表为空、抽屉不可打开。断言相应改为精确的业务表格行计数、真实 DOM 控件检测，并把详情级说明如实转入不可验证清单，**未通过放宽断言或伪造响应制造通过**。
+**首次验证 3 项失败均已查清为验证脚本口径问题，非实现缺陷**：`tableRows=8` 是运行期接口状态表的合法静态行（不是业务假数据）；法规库出现的 "violation" 字样来自「法规库不渲染也不发送 violation 参数」说明文案（控件本身由 `v-if="isCase"` 隐藏）；OCR / Bearer 说明位于详情区，旧实例下列表为空、详情入口不可用。断言相应改为精确的业务表格行计数、真实 DOM 控件检测，并把详情级说明如实转入不可验证清单，**未通过放宽断言或伪造响应制造通过**。
 
-截图 4 张位于 ignored 的 `local/frontend-evidence/screenshots/draft5/`，不入库。`git diff --check` 无错误；源码与本文档敏感词 / 绝对路径扫描无命中（仅出现既有配置变量名说明，无凭证值、DSN 或机器路径）；未把会话凭证写入源码、报告、截图或 Git。
+截图 4 张（最终修正态刷新）位于 ignored 的 `local/frontend-evidence/screenshots/draft5/`，不入库，sha256 / bytes 见 `evidence-manifest.json`。`git diff --check` 无错误；源码与本文档敏感词 / 绝对路径扫描无命中（仅出现既有配置变量名说明，无凭证值、DSN 或机器路径）；未把会话凭证写入源码、报告、截图或 Git。
 
 ## 6. 未验证与边界（如实标注，不得据此签发 QA_PASS）
 
@@ -119,10 +122,12 @@ GET /api/system/capabilities -> 404
 
 ## 7. 提交与交接
 
-- 分支 `feat/frontend-api-v0.2.2`，**仅本地提交**，共 3 笔：
+- 分支 `feat/frontend-api-v0.2.2`，**仅本地提交**，共 4 笔已完成提交 + 本文档最终修订为最后一笔：
   1. `36b5a94de9946c73a5635851df2e9ffc46261353` — `feat(frontend)`: draft-5 契约层 + 两页初版接入；
-  2. `9038b15981fcf3f3ce45f6a7bd38f4f900359594` — `refactor(frontend)`: 两页改用页面局部状态机与 L1/L2 分层渲染（**最终源码 HEAD**）；
-  3. 本文件为文档提交（最终前端完整 HEAD 见交付消息 / 工作记忆）。
+  2. `9038b15981fcf3f3ce45f6a7bd38f4f900359594` — `refactor(frontend)`: 两页改用页面局部状态机与 L1/L2 分层渲染；
+  3. `59f0b9614061a6501749fc5d87345d50d718345e` — `docs(frontend)`: 初版交付文档；
+  4. `39429b36abc4787cae1ac1efa81ce9d598e0db27` — `fix(frontend)`: 恢复 `canQuery` 门控、修正 `openDetailFromRow` 索引错位、收紧 `contractState` 边界、补齐 `data-lib-*` 标记（**最终源码 HEAD**，全套验证绑定此 SHA）；
+  5. 本文档最终修订提交为最后一笔，**最终前端完整 HEAD 以交付消息 / 工作记忆记录为准**。
 - 未 Push / Merge main / 打 Tag / 部署生产。
 - 8180 容器内 dist 仍是冻结的 `63bbcc07…` 构建，**前端源码提交不会自动反映到 8180**；4173 预览已用本轮新构建产物验证，但那是独立预览服务，不代表活动实例已更新。
 - 请 **Agent C 在构建 v0.2.3 联合候选时带入本轮最新 dist**，并在交接六项中记录文档提交后的最终前端完整 HEAD；QA 报告另记镜像 ID、8180 身份、前端 SHA 与实际验收范围。
