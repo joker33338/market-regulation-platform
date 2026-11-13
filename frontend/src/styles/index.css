@@ -217,6 +217,13 @@ body {
   color: var(--mr-text-3);
   font-size: 13px;
 }
+/* 列表空态操作：刷新 + 返回（返回＝清空筛选回到全部数据） */
+.mr-empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 
 /* 1920 大屏限宽 / 1366 笔记本收缩 */
 @media (min-width: 1800px) {
@@ -226,4 +233,135 @@ body {
   .page { padding: 14px; }
   .card-grid { gap: 12px; }
   .mr-pro-search { gap: 8px; }
+}
+
+/* ───────── 全局可拖动滚动条滑块 ─────────
+ * 文件 / 记录较多时，列表、详情抽屉、结果区与页面主内容区都能直接抓住滑块滑动浏览。
+ * 统一作用于七个页面的所有滚动容器（含 el-table、el-drawer、长 JSON / OCR 结果区）。
+ * 滑块设 min-height，超长列表里也不会缩成一条细线，便于抓取与拖拽。 */
+html { scrollbar-color: #b9c9e2 #f2f5fa; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: #f2f5fa; border-radius: 6px; }
+::-webkit-scrollbar-thumb {
+  background: #b9c9e2; background-clip: padding-box;
+  border: 3px solid transparent; border-radius: 6px; min-height: 48px;
+}
+::-webkit-scrollbar-thumb:hover { background: #8aa8d4; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:active { background: #6d94c8; background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: #f2f5fa; }
+/* Element Plus 自带 6px 细滚动条，用更高特异性覆盖，表格 / 抽屉里滑块同样好抓握 */
+.el-table__body-wrapper::-webkit-scrollbar,
+.el-scrollbar__wrap::-webkit-scrollbar,
+.el-drawer__body::-webkit-scrollbar { width: 12px; height: 12px; }
+/* Element Plus 自定义滚动条默认 hover 才出现且很细，改为常显、加粗、可抓握 */
+.el-scrollbar__bar.is-vertical { width: 12px; opacity: 1; }
+.el-scrollbar__bar.is-horizontal { height: 12px; opacity: 1; }
+.el-scrollbar__thumb { background-color: #b9c9e2 !important; border-radius: 6px; }
+.el-scrollbar__thumb:hover { background-color: #8aa8d4 !important; }
+
+/* ───────── 注释性文字默认收起，点击展开 ─────────
+ * 页面上的口径说明、接口提示、禁用原因等长文本默认只显示一个小入口，
+ * 点击展开原文，再点收起；刷新或切换页面后恢复默认收起。
+ * 覆盖 el-alert 描述与各页 hint 类文本；错误提示（el-alert--error）以及
+ * 含按钮 / 链接 / 输入框的说明块不折叠，避免把「重试」「刷新」等操作入口一起藏掉。
+ * 交互由 utils/noteToggle.ts 的事件委托实现，不改页面模板，Vue 重渲染后仍生效。 */
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__description {
+  display: none;
+}
+#app .el-alert.is-note-open .el-alert__description { display: block; }
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__title {
+  cursor: pointer;
+}
+#app .el-alert:not(.el-alert--error):not(.is-note-open):has(.el-alert__description):not(:has(button, a, .el-button, input)) .el-alert__title::after {
+  content: ' · 说明 ▾';
+  font-size: 11px; font-weight: 400; color: var(--mr-text-3); white-space: nowrap;
+}
+#app .el-alert.is-note-open .el-alert__title::after { content: ' · 收起 ▴'; }
+
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)) {
+  cursor: pointer;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)):not(.is-note-open) {
+  font-size: 0; line-height: 0; color: transparent;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)):not(.is-note-open) > * {
+  display: none;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input))::before {
+  content: '说明 ▾';
+  display: inline-block; margin-right: 4px; padding: 1px 6px;
+  font-size: 11px; line-height: 1.5; font-weight: 400; letter-spacing: 0;
+  color: var(--mr-text-3); background: #f7f9fc;
+  border: 1px solid var(--mr-line); border-radius: 4px;
+  vertical-align: middle;
+}
+#app :is(.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note):not(:has(button, a, .el-button, input)).is-note-open::before {
+  content: '收起 ▴';
+}
+
+/* ============================================================
+   v0.2.3 draft-5：法规库 / 处罚案例库只读页面
+   复用既有 --mr-* 变量与页面骨架；新增样式一律 lib- 前缀。
+   全局 .mono 沿用既有等宽约定（原为检索页局部类，供两页复用）。
+   ============================================================ */
+.lib-browser { display: flex; flex-direction: column; gap: 16px; }
+.lib-live { min-height: 18px; font-size: 12px; color: var(--mr-text-3); }
+.lib-cancel-note { margin-bottom: 0; }
+.lib-filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.lib-filter-label { flex-shrink: 0; font-size: 12px; color: var(--mr-text-2); }
+.lib-lead { margin: 10px 0 0; font-size: 13px; line-height: 1.8; color: var(--mr-text-1); }
+.lib-gate-head { display: flex; align-items: center; gap: 10px; }
+.lib-gate-title { font-size: 15px; font-weight: 600; color: var(--mr-text-1); }
+.lib-gate-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.lib-gate-mini { padding: 10px 0; }
+.lib-gate-mini .lib-lead { margin-top: 8px; }
+.lib-scroll-x { overflow-x: auto; }
+.lib-table { min-width: 860px; }
+.lib-pager { display: flex; justify-content: flex-end; margin-top: 10px; }
+.lib-box { padding: 12px; border: 1px solid var(--mr-line); border-radius: var(--mr-radius); background: var(--mr-surface); }
+.lib-drawer-section { margin-top: 14px; }
+.lib-box-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--mr-text-1); }
+.lib-pre {
+  margin: 10px 0 0; padding: 12px; max-height: 340px; overflow: auto;
+  background: #fff; border: 1px solid var(--mr-line); border-radius: 6px;
+  font-family: var(--mr-font); font-size: 12.5px; line-height: 1.85;
+  white-space: pre-wrap; word-break: break-word;
+}
+.lib-null { font-size: 13px; color: var(--mr-text-3); }
+.lib-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.lib-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px; border: 1px solid var(--mr-line); border-radius: 6px; background: #fafbfe; }
+.lib-field-key { font-size: 11px; color: var(--mr-text-3); word-break: break-all; }
+.lib-field-val { font-size: 13px; color: var(--mr-text-1); white-space: pre-wrap; word-break: break-word; }
+.lib-source-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.lib-source-frame { overflow: hidden; border: 1px solid var(--mr-line); border-radius: 6px; background: #fff; }
+.lib-source-frame iframe { display: block; width: 100%; height: 420px; border: 0; }
+.lib-source-frame img { display: block; max-width: 100%; }
+.lib-source-fallback { padding: 14px; font-size: 13px; color: var(--mr-text-2); }
+.lib-desc { margin-bottom: 4px; }
+.mono { font-family: monospace; font-size: 12px; }
+/* ───────── Phase 2：L1/L2 两层状态区、页内主从、窄屏卡片列表 ───────── */
+.lib-state { min-height: 24px; }
+.lib-l1 { padding: 4px 0; }
+.lib-l1-head { display: flex; align-items: center; gap: 10px; }
+.lib-l1-title { font-size: 15px; font-weight: 600; color: var(--mr-text-1); }
+.lib-l1-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.lib-crumbs { margin: 2px 0 12px; font-size: 13px; }
+.lib-detail-card { margin-top: 14px; }
+.lib-card-list { display: flex; flex-direction: column; gap: 10px; }
+.lib-record-card {
+  padding: 12px; border: 1px solid var(--mr-line); border-radius: var(--mr-radius);
+  background: var(--mr-surface); box-shadow: var(--mr-shadow);
+}
+.lib-record-title { font-size: 14px; font-weight: 600; color: var(--mr-text-1); margin-bottom: 6px; word-break: break-word; }
+.lib-record-meta {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  font-size: 12px; color: var(--mr-text-2); margin-bottom: 5px; word-break: break-word;
+}
+@media (max-width: 1366px) {
+  .lib-filter-row { gap: 8px; }
+  .lib-field-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .lib-crumbs { margin-bottom: 10px; }
+  .lib-record-card { padding: 10px; }
 }

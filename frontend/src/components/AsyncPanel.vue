@@ -10,7 +10,7 @@
       :closable="false"
       show-icon
       title="未认证 / 无权限"
-      :description="error || '所有 /api/* 请求需要 Bearer Token；请在系统监控页配置有效会话凭证。后端按 owner 隔离数据，跨用户访问返回 404。'"
+      :description="error || '所有 /api/* 请求需要 Bearer Token；请在系统监控页配置有效会话凭证。后端按 principal 与业务 owner 范围隔离，越界读取返回 404。'"
     >
       <template #default>
         <div class="ap-actions">
@@ -24,8 +24,8 @@
       type="warning"
       :closable="false"
       show-icon
-      title="后端服务未加载 v0.2.2 契约"
-      description="运行期探测 /api/openapi.json 失败或缺少新增路由：活动 8180 实例仍可能是 v0.2.1 旧镜像。按后端交付约定，切换候选镜像需用户明确授权；本页不会用离线快照、Mock 或 DEMO 冒充真实响应。"
+      title="后端服务未加载所需契约路由"
+      description="运行期探测 /api/openapi.json 失败或未声明所需路由 / 方法：活动实例的路径数与契约版本一律以实测为准，不沿用离线快照中的数字。新契约须在经授权的隔离实例上验证，切换镜像需用户明确授权；本页不会用离线快照、Mock 或 DEMO 冒充真实响应。"
     >
       <template #default>
         <p v-if="error" class="ap-detail">{{ error }}</p>

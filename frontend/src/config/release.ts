@@ -1,20 +1,25 @@
 /**
- * 发布状态 —— 全站唯一事实来源（v0.2.2 运行期联调通过）
+ * 发布状态 —— 全站展示文案的事实来源
  *
- * 事实依据：
- *  - docs/integration/frontend-api-contract.md（契约版本 frontend-api-v0.2.2-1）
- *  - docs/integration/v0.2.2-local-runtime-handoff.md（8180 已重建为候选镜像、health=healthy）
- *  - 后端分支 feat/backend-api-v0.2.2 @ 4fc4cf124a120762593064676ea5f8dbe2394119
- *  - 前端 docs/frontend-api-integration-report.md（七页面真实浏览器联调记录）
- *
- * 2026-11-11 运行期复核：活动 8180 实例返回 info.version=0.2.2-api-candidate、
- * 22 个 OpenAPI 路径；本机用私有会话凭证在真实浏览器（Edge headless / CDP）完成
- * 七页面渲染与交互联调，约定只读接口全部成功返回并渲染真实业务数据。
+ * 口径（2026-11-13，按 v0.2.3 draft-4 后端交接修正）：
+ *  - 前端不再内嵌「固定版本 SHA / 固定路径数 / 固定能力缺口数」当作当前运行期结论。
+ *    活动实例加载了哪些路径与方法，一律以 GET /api/openapi.json 运行期方法级探测为准；
+ *    镜像 ID、源码 SHA、OCI revision 等六项交接事实由后端 / QA 交接文档记录。
+ *  - v0.2.2 冻结镜像（0.2.2-api-candidate）与 v0.2.2 离线快照是**历史基线**，
+ *    仅用于追溯当时的联调证据，不代表当前活动实例，也不作为前端解锁 / 禁用能力的依据。
+ *  - 草稿演进：draft-1（owner→writers 授权说明，已废止）→ draft-2（principal-v1
+ *    身份模型）→ draft-4（账号密码 / ADMIN 全权限 / 运行日志 / 入库链路 / 检索新筛选）
+ *    → draft-5（法规库 / 处罚案例库两个只读入口：新增 GET /api/library/** 只读路由，
+ *    相对前一草稿为纯增量、无删除、无既有方法变更；活动实例是否加载以运行期方法级探测为准，
+ *    未加载时保持禁用 / 合法空态，不发起请求、不展示演示数据）。
+ *  - 源码契约已交付 ≠ 活动实例已加载：未声明的路由保持禁用 / 空态，不调用不存在的接口；
+ *    写链路须在经授权的隔离实例验证，默认开发代理不向正式实例转发写入请求。
  *
  * 边界（不得越界宣称）：
- *  - 正式审核写入、入库批次/发布/回滚、结构化日志仍无 HTTP 接口，按钮保持禁用；
- *  - 上传、创建任务、恢复/取消等写链路按用户约束未执行，不属于本轮验证范围；
- *  - 独立 QA 验收与生产部署尚未进行；public 知识库无 ACTIVE 版本，检索返回 unpublished。
+ *  - 新版本的独立 QA 验收与生产部署尚未进行，不签发 QA_PASS 或发布结论；
+ *  - 上传 / 创建任务 / 恢复 / 取消 / 审核写入 / 入库发布回滚等写链路，在正式实例上未执行；
+ *  - 不把历史 owner 当成具体操作者，不从 owner 推断人员或权限；
+ *  - public 知识库无 ACTIVE 版本时检索返回 unpublished，属真实空态。
  */
 export const releaseStatus = {
   version: 'v0.2.2',
@@ -23,24 +28,16 @@ export const releaseStatus = {
   qaDate: '2026-11-11',
   qaDecisionFile: 'docs/qa/v0.2.1/final-release-decision.md',
   qaScope: 'v0.2.1 后端 MVP 有限范围验收；不含 v0.2.2 新接口、独立 QA 全验收与生产部署',
-  /** 后端契约与运行期一致：同一源码 SHA 构建的活动镜像 */
-  backendContractSha: '4fc4cf124a120762593064676ea5f8dbe2394119',
+  /** 历史基线分支（仅追溯，不作当前运行结论） */
   backendContractBranch: 'feat/backend-api-v0.2.2',
-  frontendBaseSha: '5dd44b97710db0d3bdb84bcec6e1624dd70205dc',
-  contractVersion: 'frontend-api-v0.2.2-1',
-  /** 运行期事实（来自本地运行交接文档 + 实测 /api/openapi.json） */
-  runtimeImage: 'market-regulation-workbench:candidate-v022-4fc4cf124a12',
-  runtimeContractVersion: '0.2.2-api-candidate',
-  runtimeOpenApiPaths: 22,
-  runtimeVerifiedAt: '2026-11-11',
-  /** 顶栏 / 页头短标签 */
-  shortLabel: 'v0.2.2 运行期联调通过 · 只读',
+  /** 顶栏 / 页头短标签：不写死活动实例版本，能力以运行期契约探测为准 */
+  shortLabel: '真实 API · 运行期契约驱动',
   /** 详细告警 */
-  alertTitle: 'v0.2.2 只读接口运行期联调通过，正式写入能力仍未提供',
+  alertTitle: '前端已对接真实接口；能力可用性以运行期契约探测为准',
   alertDescription:
-    '活动 8180 已加载 4fc4cf124a12 候选镜像，运行期 /api/openapi.json 返回 22 个路径；七个页面已在真实浏览器完成只读接口联调，业务数据全部来自后端真实响应，无 DEMO 回退。正式审核通过/驳回/修订、入库批次/发布/回滚及结构化日志仍无 HTTP 接口，相关按钮保持禁用；上传、创建任务等写链路与独立 QA 验收不在本轮范围内。运行期能力仍以页面上的契约探测标签为准，服务回退到旧镜像时会显示明确异常态。',
+    '各页面业务数据全部来自后端真实响应，无 DEMO / Mock 回退。哪些接口可用一律以 GET /api/openapi.json 的运行期路径与方法级探测为准：未声明的路由保持禁用 / 空态，绝不调用不存在的接口或伪造成功。draft-4 的账号密码登录、管理员账号管理、运行日志、入库预检 / 批次 / 发布回滚、检索新筛选等能力已在源码交付，须在经授权的隔离实例上验证；源码分支与活动实例是两回事。draft-5 追加法规库与处罚案例库两个只读页面：仅当运行期契约声明对应 GET 方法时才发起请求，未加载时以文字说明 + 控件禁用呈现；status=unpublished 的合法空态不是错误，404 / 422 / 503 一律按真实错误态常显，不把自动提取或待核验字段标成已核验。所有 /api/* 请求需要 Bearer 会话凭证，401 / 403 / 404 / 409 / 422 / 429 / 503 均按真实错误态呈现，不隐藏错误。独立 QA 验收与生产部署尚未进行，本页不签发任何发布结论。',
   /** 独立前端只读联调是否完成：运行期契约 + 真实 Token + 浏览器逐页验证 */
   frontendIntegrated: true,
   /** 接口契约复核结论 */
-  apiContractReview: '22 个 OpenAPI 路径（复用 8 + 新增 14）＋ 1 个认证探测端点 · 按方法列举 24 行 · 8 组能力明确不支持'
+  apiContractReview: '路径与方法以运行期 /api/openapi.json 实测为准 · 源码快照仅作参考 · 不写死路径数 / 版本 SHA / 能力缺口数'
 } as const

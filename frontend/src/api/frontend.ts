@@ -7,7 +7,7 @@ import type {
 } from './types'
 
 /**
- * v0.2.2 新增只读接口 —— 全部路径取自 docs/integration/frontend-openapi.json（22 路径）
+ * v0.2.2 只读接口 —— 路径以运行期 GET /api/openapi.json 实测为准，离线快照仅作源码参考
  * 与 docs/integration/frontend-api-contract.md。复用 parse.ts 的 9 个既有接口，不重复定义。
  *
  * 约定：
@@ -33,7 +33,12 @@ export function listDocuments(q: DocumentQuery, signal?: AbortSignal): Promise<D
         page_size: q.pageSize,
         keyword: q.keyword || undefined,
         status: q.status || undefined,
-        doc_type: q.docType || undefined
+        doc_type: q.docType || undefined,
+        // v0.2.3 新增；调用方须先确认运行期契约具备这些参数，未确认时字段保持 undefined（不发送）
+        date_from: q.dateFrom || undefined,
+        date_to: q.dateTo || undefined,
+        sort_by: q.sortBy || undefined,
+        order: q.order || undefined
       },
       ...signalOf(signal)
     })
@@ -59,6 +64,18 @@ export function getDocumentHistory(
       ...signalOf(signal)
     })
     .then((r) => r.data)
+}
+
+/**
+ * DELETE /api/documents/{file_id} —— 文档删除（当前后端契约未声明，调用方必须先经方法级门控）
+ *
+ * 只有在运行期 GET /api/openapi.json 确实声明 DELETE 该方法时，页面才会解锁按钮并调用本函数。
+ * 删除结果以后端真实响应为准：成功只代表请求被接受，页面随后重新拉取列表确认，绝不本地删除行。
+ */
+export function deleteDocument(fileId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+  return client
+    .delete<Record<string, unknown>>(`/api/documents/${encodeURIComponent(fileId)}`, signalOf(signal))
+    .then((r) => r.data || {})
 }
 
 /* ───────────── 智能解析中心 ───────────── */
@@ -157,10 +174,23 @@ export function getKbVersion(version: string, signal?: AbortSignal): Promise<Ver
 
 /* ───────────── 法规检索（仅 public ACTIVE，无 AI 问答） ───────────── */
 
-/** POST /api/knowledge/search —— body 仅 query/mode/limit，额外字段 422 */
+/**
+ * POST /api/knowledge/search —— 基础仅 query/mode/limit；
+ * v0.2.3 draft-4 新增 kb_version / issuing_authority / effective_status，
+ * 仅在调用方确认运行期能力（capabilities.search_filters）包含时才传入，否则字段不发送（额外字段 422）。
+ */
 export function searchKnowledge(body: SearchRequest, signal?: AbortSignal): Promise<SearchResponse> {
+  // 请求体键名与后端契约一致（snake_case）；未确认支持的筛选不进入 payload
+  const payload: Record<string, unknown> = {
+    query: body.query,
+    mode: body.mode,
+    limit: body.limit
+  }
+  if (body.kbVersion) payload.kb_version = body.kbVersion
+  if (body.issuingAuthority) payload.issuing_authority = body.issuingAuthority
+  if (body.effectiveStatus) payload.effective_status = body.effectiveStatus
   return client
-    .post<SearchResponse>('/api/knowledge/search', body, signalOf(signal))
+    .post<SearchResponse>('/api/knowledge/search', payload, signalOf(signal))
     .then((r) => r.data)
 }
 

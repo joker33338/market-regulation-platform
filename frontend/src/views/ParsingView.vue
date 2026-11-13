@@ -71,7 +71,7 @@
       <template #header>
         <div class="card-head-title">
           <span>创建解析任务 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">POST /api/parse/tasks · 必带 Idempotency-Key · 幂等防重复提交</span>
+          <span class="card-sub">POST /api/parse/tasks · 必带 Idempotency-Key · 同一请求沿用同键，创建成功后清空输入框</span>
         </div>
       </template>
       <div class="create-row">
@@ -82,7 +82,7 @@
       <div class="mr-disabled-hint" style="margin-top: 8px">
         <template v-if="!hasAuth">未配置 API Token，请在系统监控页配置。</template>
         <template v-else-if="!fileIdsValid">请填写 1–20 个合法的 32 位十六进制 file_id（当前 {{ parsedFileIds.length }} 个）。</template>
-        <template v-else>请求体仅含 file_ids，引擎选择、质量评估与 MinerU 回退全部由后端决定；页面刷新只查询任务，不会重新创建。</template>
+        <template v-else>请求体仅含 file_ids，引擎选择、质量评估与 MinerU 回退全部由后端决定；创建成功后输入框自动清空，结果未确认的重试沿用同一幂等键，不会重复创建；页面刷新只查询任务。</template>
       </div>
       <el-alert v-if="lastCreated" type="success" :closable="false" style="margin-top: 12px"
         :title="`任务已由后端创建：${lastCreated.task_id}（状态 ${lastCreated.status}）`" />
@@ -113,6 +113,7 @@
         :loading="list.loading.value"
         :state="list.state.value"
         :error="list.error.value"
+        empty-text="当前筛选条件下没有解析任务（后端返回空列表）"
         @query="onQuery"
         @retry="list.load()"
       >
@@ -127,14 +128,13 @@
               <el-button text size="small" type="primary" @click="queryRealTaskById(String(row.taskId))">详情</el-button>
               <el-button text size="small" @click="viewLogs(String(row.taskId))">日志</el-button>
               <el-button text size="small" @click="gotoPreview(String(row.taskId), String(row.firstFileId))">Chunk 预览</el-button>
-              <el-button text size="small" :disabled="isTerminalStatus(String(row.status))" @click="retryById(String(row.taskId))">重试</el-button>
+              <el-tooltip :content="canRetryStatus(String(row.status))
+                ? '提交 POST /api/parse/tasks/{task_id}/resume；是否可恢复以后端返回为准'
+                : '任务进行中或已成功完成，无需重试'" placement="top">
+                <span><el-button text size="small" :disabled="!canRetryStatus(String(row.status))" @click="retryById(String(row.taskId))">重试</el-button></span>
+              </el-tooltip>
             </template>
           </el-table-column>
-        </template>
-        <template #empty>
-          <el-empty :image-size="70" description="当前筛选条件下没有解析任务（后端返回空列表）">
-            <el-button size="small" @click="list.load()">刷新</el-button>
-          </el-empty>
         </template>
       </MrProTable>
     </el-card>
@@ -162,7 +162,7 @@
           </el-descriptions>
 
           <el-divider content-position="left">任务文件（引擎与回退均由后端返回）</el-divider>
-          <el-table :data="realDetail.files" size="small">
+          <el-table :data="realDetail.files" size="small" max-height="240">
             <el-table-column prop="file_name" label="文件" min-width="150" show-overflow-tooltip />
             <el-table-column label="选定引擎" width="150"><template #default="{ row }">{{ engineLabel(row.selected_engine) }}</template></el-table-column>
             <el-table-column label="状态" width="100"><template #default="{ row }"><StatusTag :status="row.status" /></template></el-table-column>
@@ -176,7 +176,7 @@
             <el-button size="small" @click="loadResults">标准化结果</el-button>
             <el-button size="small" @click="loadErrors">错误原因</el-button>
             <el-button size="small" :disabled="!realDetail.files.length" @click="downloadArtifact">下载解析产物</el-button>
-            <el-button size="small" @click="retryReal">重试任务</el-button>
+            <el-button size="small" :disabled="!canRetryStatus(realDetail.status)" @click="retryReal">重试任务</el-button>
             <el-button size="small" :disabled="isTerminalStatus(realDetail.status)" @click="cancelReal">取消任务</el-button>
             <el-button size="small" :disabled="!realDetail.files.length" @click="gotoPreview(realDetail.task_id, realDetail.files[0].file_id)">Chunk 预览</el-button>
           </div>
@@ -215,7 +215,7 @@ import {
   resumeParseTask, cancelParseTask, createParseTask
 } from '@/api/parse'
 import {
-  isTerminalStatus, type ComponentState, type HealthResponse,
+  isTerminalStatus, canRetryStatus, type ComponentState, type HealthResponse,
   type ParseTask, type TaskList, type TaskQuery
 } from '@/api/types'
 import type { LoadState } from '@/api/types'
@@ -325,14 +325,23 @@ const lastCreated = ref<ParseTask | null>(null)
 const parsedFileIds = computed(() => fileIdsInput.value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))
 const fileIdsValid = computed(() => parsedFileIds.value.length > 0 && parsedFileIds.value.length <= 20 && parsedFileIds.value.every((id) => /^[0-9a-fA-F]{32}$/.test(id)))
 const canCreate = computed(() => hasAuth.value && fileIdsValid.value && !submitting.value)
+/** 同一组 file_id 的未确认请求复用同一键；输入变化或创建成功后换键作为新操作 */
+const pendingRequest = ref<{ signature: string; key: string } | null>(null)
 
 async function submitTask() {
   if (!canCreate.value || submitting.value) return
+  const ids = [...parsedFileIds.value]
+  const signature = JSON.stringify(ids)
+  const existing = pendingRequest.value
+  const key = existing && existing.signature === signature ? existing.key : crypto.randomUUID()
+  pendingRequest.value = { signature, key }
   submitting.value = true
   try {
-    const task = await createParseTask({ file_ids: parsedFileIds.value }, crypto.randomUUID())
+    const task = await createParseTask({ file_ids: ids }, key)
     lastCreated.value = task
     realTaskId.value = task.task_id
+    pendingRequest.value = null
+    fileIdsInput.value = '' // 已创建则清空输入，避免连点重复提交；重新填写视为显式新任务
     ElMessage.success(`解析任务已创建：${task.task_id}`)
     void list.load()
     await queryRealTask()

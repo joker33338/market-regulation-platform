@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { getRuntimeOpenApi } from './frontend'
 import { hasToken } from './client'
 import { toApiError } from './errors'
+import { LIBRARY_LIST_PATHS, LIBRARY_ROUTES } from './library'
 import type { DataSource } from './types'
 
 /**
@@ -9,10 +10,21 @@ import type { DataSource } from './types'
  *
  * 重大变更（相对 v0.2.1）：能力开关**不再硬编码 true/false**。
  * 「源码已交付」与「运行期可用」是两件事：
- *   - 后端 feat/backend-api-v0.2.2 @ 4fc4cf1 已实现 22 条路径并导出离线 OpenAPI 快照；
+ *   - v0.2.2 基线曾导出离线 OpenAPI 快照；draft-4 起路径数、契约版本与能力一律以运行期探测为准，
+ *     不写死版本 SHA 或路径总数；
  *   - 但活动 8180 实例仍为 v0.2.1 旧镜像，实测新接口全部 404。
  * 因此页面一律以运行期 GET /api/openapi.json 的探测结果为准：
  *   ready → 允许真实数据渲染；其余状态 → AsyncPanel 显示明确异常态 + 重试，绝不回退 DEMO。
+ *
+ * v0.2.3 draft-2 阶段补充：新增 GET /api/auth/me 作为当前登录人员的唯一事实来源；
+ * principal_id 与 owner_id 分离，写授权由后端按角色 + 范围逐请求判定。
+ * 旧 draft-1 的「Token→owner→writers 名单」说明不再适用于当前契约（历史记录保留原事实）。
+ *
+ * v0.2.3 draft-4（草稿阶段契约清单，以运行期探测为准）补充：ADMIN 拥有全部业务权限（覆盖 draft-2
+ * 「ADMIN 不隐含 REVIEWER」旧口径）；新增账号密码登录 / 登出、管理员账号管理与审计、
+ * GET /api/system/capabilities 能力声明、API/错误/任务阶段日志、入库批次 / 预检 / 发布 / 回滚、
+ * 检索新筛选（kb_version / issuing_authority / effective_status）与 DELETE /api/documents/{file_id}。
+ * 活动实例是否加载上述能力一律以本模块的方法级探测为准：源码已交付 ≠ 运行期可用。
  */
 
 export type ContractState =
@@ -26,6 +38,8 @@ export type ContractState =
 export interface ContractMeta {
   probedAt: string
   version: string
+  /** info['x-contract-version']：draft-2 为 frontend-api-v0.2.3-draft-2 */
+  contractVersion: string
   pathCount: number
   hint: string
 }
@@ -35,6 +49,7 @@ export const contractState = ref<ContractState>('unknown')
 export const contractMeta = ref<ContractMeta>({
   probedAt: '',
   version: '',
+  contractVersion: '',
   pathCount: 0,
   hint: '尚未探测运行期接口'
 })
@@ -48,6 +63,177 @@ export const contractLabel = computed<Record<ContractState, string>>(() => ({
   error: '探测失败'
 }))
 
+/** v0.2.3 草稿阶段新增路由；当前可用路径一律以运行期方法级探测为准 */
+export const V023_IDENTITY_ROUTE = '/api/auth/me'
+export const V023_REVIEW_WRITE_ROUTES = [
+  '/api/review/{parse_id}/approve',
+  '/api/review/{parse_id}/reject',
+  '/api/review/{parse_id}/mark-error',
+  '/api/review/{parse_id}/save-revision'
+] as const
+export const V023_READ_ROUTES = [
+  '/api/review/{parse_id}/events',
+  '/api/system/resources',
+  '/api/system/audit-logs'
+] as const
+
+/** v0.2.3 draft-4 相对 draft-2 新增的路径（草稿阶段契约清单，以运行期探测为准） */
+export const CONTRACT_ROUTES_V023_DRAFT4: ContractRoute[] = [
+  { method: 'POST', path: '/api/auth/login', page: '登录页（账号密码登录，匿名可调用）', group: 'new' },
+  { method: 'POST', path: '/api/auth/logout', page: '全局（服务端撤销当前会话）', group: 'new' },
+  { method: 'GET', path: '/api/auth/roles', page: '账号管理（角色定义口径）', group: 'new' },
+  { method: 'GET', path: '/api/admin/accounts', page: '账号管理（账号列表）', group: 'new' },
+  { method: 'POST', path: '/api/admin/accounts', page: '账号管理（创建账号）', group: 'new' },
+  { method: 'PATCH', path: '/api/admin/accounts/{principal_id}', page: '账号管理（角色/范围/状态/密码）', group: 'new' },
+  { method: 'GET', path: '/api/admin/account-events', page: '账号管理（账号变更审计）', group: 'new' },
+  { method: 'GET', path: '/api/system/capabilities', page: '系统监控（能力声明）', group: 'new' },
+  { method: 'GET', path: '/api/system/api-logs', page: '系统监控（API 访问日志）', group: 'new' },
+  { method: 'GET', path: '/api/system/error-logs', page: '系统监控（错误日志）', group: 'new' },
+  { method: 'GET', path: '/api/parse/tasks/{task_id}/logs', page: '解析中心（任务阶段日志）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/precheck', page: '入库管理（入库预检，只读）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/batches', page: '入库管理（创建入库批次，ADMIN）', group: 'new' },
+  { method: 'GET', path: '/api/ingestion/batches', page: '入库管理（批次历史）', group: 'new' },
+  { method: 'GET', path: '/api/ingestion/version-check', page: '入库管理（版本技术条件）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/publish、/rollback', page: '入库管理（发布 / 回滚，ADMIN）', group: 'new' }
+]
+
+/** 运行期 OpenAPI 实际返回的路径；源码里存在某接口不等于活动服务已加载 */
+export const runtimePaths = ref<string[]>([])
+
+/**
+ * 运行期 OpenAPI 实际支持的「方法 + 路径」。
+ * 路径存在不等于方法可用：例如 /api/documents/{file_id} 只有 GET，
+ * 若仅按路径集合判断就会错误解锁删除按钮，因此方法级能力必须单独比对。
+ */
+export const runtimeMethodPaths = ref<string[]>([])
+const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'])
+
+export function collectRuntimeMethodPaths(doc: unknown): string[] {
+  const result: string[] = []
+  if (!doc || typeof doc !== 'object') return result
+  const paths = (doc as { paths?: Record<string, unknown> }).paths
+  if (!paths || typeof paths !== 'object') return result
+  for (const [path, def] of Object.entries(paths)) {
+    if (!def || typeof def !== 'object') continue
+    for (const key of Object.keys(def as Record<string, unknown>)) {
+      if (HTTP_METHODS.has(key.toLowerCase())) result.push(`${key.toUpperCase()} ${path}`)
+    }
+  }
+  return result
+}
+
+/** 纯粹的路径集合比对，不依赖探测状态（供 probeContract 内部使用） */
+function pathsInclude(required: readonly string[], paths: string[]): boolean {
+  return required.every((path) => paths.includes(path))
+}
+
+/** 所有入参路径都必须在运行期 OpenAPI 中出现，才允许启用对应能力 */
+export function hasRuntimeRoutes(required: readonly string[]): boolean {
+  if (contractState.value !== 'ready' || runtimePaths.value.length === 0) return false
+  return pathsInclude(required, runtimePaths.value)
+}
+
+/** 方法级门控：只有运行期契约确实声明了该 HTTP 方法，才允许启用对应写操作 */
+export function hasRuntimeMethod(method: string, path: string): boolean {
+  if (contractState.value !== 'ready' || runtimeMethodPaths.value.length === 0) return false
+  return runtimeMethodPaths.value.includes(`${method.toUpperCase()} ${path}`)
+}
+
+export function hasV023ReviewWriteRoutes(): boolean {
+  return hasRuntimeRoutes(V023_REVIEW_WRITE_ROUTES)
+}
+export function hasV023ReviewEvents(): boolean {
+  return hasRuntimeRoutes(['/api/review/{parse_id}/events'])
+}
+export function hasV023Monitoring(): boolean {
+  return hasRuntimeRoutes(['/api/system/resources', '/api/system/audit-logs'])
+}
+/** 文档筛选新参数没有独立路径，用同批新增的监控路由作为 v0.2.3 运行期标记 */
+export function hasV023DocumentFilters(): boolean {
+  return hasRuntimeRoutes(['/api/system/resources'])
+}
+/** GET /api/auth/me 是否在活动服务上真实可用（不是离线快照存在与否） */
+export function hasV023Identity(): boolean {
+  return hasRuntimeRoutes([V023_IDENTITY_ROUTE])
+}
+
+/* ───────────── v0.2.3 draft-4 方法级门控（8180 正式实例未加载时一律 false） ───────────── */
+
+/** POST /api/auth/login 是否可用：账号密码登录表单据此显示/提交 */
+export function hasPasswordLogin(): boolean {
+  return hasRuntimeMethod('POST', '/api/auth/login')
+}
+
+/** POST /api/auth/logout 是否可用：登出才尝试服务端撤销，否则仅清本机会话 */
+export function hasServerLogout(): boolean {
+  return hasRuntimeMethod('POST', '/api/auth/logout')
+}
+
+/** 管理员账号管理是否可用（GET /api/admin/accounts 方法级） */
+export function hasAdminAccounts(): boolean {
+  return hasRuntimeMethod('GET', '/api/admin/accounts')
+}
+
+/** 运行日志（API 日志 / 错误日志）是否可用 */
+export function hasOperationalLogs(kind: 'api-logs' | 'error-logs'): boolean {
+  return hasRuntimeMethod('GET', `/api/system/${kind}`)
+}
+
+/** 任务阶段日志是否可用 */
+export function hasTaskLogs(): boolean {
+  return hasRuntimeMethod('GET', '/api/parse/tasks/{task_id}/logs')
+}
+
+/** 入库批次（历史查询）是否可用 */
+export function hasIngestionBatches(): boolean {
+  return hasRuntimeMethod('GET', '/api/ingestion/batches')
+}
+
+/** 入库预检（只读）是否可用 */
+export function hasIngestionPrecheck(): boolean {
+  return hasRuntimeMethod('POST', '/api/ingestion/precheck')
+}
+
+/** 发布 / 回滚（ADMIN 写操作）是否可用 */
+export function hasIngestionRelease(): boolean {
+  return hasRuntimeMethod('POST', '/api/ingestion/publish') &&
+    hasRuntimeMethod('POST', '/api/ingestion/rollback')
+}
+
+/* ───────────── v0.2.3 draft-5：法规库 / 案例库方法级门控 ─────────────
+ * draft-5 的 CapabilitiesResponse 没有新增 library 字段，不能读能力声明判定可用性；
+ * 两页一律以 GET /api/openapi.json 的方法级探测为准（路径存在 ≠ 方法可用）。
+ * 未加载时页面保持禁用 / 合法空态且不发起请求；源码契约已交付 ≠ 活动实例已加载。
+ * ------------------------------------------------------------------ */
+
+/** draft-5 相对 draft-4 纯增量新增的只读路由（草稿阶段契约清单，以运行期探测为准） */
+export const CONTRACT_ROUTES_V023_DRAFT5: ContractRoute[] = LIBRARY_ROUTES.map((route) => ({
+  method: route.method,
+  path: route.path,
+  page: route.page,
+  group: 'new' as const
+}))
+
+/** 单条 library 路由的方法级门控（8 条全部为 GET） */
+export function hasLibraryRoute(path: string): boolean {
+  return hasRuntimeMethod('GET', path)
+}
+
+/** 法规库列表是否在运行期加载 */
+export function hasLawLibraryList(): boolean {
+  return hasLibraryRoute(LIBRARY_LIST_PATHS.law)
+}
+
+/** 处罚案例库列表是否在运行期加载 */
+export function hasCaseLibraryList(): boolean {
+  return hasLibraryRoute(LIBRARY_LIST_PATHS.case)
+}
+
+/** 8 条 library 只读接口是否全部加载（仅供状态说明，不放宽任何单页门控） */
+export function hasFullLibraryRoutes(): boolean {
+  return CONTRACT_ROUTES_V023_DRAFT5.every((route) => hasLibraryRoute(route.path))
+}
+
 let inflight: Promise<ContractState> | null = null
 
 /** 运行期能力探测；并发调用共用同一 Promise，避免页面切换重复请求 */
@@ -57,7 +243,7 @@ export function probeContract(force = false): Promise<ContractState> {
     if (!hasToken()) {
       contractState.value = 'no-permission'
       contractMeta.value = {
-        probedAt: new Date().toISOString(), version: '', pathCount: 0,
+        probedAt: new Date().toISOString(), version: '', contractVersion: '', pathCount: 0,
         hint: '未配置 API Token，所有 /api/* 请求会被后端拒绝（401）。请在系统监控页配置会话凭证。'
       }
       return contractState.value
@@ -66,13 +252,24 @@ export function probeContract(force = false): Promise<ContractState> {
       const doc = await getRuntimeOpenApi()
       const paths = doc && typeof doc === 'object' && doc.paths ? Object.keys(doc.paths) : []
       const hasNewRoutes = paths.includes('/api/documents') && paths.includes('/api/system/health')
+      runtimePaths.value = paths
+      runtimeMethodPaths.value = collectRuntimeMethodPaths(doc)
+      const hasV023 = pathsInclude(V023_REVIEW_WRITE_ROUTES, paths)
+      // draft-5：CapabilitiesResponse 无 library 字段，只按运行期方法级声明判定
+      const hasLibraryRoutes = CONTRACT_ROUTES_V023_DRAFT5.every((route) =>
+        runtimeMethodPaths.value.includes(`GET ${route.path}`)
+      )
+      const libraryHint = hasLibraryRoutes
+        ? '；draft-5 法规 / 案例库只读接口已加载'
+        : '；draft-5 法规 / 案例库只读接口未加载，两页保持禁用 / 合法空态'
       contractMeta.value = {
         probedAt: new Date().toISOString(),
         version: doc?.info?.version || '',
+        contractVersion: doc?.info?.['x-contract-version'] || '',
         pathCount: paths.length,
         hint: hasNewRoutes
-          ? `运行期 OpenAPI 返回 ${paths.length} 条路径，v0.2.2 契约已加载`
-          : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像`
+          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}${paths.includes('/api/auth/login') ? '；draft-4 账号登录 / 管理员账号 / 入库 / 日志接口已加载' : ''}${libraryHint}`
+          : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像${libraryHint}`
       }
       contractState.value = hasNewRoutes ? 'ready' : 'outdated'
     } catch (err) {
@@ -82,7 +279,7 @@ export function probeContract(force = false): Promise<ContractState> {
           : e.kind === 'outdated' || e.kind === 'not-found' ? 'outdated'
             : e.kind === 'unavailable' ? 'unavailable' : 'error'
       contractMeta.value = {
-        probedAt: new Date().toISOString(), version: '', pathCount: 0, hint: e.hint
+        probedAt: new Date().toISOString(), version: '', contractVersion: '', pathCount: 0, hint: e.hint
       }
     }
     return contractState.value
@@ -98,7 +295,9 @@ export function isContractReady(): boolean {
 
 export function resetContractState() {
   contractState.value = 'unknown'
-  contractMeta.value = { probedAt: '', version: '', pathCount: 0, hint: '已重置，等待重新探测' }
+  runtimePaths.value = []
+  runtimeMethodPaths.value = []
+  contractMeta.value = { probedAt: '', version: '', contractVersion: '', pathCount: 0, hint: '已重置，等待重新探测' }
 }
 
 /** 写操作 / 未实现能力的统一禁用说明 */
@@ -200,12 +399,25 @@ export function isDemo(_key: CapabilityKey): boolean {
 }
 
 export const MISSING_CAPABILITIES: MissingCapability[] = [
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: '审核中心「审核通过」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '审核中心「退回」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '审核中心「标记错误」按钮禁用' },
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '审核中心「保存修订」按钮禁用' },
-  { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: '入库页「发起入库批次」禁用' },
-  { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: '入库页不开放发布/回滚' },
-  { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: '解析中心日志仅能展示 public(task) 真实字段' },
-  { priority: 'P1', api: 'GET /api/system/resources、/api-logs、/error-logs、/audit-logs', usage: '资源与三类日志', impact: '系统监控相关卡片显示「未接入」空态' }
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'draft-2 起源码契约已交付；运行期未加载路由、当前 principal 无审核权限、目标 owner 不在授权范围，或详情双门控未通过时保持禁用，绝不本地假成功' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '同上：双门控（运行期路径 + 详情 review_write_supported / review_ledger.available）' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '同上：必填 reason 与真实 page，失败按 409/422/403/503 明确提示' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '同上：修订正文按不可信纯文本渲染，不覆盖原始解析结果' },
+  { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: 'draft-4 源码契约已交付（ADMIN + 幂等键）；运行期未加载路由或非 ADMIN 时保持禁用' },
+  { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: 'draft-4 源码契约已交付（ADMIN + expected_active_version + 幂等键）；运行期未加载或独立入库写库未配置（503）时如实报错，不本地假成功' },
+  { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: 'draft-4 源码契约已交付；运行期未加载路由时解析中心日志按钮禁用；历史未记录任务返回 available=false，不回填' },
+  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: 'draft-4 源码契约已交付；运行期未加载路由时系统监控保持「未接入」空态，不编造历史事件' },
+  { priority: 'P1', api: 'DELETE /api/documents/{file_id}', usage: '文档删除（单行 / 多选批量）', impact: 'draft-4 源码契约已声明（仅 ADMIN，未形成证据链的软删除）；运行期按方法级门控解锁，403/409/503 不本地移除行，成功后重新拉取列表确认' }
+]
+
+/** v0.2.3 draft-2 相对 v0.2.2 新增的 8 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */
+export const CONTRACT_ROUTES_V023: ContractRoute[] = [
+  { method: 'GET', path: '/api/auth/me', page: '全局身份（当前登录人员）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/approve', page: '审核中心（审核通过）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/reject', page: '审核中心（退回）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/mark-error', page: '审核中心（标记错误）', group: 'new' },
+  { method: 'POST', path: '/api/review/{parse_id}/save-revision', page: '审核中心（保存修订）', group: 'new' },
+  { method: 'GET', path: '/api/review/{parse_id}/events', page: '审核中心（台账事件）', group: 'new' },
+  { method: 'GET', path: '/api/system/resources', page: '系统监控（API 进程资源）', group: 'new' },
+  { method: 'GET', path: '/api/system/audit-logs', page: '系统监控（审核审计摘要）', group: 'new' }
 ]

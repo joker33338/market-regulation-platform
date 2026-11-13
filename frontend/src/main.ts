@@ -6,9 +6,11 @@ import 'element-plus/dist/index.css'
 import './styles/index.css'
 import App from './App.vue'
 import router from './router'
+import { setupNoteToggle } from './utils/noteToggle'
 
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+setupNoteToggle()
 app.mount('#app')

@@ -6,7 +6,7 @@ import type {
 /**
  * 复用接口（9 个）—— 对应 qa_core/document_parsing/mineru_api.py 既有路由。
  * v0.2.2 复核：新增只读接口见 frontend.ts；本文件的 9 个契约在
- * feat/backend-api-v0.2.2 @ 4fc4cf1 中保持不变（仅补 OpenAPI 描述，不改行为）。
+ * v0.2.2 基线中保持不变（仅补 OpenAPI 描述，不改行为）；运行期可用性以契约探测为准。
  *
  * 契约来源：docs/integration/frontend-api-contract.md + frontend-openapi.json
  * + 后端自带参考客户端 parsing_upload.html。

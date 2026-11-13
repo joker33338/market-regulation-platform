@@ -15,8 +15,12 @@
           <span>统计窗口</span>
           <el-input-number v-model="days" :min="1" :max="366" :step="1" size="small" controls-position="right" style="width: 110px" />
           <span>天</span>
+          <el-tag v-if="days !== loadedDays" size="small" type="warning" effect="plain">
+            {{ stats.loading.value ? '正在切换窗口…' : '窗口待刷新' }}
+          </el-tag>
+          <span class="loaded-window">已加载：近 {{ loadedDays }} 天</span>
         </span>
-        <el-button size="small" :loading="stats.loading.value" @click="stats.load()">刷新统计</el-button>
+        <el-button size="small" :loading="stats.loading.value" @click="reloadStats()">刷新统计</el-button>
       </div>
     </div>
 
@@ -36,7 +40,7 @@
       :title="`真实统计一致性告警：${distributionMismatch}`"
       description="契约要求 status_distribution 之和等于 tasks.total。此处仅报告后端真实返回值的差异，不做任何自动修正或补数。" />
 
-    <AsyncPanel :state="stats.state.value" :error="stats.error.value" empty-text="后端未返回统计数据" @retry="stats.load()">
+    <AsyncPanel :state="stats.state.value" :error="stats.error.value" empty-text="后端未返回统计数据" @retry="reloadStats()">
       <div class="window-note">
         生成时间 {{ formatTime(stats.data.value?.generated_at || '') }} ·
         窗口 {{ formatTime(stats.data.value?.window.since || '') }} ~ {{ formatTime(stats.data.value?.window.until || '') }} ·
@@ -46,16 +50,20 @@
 
       <div class="card-grid stat-grid">
         <StatCard label="上传文件总数" :value="stats.data.value?.uploads.total ?? 0" scope="全量" hint="· 当前用户上传元数据" real />
-        <StatCard label="解析任务总数" :value="stats.data.value?.tasks.total ?? 0" :scope="`近 ${days} 天`" hint="· SQLite 任务" color="var(--mr-primary)" real />
+        <StatCard label="解析任务总数" :value="stats.data.value?.tasks.total ?? 0" :scope="`近 ${loadedDays} 天`" hint="· SQLite 任务" color="var(--mr-primary)" real />
         <StatCard label="已解析文档" :value="parsedTotal" scope="全历史" hint="· document_review 回执" color="var(--mr-st-success)" real />
         <StatCard label="需人工复核" :value="reviewTotal" scope="全历史" hint="· document_review 回执" color="var(--mr-st-warning)" real />
       </div>
+
+      <el-alert v-if="statsReason" type="warning" :closable="false" style="margin-top: 12px"
+        title="已解析文档统计不可用（不是 0）"
+        :description="`后端返回 available=false 与 null 计数；原因：${statsReason}。前端不做 0 填充、不生成模拟序列，也不把数据库异常伪装成统计成功。`" />
 
       <div class="card-grid" style="grid-template-columns: 2fr 1fr; margin-top: 16px">
         <el-card shadow="never">
           <template #header>
             <div class="card-head">
-              <span>任务创建日趋势（近 {{ days }} 天）<span class="real-badge">REAL</span></span>
+              <span>任务创建日趋势（近 {{ loadedDays }} 天）<span class="real-badge">REAL</span></span>
               <span class="card-sub">created_daily · 真实任务创建日计数</span>
             </div>
           </template>
@@ -147,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { InfoFilled } from '@element-plus/icons-vue'
 import StatCard from '@/components/StatCard.vue'
@@ -167,9 +175,20 @@ import type { ComponentState, HealthResponse, StatsResponse } from '@/api/types'
  * - 零 DEMO 业务结果；接口未就绪由 AsyncPanel 统一呈现 no-permission / outdated / unavailable / error
  */
 const days = ref(14)
+/** 已成功加载的统计窗口：卡片 / 趋势图标注的是数据实际对应的 days，不跟着输入控件瞬时改写 */
+const loadedDays = ref(14)
 
 const stats = useAsyncData<StatsResponse>((signal) => getStatsOverview(days.value, signal))
 const health = useAsyncData<HealthResponse>((signal) => getSystemHealth(signal))
+
+let requestedDays = days.value
+/** 窗口变更即重新请求真实接口；仅在响应就绪后更新「已加载」标签，失败时保留上一个真实窗口 */
+async function reloadStats() {
+  requestedDays = days.value
+  await stats.load()
+  if (stats.state.value === 'ready') loadedDays.value = requestedDays
+}
+watch(days, () => { void reloadStats() })
 
 const parsedTotal = computed<number | string>(() => {
   const p = stats.data.value?.parsed_documents
@@ -181,6 +200,8 @@ const reviewTotal = computed<number | string>(() => {
   if (!p || !p.available || p.requires_review == null) return '暂无数据'
   return p.requires_review
 })
+/** v0.2.3：parsed_documents 不可用时后端给出真实原因（含审核台账未配置/不可用），前端如实展示 */
+const statsReason = computed(() => stats.data.value?.parsed_documents?.reason || '')
 
 const statusEntries = computed(() =>
   Object.entries(stats.data.value?.tasks.status_distribution || {})
@@ -285,6 +306,7 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 <style scoped>
 .header-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .days-control { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mr-text-2); }
+.loaded-window { color: var(--mr-text-3); white-space: nowrap; }
 .scope-note {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 10px 14px; margin-bottom: 12px;

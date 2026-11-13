@@ -44,10 +44,28 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '法规知识检索' }
       },
       {
+        path: 'library/laws',
+        name: 'LibraryLaws',
+        component: () => import('@/views/LawLibraryView.vue'),
+        meta: { title: '法规库' }
+      },
+      {
+        path: 'library/cases',
+        name: 'LibraryCases',
+        component: () => import('@/views/CaseLibraryView.vue'),
+        meta: { title: '处罚案例库' }
+      },
+      {
         path: 'system',
         name: 'System',
         component: () => import('@/views/SystemView.vue'),
         meta: { title: '系统监控' }
+      },
+      {
+        path: 'admin/accounts',
+        name: 'Accounts',
+        component: () => import('@/views/AccountsView.vue'),
+        meta: { title: '账号与权限管理' }
       }
     ]
   },

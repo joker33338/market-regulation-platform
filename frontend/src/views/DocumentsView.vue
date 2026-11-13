@@ -13,7 +13,9 @@
 
     <el-alert type="info" :closable="false" class="contract-note"
       title="筛选与列表均以后端契约为准"
-      description="GET /api/documents 仅支持 page、page_size、keyword、status、doc_type；后端明确不支持时间区间与任意排序，故本页不提供这两个筛选器，也不向后端发送额外字段。SHA256、状态、解析次数、上传时间来源标记均由后端返回。" />
+      :description="v023Filters
+        ? '运行期已加载 v0.2.3 查询能力：除 page / page_size / keyword / status / doc_type 外，支持 date_from / date_to（必须带时区的闭区间）与 sort_by / order 白名单排序（同值按 file_id 稳定分页）。高级筛选只发契约允许字段，非法区间与非法排序由后端返回 422。'
+        : '当前运行期契约仅支持 page、page_size、keyword、status、doc_type；v0.2.3 的日期区间与排序参数未加载，故本页不提供这两个筛选器，也不向后端发送额外字段。SHA256、状态、解析次数、上传时间来源标记均由后端返回。'" />
 
     <!-- 上传区：POST /api/parse/files，body 为原始二进制流 -->
     <el-card shadow="never" class="upload-card">
@@ -48,10 +50,23 @@
       <template #header>
         <div class="card-head">
           <span>本次会话真实上传 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">来自 POST /api/parse/files 的真实响应</span>
+          <div class="card-actions">
+            <span class="card-sub">来自 POST /api/parse/files 的真实响应 · 创建成功后自动移出待创建列表</span>
+            <el-button v-if="selectedUploads.length" size="small" type="danger" plain @click="removeSelectedUploads">
+              移出待创建（{{ selectedUploads.length }}）
+            </el-button>
+            <el-tooltip :disabled="bulkCreatable" :content="bulkHint" placement="top">
+              <span>
+                <el-button size="small" type="primary" :loading="bulkSubmitting" :disabled="!bulkCreatable" @click="createTasksForAll">
+                  一键解析全部（{{ realUploads.length }}）
+                </el-button>
+              </span>
+            </el-tooltip>
+          </div>
         </div>
       </template>
-      <el-table :data="realUploads" size="small">
+      <el-table ref="uploadTableRef" :data="realUploads" size="small" max-height="200" @selection-change="onUploadSelectionChange">
+        <el-table-column type="selection" width="46" />
         <el-table-column prop="name" label="文件名称" min-width="220" show-overflow-tooltip />
         <el-table-column label="大小" width="100" align="right">
           <template #default="{ row }"><span class="num">{{ formatSize(row.bytes) }}</span></template>
@@ -62,18 +77,24 @@
         <el-table-column prop="at" label="上传时间" width="160" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text size="small" type="primary" :loading="submittingId === row.fileId" :disabled="!hasAuth || submittingId !== ''" @click="createTaskFor(row)">
+            <el-button text size="small" type="primary" :loading="submittingId === row.fileId" :disabled="!hasAuth || submittingId !== '' || bulkSubmitting" @click="createTaskFor(row)">
               创建解析任务
             </el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-alert v-if="lastTask" type="success" :closable="false" style="margin-top: 12px"
-        :title="`解析任务已创建：${lastTask.task_id}（状态 ${lastTask.status}）— 可到智能解析中心查看真实进度`" />
       <div v-if="!hasAuth" class="mr-disabled-hint" style="margin-top: 8px">
         未配置 API Token：请在系统监控页配置后，方可调用上传与创建任务接口。
       </div>
     </el-card>
+
+    <!-- 创建回执放在卡片外：待创建列表清空后仍可见，避免误以为任务没有创建成功 -->
+    <div v-if="lastTask" class="created-task-note">
+      <el-alert type="success" :closable="false"
+        :title="`解析任务已创建：${lastTask.task_id}（状态 ${lastTask.status}）— 本次会话累计创建 ${createdTaskCount} 个`"
+        description="收到后端真实回执后，创建成功的文件已从上方「本次会话真实上传」待创建列表移除；同一上传项始终复用同一 Idempotency-Key，重复点击或网络重试不会重复建任务。确需重跑请使用下方文档列表的「重新解析」（这是显式的新任务）。" />
+      <el-button text size="small" type="primary" @click="gotoTask(lastTask.task_id)">到智能解析中心查看真实进度 →</el-button>
+    </div>
 
     <!-- 文档列表：真实 GET /api/documents，MrProTable 受控模式 -->
     <el-card shadow="never" style="margin-top: 16px">
@@ -83,15 +104,58 @@
           <span class="card-sub">数据源：{{ listSource }}</span>
         </div>
       </template>
+      <!-- v0.2.3 高级筛选：只在运行期契约确认具备 date_from/date_to/sort_by/order 时出现 -->
+      <div v-if="v023Filters" class="advanced-filter">
+        <span class="af-label">上传时间（闭区间 · 自动带时区）</span>
+        <el-date-picker v-model="dateRange" type="datetimerange" size="small"
+          start-placeholder="开始时间" end-placeholder="结束时间" style="width: 350px" />
+        <span class="af-label">排序字段</span>
+        <el-select v-model="sortBy" size="small" placeholder="默认 uploaded_at" style="width: 150px">
+          <el-option label="上传时间" value="uploaded_at" />
+          <el-option label="文件名" value="file_name" />
+          <el-option label="文件大小" value="size_bytes" />
+          <el-option label="状态" value="status" />
+        </el-select>
+        <el-select v-model="order" size="small" style="width: 100px">
+          <el-option label="降序" value="desc" />
+          <el-option label="升序" value="asc" />
+        </el-select>
+        <el-button size="small" type="primary" @click="applyAdvanced">应用</el-button>
+        <el-button size="small" @click="resetAdvanced">重置</el-button>
+      </div>
+
+      <div v-if="selectedRows.length" class="batch-bar">
+        <span>已选 <b>{{ selectedRows.length }}</b> 项（仅当前页，翻页 / 查询 / 刷新后自动清空）</span>
+        <el-button size="small" @click="clearTableSelection">取消选择</el-button>
+        <el-button size="small" type="primary" plain :loading="batchBusy" :disabled="!hasAuth || batchBusy" @click="batchDownload">
+          批量下载原件
+        </el-button>
+        <el-tooltip :disabled="canDeleteDocuments" :content="deleteDisabledHint" placement="top">
+          <span>
+            <el-button size="small" type="danger" plain :disabled="!canDeleteDocuments || batchBusy" @click="deleteSelected">
+              删除选中（{{ selectedRows.length }}）
+            </el-button>
+          </span>
+        </el-tooltip>
+      </div>
+      <el-alert v-if="!canDeleteDocuments" type="warning" :closable="false" class="delete-note"
+        title="删除按钮按「运行期方法 + ADMIN 权限」双重门控"
+        :description="`${deleteDisabledHint}。原始文件为只读证据：403（无权）、409（证据链 / 版本冲突）、503（存储不可用）一律保留原行并显示真实错误；仅后端真实成功后重新拉取 GET /api/documents 确认，不本地隐藏行假装删除成功。多选与批量下载原件现在即可使用。`" />
+
       <MrProTable
+        ref="tableRef"
+        selectable
         :columns="columns"
         :rows="tableRows"
         :total="tableTotal"
         :loading="list.loading.value"
         :state="list.state.value"
         :error="list.error.value"
+        empty-text="当前筛选条件下没有文档记录（后端返回空列表，非演示数据）"
         @query="onQuery"
         @retry="list.load()"
+        @selection-change="onSelectionChange"
+        @filter-reset="onFilterReset"
       >
         <template #col-size_bytes="{ row }"><span class="num">{{ formatSize(Number(row.size_bytes)) }}</span></template>
         <template #col-status="{ row }"><StatusTag :status="String(row.status)" /></template>
@@ -103,19 +167,19 @@
           </el-tooltip>
         </template>
         <template #extra-columns>
-          <el-table-column label="操作" width="270" fixed="right">
+          <el-table-column label="操作" width="330" fixed="right">
             <template #default="{ row }">
               <el-button text size="small" type="primary" @click="openDetail(row)">详情</el-button>
               <el-button text size="small" :loading="downloadingId === row.file_id" :disabled="!hasAuth || downloadingId !== ''" @click="download(row)">下载原件</el-button>
               <el-button text size="small" :loading="submittingId === row.file_id" :disabled="!hasAuth || submittingId !== ''" @click="reparse(row)">重新解析</el-button>
               <el-button text size="small" :disabled="!row.latest_task_id" @click="viewResults(row)">解析结果</el-button>
+              <el-tooltip :disabled="canDeleteDocuments" :content="deleteDisabledHint" placement="top">
+                <span>
+                  <el-button text size="small" type="danger" :disabled="!canDeleteDocuments || batchBusy" @click="deleteOne(row)">删除</el-button>
+                </span>
+              </el-tooltip>
             </template>
           </el-table-column>
-        </template>
-        <template #empty>
-          <el-empty :image-size="70" description="当前筛选条件下没有文档记录（后端返回空列表，非演示数据）">
-            <el-button size="small" @click="list.load()">刷新</el-button>
-          </el-empty>
         </template>
       </MrProTable>
     </el-card>
@@ -142,7 +206,7 @@
 
       <el-divider content-position="left">关联 OCR 解析历史（真实 GET /parse-history）</el-divider>
       <AsyncPanel :state="history.state.value" :error="history.error.value" empty-text="该文档尚无关联解析任务" @retry="history.load()">
-        <el-table :data="history.data.value?.list || []" size="small">
+        <el-table :data="history.data.value?.list || []" size="small" max-height="240">
           <el-table-column label="任务 ID" min-width="140" show-overflow-tooltip>
             <template #default="{ row }"><code class="sha">{{ row.task.task_id }}</code></template>
           </el-table-column>
@@ -168,7 +232,7 @@
 
       <el-alert type="info" :closable="false" style="margin-top: 14px"
         title="原始文件为只读证据"
-        description="解析结果与原始文件通过后端 SHA256 绑定；下载字节来自 owner 隔离的 /source 接口，前端不修改原始文件、不绕过后端权限。" />
+        description="解析结果与原始文件通过后端 SHA256 绑定；下载字节来自按当前 principal 与业务 owner 范围隔离的 /source 接口，前端不修改原始文件、不绕过后端权限。" />
     </el-drawer>
   </div>
 </template>
@@ -176,7 +240,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import type { UploadRequestOptions } from 'element-plus'
 import StatusTag from '@/components/StatusTag.vue'
@@ -184,10 +248,14 @@ import MrProTable, { type MrColumn, type MrQuery } from '@/components/MrProTable
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { hasToken } from '@/api/client'
-import { apiErrorHint, notifyApiError } from '@/api/errors'
-import { contractState, contractLabel } from '@/api/dataSource'
+import { apiErrorHint, notifyApiError, toApiError } from '@/api/errors'
+import {
+  contractState, contractLabel, hasV023DocumentFilters,
+  hasRuntimeMethod, unimplementedHint
+} from '@/api/dataSource'
 import { downloadSourceFile } from '@/api/documentFiles'
-import { getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
+import { deleteDocument, getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
+import { isAdminIdentity } from '@/api/principal'
 import { uploadFile, createParseTask, UPLOAD_LIMIT_BYTES, UPLOAD_ALLOWED_EXT, MAX_FILES_PER_TASK } from '@/api/parse'
 import type { DocumentInfo, DocumentList, DocumentQuery, ParseHistory, ParseTask } from '@/api/types'
 
@@ -199,6 +267,43 @@ const contractTagType = computed(() => (contractState.value === 'ready' ? 'succe
 /* ───────── 真实文档列表（受控 MrProTable） ───────── */
 const query = ref<DocumentQuery>({ page: 1, pageSize: 20, keyword: '', status: '', docType: '' })
 const list = useAsyncData<DocumentList>((signal) => listDocuments(query.value, signal), { immediate: false })
+
+/* v0.2.3 高级筛选：运行期契约未加载时不渲染控件，也不发 date_from/date_to/sort_by/order */
+const v023Filters = computed(() => hasV023DocumentFilters())
+const dateRange = ref<Date[] | null>(null)
+const sortBy = ref<DocumentQuery['sortBy']>('')
+const order = ref<DocumentQuery['order']>('')
+function applyAdvanced() {
+  const d = dateRange.value
+  query.value = {
+    ...query.value,
+    page: 1,
+    dateFrom: d?.[0] ? new Date(d[0]).toISOString() : '',
+    dateTo: d?.[1] ? new Date(d[1]).toISOString() : '',
+    sortBy: sortBy.value,
+    order: order.value
+  }
+  void list.load()
+}
+function resetAdvanced() {
+  dateRange.value = null
+  sortBy.value = ''
+  order.value = ''
+  query.value = { ...query.value, page: 1, dateFrom: '', dateTo: '', sortBy: '', order: '' }
+  void list.load()
+}
+
+/**
+ * MrProTable 的「重置」与空态「返回」都会广播 filter-reset：
+ * 表格自己的搜索表单 / 排序由组件清空，页面级高级筛选在这里一并清掉，
+ * 避免「搜索框清了、日期区间还留着」导致返回后依旧空列表。
+ */
+function onFilterReset() {
+  dateRange.value = null
+  sortBy.value = ''
+  order.value = ''
+  query.value = { ...query.value, dateFrom: '', dateTo: '', sortBy: '', order: '' }
+}
 
 const tableRows = computed(() => (list.data.value?.list || []) as unknown as Record<string, unknown>[])
 const tableTotal = computed(() => list.data.value?.total || 0)
@@ -228,7 +333,11 @@ function onQuery(q: MrQuery) {
     pageSize: q.pageSize,
     keyword: String(q.search.file_name || ''),
     status: String(q.search.status || ''),
-    docType: (String(q.search.doc_type || '') || '') as DocumentQuery['docType']
+    docType: (String(q.search.doc_type || '') || '') as DocumentQuery['docType'],
+    dateFrom: v023Filters.value ? query.value.dateFrom : undefined,
+    dateTo: v023Filters.value ? query.value.dateTo : undefined,
+    sortBy: v023Filters.value ? query.value.sortBy : undefined,
+    order: v023Filters.value ? query.value.order : undefined
   }
   void list.load()
 }
@@ -262,6 +371,114 @@ function engineOf(task: ParseTask): string {
 const downloadingId = ref('')
 const submittingId = ref('')
 const lastTask = ref<ParseTask | null>(null)
+const createdTaskCount = ref(0)
+
+/* ───────── 多选与删除 ─────────
+ * 多选列 / 批量下载是真实可用能力；删除按「方法级」运行期门控：
+ * /api/documents/{file_id} 只有 GET，路径存在不代表 DELETE 可用，
+ * 因此必须比对 /api/openapi.json 里的 HTTP 方法声明，绝不本地隐藏行伪造删除成功。
+ */
+const DELETE_DOCUMENT_PATH = '/api/documents/{file_id}'
+const tableRef = ref<{ clearSelection: () => void } | null>(null)
+const selectedRows = ref<Record<string, unknown>[]>([])
+const batchBusy = ref(false)
+
+const canDeleteDocuments = computed(() =>
+  hasToken() && hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH) && isAdminIdentity.value
+)
+const deleteDisabledHint = computed(() => {
+  if (!hasToken()) return '请先在系统监控页配置 API Token'
+  if (!hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH)) {
+    return `运行期 GET /api/openapi.json 未声明 DELETE ${DELETE_DOCUMENT_PATH}（路径存在不等于方法可用），按钮保持禁用`
+  }
+  if (!isAdminIdentity.value) {
+    return '删除仅 ADMIN 可执行（当前身份未确认或不具备管理员权限）：以服务端 Principal 逐请求判定，前端不越权放宽'
+  }
+  return unimplementedHint(`DELETE ${DELETE_DOCUMENT_PATH}`)
+})
+
+function onSelectionChange(rows: Record<string, unknown>[]) {
+  selectedRows.value = rows
+}
+function clearTableSelection() {
+  tableRef.value?.clearSelection()
+  selectedRows.value = []
+}
+
+/** 批量下载走真实 GET /source，逐个字节下载；任一失败如实计数，不吞错 */
+async function batchDownload() {
+  if (!hasAuth.value || batchBusy.value || !selectedRows.value.length) return
+  batchBusy.value = true
+  let ok = 0
+  const failed: string[] = []
+  try {
+    for (const row of selectedRows.value) {
+      const id = String(row.file_id || '')
+      const name = String(row.file_name || id)
+      if (!id) continue
+      try {
+        await downloadSourceFile(id, name)
+        ok += 1
+      } catch {
+        failed.push(name)
+      }
+    }
+    if (ok) ElMessage.success(`已发起 ${ok} 个原件下载${failed.length ? `，${failed.length} 个失败` : ''}`)
+    if (failed.length) ElMessage.warning(`下载失败：${failed.slice(0, 3).join('、')}${failed.length > 3 ? ' 等' : ''}`)
+  } finally {
+    batchBusy.value = false
+  }
+}
+
+async function confirmDelete(count: number): Promise<boolean> {
+  return ElMessageBox.confirm(
+    `将对 ${count} 个文档调用真实 DELETE 接口（仅 ADMIN，后端按目标 owner 与证据链逐项校验；403 / 409 / 503 均保留原行）。原始文件是只读证据，前端不会隐藏列表行来伪造成功，结果以刷新后的列表为准。`,
+    '确认删除文档',
+    { type: 'warning', confirmButtonText: '提交删除请求', cancelButtonText: '取消' }
+  ).then(() => true).catch(() => false)
+}
+
+/**
+ * 仅按后端真实响应计数：2xx 视为「请求被接受」，随后重新拉取列表确认。
+ * 403 / 409 / 503 / 网络不明都不从本地列表移除行；重复 404 不计成功；不伪造删除回执。
+ */
+async function submitDeletes(rows: Record<string, unknown>[]) {
+  batchBusy.value = true
+  let accepted = 0
+  const rejected: string[] = []
+  try {
+    for (const row of rows) {
+      const id = String(row.file_id || '')
+      const name = String(row.file_name || id)
+      if (!id) continue
+      try {
+        await deleteDocument(id)
+        accepted += 1
+      } catch (err) {
+        rejected.push(`${name}：${apiErrorHint(err)}`)
+      }
+    }
+    if (accepted) ElMessage.success(`后端已接受 ${accepted} 个删除请求，正在刷新列表确认`)
+    if (rejected.length) ElMessage.warning(`${rejected.length} 个删除请求失败：${rejected.slice(0, 2).join('；')}`)
+    void list.load()
+  } finally {
+    batchBusy.value = false
+    clearTableSelection()
+  }
+}
+
+async function deleteSelected() {
+  if (!canDeleteDocuments.value || batchBusy.value || !selectedRows.value.length) return
+  const rows = [...selectedRows.value]
+  if (!(await confirmDelete(rows.length))) return
+  await submitDeletes(rows)
+}
+
+async function deleteOne(row: Record<string, unknown>) {
+  if (!canDeleteDocuments.value || batchBusy.value) return
+  if (!(await confirmDelete(1))) return
+  await submitDeletes([row])
+}
 
 async function download(row: Record<string, unknown>) {
   const id = String(row.file_id || '')
@@ -283,8 +500,10 @@ async function reparse(row: Record<string, unknown>) {
   if (!id || !hasAuth.value || submittingId.value) return
   submittingId.value = id
   try {
+    // 「重新解析」是用户显式发起的新任务，每次点按都用新键；请求期间由 submittingId 防连点
     const task = await createParseTask({ file_ids: [id] }, crypto.randomUUID())
     lastTask.value = task
+    createdTaskCount.value += 1
     ElMessage.success(`已创建解析任务 ${task.task_id}`)
     void list.load()
   } catch (err) {
@@ -314,11 +533,59 @@ function copySha(value: string) {
 
 /* ───────── 上传（复用旧接口，结果只以后端响应为准） ───────── */
 interface QueueItem { uid: string; name: string; size: number; percent: number; error: boolean; message?: string }
-interface RealUpload { fileId: string; name: string; sha256: string; bytes: number; at: string }
+interface RealUpload {
+  fileId: string; name: string; sha256: string; bytes: number; at: string
+  /** 该上传项在整个会话里复用同一幂等键：同键同请求由后端返回原任务，不会重复创建 */
+  idempotencyKey: string
+}
 
 const uploadQueue = ref<QueueItem[]>([])
 const realUploads = ref<RealUpload[]>([])
 const uploadedHashes = new Set<string>()
+
+/* 上传项多选：只清理本地「待创建」队列，不触碰后端已上传的原始文件与已创建任务 */
+const uploadTableRef = ref<{ clearSelection: () => void } | null>(null)
+const selectedUploads = ref<RealUpload[]>([])
+function onUploadSelectionChange(rows: RealUpload[]) {
+  selectedUploads.value = rows
+}
+
+async function removeSelectedUploads() {
+  const ids = new Set(selectedUploads.value.map((i) => i.fileId))
+  if (!ids.size) return
+  try {
+    await ElMessageBox.confirm(
+      `仅从「本次会话真实上传」待创建列表移除 ${ids.size} 项，不会删除后端已上传的原始文件，也不会取消已创建的解析任务。`,
+      '移出待创建列表',
+      { type: 'info', confirmButtonText: '确认移出', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  realUploads.value = realUploads.value.filter((i) => !ids.has(i.fileId))
+  selectedUploads.value = []
+  uploadTableRef.value?.clearSelection()
+  ElMessage.success(`已移出 ${ids.size} 项待创建文件`)
+}
+
+/* ───────── 一键解析全部：一次 POST 提交多个 file_id（后端单任务上限 20） ───────── */
+const bulkSubmitting = ref(false)
+/** 待创建列表不变时复用同一键与同一 body；列表变化（新增/移除文件）才作为新操作换键 */
+const bulkRequest = ref<{ signature: string; key: string } | null>(null)
+const bulkCreatable = computed(() =>
+  hasAuth.value && realUploads.value.length > 0 &&
+  realUploads.value.length <= MAX_FILES_PER_TASK &&
+  !submittingId.value && !bulkSubmitting.value
+)
+const bulkHint = computed(() => {
+  if (!hasAuth.value) return '请先在系统监控页配置 API Token'
+  if (!realUploads.value.length) return '暂无待创建解析任务的上传文件'
+  if (realUploads.value.length > MAX_FILES_PER_TASK) {
+    return `待创建 ${realUploads.value.length} 个文件，超过单任务上限 ${MAX_FILES_PER_TASK} 个；请先逐个创建或减少待创建项`
+  }
+  if (submittingId.value || bulkSubmitting.value) return '正在创建解析任务，请稍候'
+  return ''
+})
 const uploadDone = computed(() => uploadQueue.value.filter((i) => i.percent >= 100 || i.error).length)
 const totalQueueSize = computed(() => uploadQueue.value.reduce((s, i) => s + i.size, 0))
 
@@ -389,7 +656,8 @@ async function doUpload(options: UploadRequestOptions) {
     if (localHash && localHash !== res.sha256) item.message = '提示：前端计算值与后端返回值不一致，请核对文件内容'
     realUploads.value.unshift({
       fileId: res.file_id, name: file.name, sha256: res.sha256, bytes: res.bytes,
-      at: new Date().toLocaleString('zh-CN')
+      at: new Date().toLocaleString('zh-CN'),
+      idempotencyKey: crypto.randomUUID()
     })
     ElMessage.success(`${file.name} 上传成功，SHA256 由后端返回`)
     void list.load()
@@ -399,18 +667,59 @@ async function doUpload(options: UploadRequestOptions) {
   }
 }
 
+/** 409 = 同键异请求；其余按统一错误模型提示。失败一律保留待创建项，允许同键重试 */
+function reportCreateFailure(err: unknown, fallback: string) {
+  const e = toApiError(err)
+  if (e.status === 409) {
+    ElMessage.error('创建被拒绝（409）：同一幂等键对应了不同请求，已刷新文档列表，请确认后再试。')
+    void list.load()
+  } else {
+    notifyApiError(err, fallback)
+  }
+}
+
 async function createTaskFor(row: RealUpload) {
-  if (submittingId.value || !hasAuth.value) return
+  if (submittingId.value || bulkSubmitting.value || !hasAuth.value) return
   submittingId.value = row.fileId
   try {
-    const task = await createParseTask({ file_ids: [row.fileId] }, crypto.randomUUID())
+    // 同一上传项固定同一键与同一 body：后端按 (owner, Idempotency-Key) + 请求指纹幂等，
+    // 连点或网络重试都会返回原任务，不会新建第二条（旧实现每次随机键导致重复建任务）。
+    const task = await createParseTask({ file_ids: [row.fileId] }, row.idempotencyKey)
     lastTask.value = task
+    createdTaskCount.value += 1
+    // 只有拿到后端真实回执才移出待创建列表，不在本地伪造「已完成」
+    realUploads.value = realUploads.value.filter((i) => i.fileId !== row.fileId)
     ElMessage.success(`解析任务已创建：${task.task_id}`)
     void list.load()
   } catch (err) {
-    notifyApiError(err, '创建解析任务失败')
+    reportCreateFailure(err, '创建解析任务失败')
   } finally {
     submittingId.value = ''
+  }
+}
+
+async function createTasksForAll() {
+  if (!bulkCreatable.value) return
+  const ids = realUploads.value.map((r) => r.fileId)
+  const signature = JSON.stringify(ids)
+  const existing = bulkRequest.value
+  const key = existing && existing.signature === signature ? existing.key : crypto.randomUUID()
+  bulkRequest.value = { signature, key } // 列表不变则重试沿用同键同 body
+  bulkSubmitting.value = true
+  try {
+    // 后端 POST /api/parse/tasks 支持一次提交 1–20 个 file_id，故整批只需一个真实任务
+    const task = await createParseTask({ file_ids: ids }, key)
+    lastTask.value = task
+    createdTaskCount.value += 1
+    const done = new Set(ids)
+    realUploads.value = realUploads.value.filter((r) => !done.has(r.fileId))
+    bulkRequest.value = null
+    ElMessage.success(`已为 ${ids.length} 个文件创建解析任务：${task.task_id}`)
+    void list.load()
+  } catch (err) {
+    reportCreateFailure(err, '一键解析失败')
+  } finally {
+    bulkSubmitting.value = false
   }
 }
 </script>
@@ -420,7 +729,9 @@ async function createTaskFor(row: RealUpload) {
 .contract-note { margin-bottom: 12px; }
 .upload-card :deep(.el-upload-dragger) { padding: 24px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.card-actions { display: flex; align-items: center; gap: 12px; font-weight: 400; }
 .card-sub { font-weight: 400; font-size: 12px; color: var(--mr-text-3); }
+.created-task-note { margin-top: 16px; }
 .upload-queue { margin-top: 16px; border-top: 1px dashed var(--mr-line); padding-top: 12px; }
 .queue-summary { font-size: 13px; color: var(--mr-text-2); margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
 .queue-item { display: flex; align-items: center; gap: 12px; margin: 6px 0; flex-wrap: wrap; }
@@ -429,4 +740,19 @@ async function createTaskFor(row: RealUpload) {
 .queue-msg { flex-basis: 100%; font-size: 12px; color: var(--mr-st-danger); }
 .sha { font-size: 12px; word-break: break-all; color: var(--mr-text-2); }
 .drawer-pager { margin-top: 10px; display: flex; justify-content: flex-end; }
+/* v0.2.3 高级筛选：仅运行期契约确认具备参数时才渲染 */
+.advanced-filter {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 0 14px; margin-bottom: 4px; border-bottom: 1px dashed var(--mr-line);
+}
+.af-label { font-size: 12px; color: var(--mr-text-2); flex-shrink: 0; }
+/* 多选批量操作条：选中后才出现，避免常态占用列表空间 */
+.batch-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: 10px;
+  border: 1px solid var(--mr-line); border-radius: 6px;
+  background: var(--mr-bg-soft, transparent); font-size: 13px;
+}
+.batch-bar b { color: var(--mr-primary); }
+.delete-note { margin-bottom: 10px; }
 </style>
