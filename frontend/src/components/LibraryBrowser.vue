@@ -88,7 +88,7 @@
       <LibraryStatePanel :query="listQuery" :show-back-list="true" @retry="runList" @back-list="runList">
         <!-- 窄屏 <768 降级为卡片列表 -->
         <div v-if="isNarrow" class="lib-card-list">
-          <div v-for="(row, i) in listRows" :key="row.doc_version_id" class="lib-record-card lib-data-row"
+          <div v-for="row in listRows" :key="row.doc_version_id" class="lib-record-card lib-data-row"
             data-lib-row="record">
             <div class="lib-record-title">{{ row.title }}</div>
             <div class="lib-record-meta">
@@ -98,11 +98,12 @@
               </el-tag>
             </div>
             <div class="lib-record-meta"><code class="mono">kb_version {{ fmt(row.kb_version) }}</code></div>
-            <el-button size="small" type="primary" text @click="openDetail(row, i)">详情</el-button>
+            <el-button size="small" type="primary" text @click="openDetailFromRow(row)">详情</el-button>
           </div>
         </div>
         <div v-else class="lib-scroll-x lib-list-table">
-          <el-table class="lib-table" :data="listRows" size="small" max-height="420" @row-click="onRowClick">
+          <el-table class="lib-table lib-records-table" data-lib-table="list" :data="listRows" size="small"
+            max-height="420" :row-class-name="() => 'lib-data-row'" @row-click="onRowClick">
             <el-table-column v-for="col in columns" :key="col.prop" :prop="col.prop" :label="col.label"
               :min-width="col.minWidth" :width="col.width" show-overflow-tooltip>
               <template #default="{ row }">
@@ -116,7 +117,7 @@
                 </template>
                 <template v-else-if="col.prop === '__action'">
                   <el-button text size="small" type="primary" :disabled="!canQuery"
-                    @click.stop="openDetail(row, $event)">详情</el-button>
+                    @click.stop="openDetailFromRow(row)">详情</el-button>
                 </template>
                 <template v-else>{{ fmt(row[col.prop]) }}</template>
               </template>
@@ -140,7 +141,7 @@
 
     <!-- ───────── 详情视图（页内主从） ───────── -->
     <template v-else>
-      <el-card shadow="never" class="lib-detail-card">
+      <el-card shadow="never" class="lib-detail-card" data-lib-section="detail">
         <template #header>
           <div class="card-head">
             <span>{{ isCase ? '处罚案例详情' : '法规详情' }} <span class="real-badge">REAL</span></span>
@@ -165,14 +166,14 @@
 
       <template v-if="detailQuery.state.value === 'ready' && detailQuery.data.value">
         <!-- 原始 OCR 文本：纯文本 <pre>，禁止 v-html，与人工核验字段分框 -->
-        <el-card shadow="never" class="lib-detail-card">
+        <el-card shadow="never" class="lib-detail-card" data-lib-section="detail">
           <div class="lib-box-title">原始 OCR 文本（text_status={{ detailQuery.data.value.text_status }}）</div>
           <div class="mr-disabled-hint">{{ LIB_COPY.ocr }}</div>
           <pre class="lib-pre">{{ detailQuery.data.value.original_text || LIB_COPY.nullShort }}</pre>
         </el-card>
 
         <!-- 人工核验的结构化字段：与 OCR 单独分框 -->
-        <el-card shadow="never" class="lib-detail-card">
+        <el-card shadow="never" class="lib-detail-card" data-lib-section="detail">
           <div class="lib-box-title">{{ isCase ? '人工核验的结构化字段（案例）' : '人工核验的结构化字段' }}</div>
           <template v-if="isCase">
             <div class="lib-field-grid">
@@ -198,7 +199,7 @@
         </el-card>
 
         <!-- 原始证据文件：source_url 仍需 Bearer，只走认证 Axios → Blob URL -->
-        <el-card shadow="never" class="lib-detail-card">
+        <el-card shadow="never" class="lib-detail-card" data-lib-section="detail">
           <div class="lib-box-title">原始证据文件</div>
           <div class="source-hint">
             后端返回 source_url：<code class="mono">{{ detailQuery.data.value.source_url }}</code>。该地址仍需 Bearer，
@@ -220,7 +221,7 @@
         </el-card>
 
         <!-- 子列表：法规库 = 章节 / 条款；案例库 = 处罚依据引用（各自独立查询实例 + 独立门控） -->
-        <el-card shadow="never" class="lib-detail-card">
+        <el-card shadow="never" class="lib-detail-card" data-lib-section="detail">
           <div class="lib-box-title">{{ isCase ? '处罚依据引用（references）' : '章节 / 条款' }}</div>
           <el-tabs v-model="activeTab" @tab-change="onTabChange">
             <el-tab-pane v-if="!isCase" label="章节（chapters）" name="chapters" />
@@ -286,7 +287,7 @@
         </el-card>
 
         <!-- 条款正文：仅法规库；doc_version_id 取自列表行、article_id 取自条款行 -->
-        <el-card v-if="!isCase && activeArticleId" shadow="never" class="lib-detail-card">
+        <el-card v-if="!isCase && activeArticleId" shadow="never" class="lib-detail-card" data-lib-section="detail">
           <div class="lib-box-title">条款正文（GET /api/library/laws/{doc_version_id}/articles/{article_id}）</div>
           <LibraryStatePanel :query="articleQuery" :show-back-parent="true" :show-back-list="true"
             neutral-text="尚未发起条款正文查询。"
@@ -472,10 +473,21 @@ function runDetail() { void detailQuery.run() }
 function runParts() { void partsQuery.run() }
 function runArticle() { void articleQuery.run() }
 
+/**
+ * 控件可用性只由列表层级的方法级门控决定；错误态不禁用控件（便于改筛选后重新查询）。
+ * 声明位置放在四个查询实例之后，避免闭包在实例创建前求值。
+ */
+const canQuery = computed(() => !listQuery.state.value.startsWith('gating-'))
+
 /* ───────── 运行期状态表 ───────── */
 
 function routeStatus(path: string): 'loaded' | 'missing' | 'unknown' {
-  if (contractState.value !== 'ready') return 'unknown'
+  const probed = contractState.value
+  // 只有探测失败才是「未探测」；ready / outdated 都已拿到运行期方法清单，
+  // 后者同样应逐条给出「未加载」，不能整表退化成 info 态。
+  if (probed === 'unknown' || probed === 'unavailable' || probed === 'error' || probed === 'no-permission') {
+    return 'unknown'
+  }
   return hasLibraryRoute(path) ? 'loaded' : 'missing'
 }
 const routeRows = computed(() => LIBRARY_ROUTES.map((route) => {
@@ -543,7 +555,10 @@ const partsHint = computed(() => isCase.value
 function restoreFocus() {
   if (focusRowIndex < 0) return
   void nextTick(() => {
-    const rows = document.querySelectorAll('.lib-list-table .el-table__body-wrapper tr.el-table__row')
+    // 宽屏表格行 / 窄屏卡片行都支持焦点回归
+    const rows = document.querySelectorAll(
+      '.lib-records-table .el-table__body-wrapper tr.el-table__row, .lib-card-list .lib-record-card'
+    )
     const el = rows[focusRowIndex] as HTMLElement | undefined
     if (el) {
       el.tabIndex = -1
@@ -552,7 +567,13 @@ function restoreFocus() {
   })
 }
 
-function openDetail(row: LibraryRecord, index: number, event?: MouseEvent) {
+/** 统一由列表行进入详情：索引从 listRows 计算，避免把 MouseEvent 当作索引 */
+function openDetailFromRow(row: LibraryRecord) {
+  const index = listRows.value.findIndex((r) => r.doc_version_id === row.doc_version_id)
+  openDetail(row, index)
+}
+
+function openDetail(row: LibraryRecord, index: number) {
   if (!row || !row.doc_version_id) return
   focusRowIndex = index
   activeRecord.value = row

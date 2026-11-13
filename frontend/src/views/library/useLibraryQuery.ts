@@ -154,7 +154,11 @@ export function useLibraryQuery<T>(options: UseLibraryQueryOptions<T>): LibraryQ
     }
     // 2) 运行期契约（门控先行；契约 / 路由未加载只在这里判定，绝不由响应 404 反推）
     if (contractState.value !== 'ready') await probeContract()
-    if (contractState.value !== 'ready') {
+    const probed = contractState.value
+    // 只有探测本身失败（网络 / 401 / 解析失败）才是「契约未就绪」。
+    // outdated 表示探测成功、只是活动实例仍是旧契约：继续走方法级门控，
+    // 由 hasRuntimeMethod 给出准确的「运行期未加载该接口」，避免误报成探测失败。
+    if (probed === 'unknown' || probed === 'unavailable' || probed === 'error' || probed === 'no-permission') {
       state.value = 'gating-contract'
       hint.value = LIB_COPY.contract
       return

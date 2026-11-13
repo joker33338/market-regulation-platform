@@ -1,10 +1,10 @@
 <template>
-  <div class="lib-state">
+  <div class="lib-state" data-lib-section="state">
     <!-- 尚未发起该层级查询：中性占位，不显示数据、不显示错误 -->
     <div v-if="!query.started.value" class="mr-disabled-hint">{{ neutralText }}</div>
 
     <!-- L1：门控态 / 全部错误态 / 合法空态 / 请求取消，一律不经过 AsyncPanel -->
-    <div v-else-if="!query.isL2.value" class="lib-l1" role="group">
+    <div v-else-if="!query.isL2.value" class="lib-l1" data-lib-layer="l1" role="group">
       <template v-if="isGating">
         <div class="lib-l1-head">
           <el-tag type="warning" effect="plain">{{ gatingTag }}</el-tag>
@@ -38,7 +38,7 @@
     </div>
 
     <!-- L2：AsyncPanel 只接 loading | empty | ready 三态 -->
-    <template v-else>
+    <div v-else data-lib-layer="l2">
       <div v-if="query.displayState.value === 'loading'" class="lib-live" aria-live="polite" aria-atomic="true">
         正在从后端加载真实数据…
       </div>
@@ -50,7 +50,7 @@
         </template>
         <slot />
       </AsyncPanel>
-    </template>
+    </div>
   </div>
 </template>
 
