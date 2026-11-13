@@ -325,6 +325,8 @@ class MinerUService:
                         result = await asyncio.to_thread(parse)
                     if not self.dual_router and result.parsing_status in {"failed", "partial"}:
                         raise MinerUError("local_parse_failed")
+                    # 解析器使用存储文件名；首次持久化前恢复上传名称，缓存重试保持原字节。
+                    result.file_name = file["file_name"]
                     directory.mkdir(parents=True, exist_ok=True)
                     if self.dual_router:
                         from .dual_engine import persist_result
@@ -337,6 +339,11 @@ class MinerUService:
                     trace = result.quality['routing_trace']
                     file.update(selected_engine=trace['selected_engine'], requires_review=result.requires_review,
                                 fallback_reason=trace.get('failure_reason') or trace['fallback_reason'])
+                else:
+                    # 本地单引擎也回填实际逐页方法，不能把原生提取统一标为OCR。
+                    file.update(selected_engine=list(dict.fromkeys(page.parsing_method for page in result.pages)),
+                                requires_review=result.requires_review,
+                                fallback_reason=result.quality.get('routing', {}).get('reasons', []))
                 if result.parsing_status in {"failed", "partial"}:
                     rejection = result.quality.get('safety_rejection', {})
                     if rejection.get('status') == 'SAFE_REJECT':
