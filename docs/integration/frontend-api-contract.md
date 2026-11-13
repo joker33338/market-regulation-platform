@@ -115,3 +115,4 @@ uploaded_at_source=metadata_mtime 表示历史上传缺乏显式时间戳，仅�
 后端开发已转到原始工程的 `feat/backend-api-v0.2.2`，不再在独立后端工作树继续开发。Python、模型、任务 SQLite、PostgreSQL 与 MinerU 配置均复用原环境。正式联调入口仍为 `http://127.0.0.1:8180`；是否切换到候选镜像以及完整 revision 以本轮部署交接记录为准。
 
 运行时读取认证 OpenAPI：`GET /api/openapi.json`。离线文件：`frontend-openapi.json`。重新导出命令：在现有 API Python 环境执行 `python scripts/export_frontend_openapi.py docs/integration/frontend-openapi.json`。
+当前增量契约为 frontend-api-v0.2.3-draft-5（54 路径）：见 [法规与案例专项报告](v023-postgresql-law-case-audit.md) 和 [OpenAPI](frontend-openapi-v023-draft5.json)。目标库结构已获准升级；8180 尚未更新。
