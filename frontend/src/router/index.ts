@@ -44,6 +44,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '法规知识检索' }
       },
       {
+        path: 'library/laws',
+        name: 'LawLibrary',
+        component: () => import('@/views/LawLibraryView.vue'),
+        meta: { title: '法规库' }
+      },
+      {
+        path: 'library/cases',
+        name: 'CaseLibrary',
+        component: () => import('@/views/CaseLibraryView.vue'),
+        meta: { title: '处罚案例库' }
+      },
+      {
         path: 'system',
         name: 'System',
         component: () => import('@/views/SystemView.vue'),

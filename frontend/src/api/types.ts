@@ -485,7 +485,7 @@ export type BatchState = '已完成' | '执行中' | '失败' | '阻塞'
 
 /* ─────────────── v0.2.3 draft-4：账号密码、管理员账号、能力声明与运行日志 ───────────────
  * 依据 docs/integration/frontend-openapi-v023-draft4.json
- * （info.version=0.2.3-dev / 46 路径 / backend handoff e24cbad）。
+ * （info.version=0.2.3-dev / 草稿阶段契约清单，以运行期探测为准）。
  * 关键口径变化（覆盖 draft-2 旧设计）：
  *  - ADMIN 拥有全部业务权限（all_permissions）；不再要求 ADMIN 额外塞入 REVIEWER；
  *  - 新增账号密码登录 POST /api/auth/login（匿名）与服务端会话撤销 POST /api/auth/logout；
@@ -761,4 +761,156 @@ export interface TaskWorkload {
   failed: number
   completion_ratio: number | null
   scope: string
+}
+
+/* ─────────────── v0.2.3 draft-5：法规库 / 处罚案例库只读接口 ───────────────
+ * 契约来源：v0.2.3 draft-5 离线契约（x-contract-version=frontend-api-v0.2.3-draft-5）。
+ * 相对 draft-4 为纯增量：新增 GET /api/library/** 共 8 条只读路由，无删除、无既有方法变更。
+ * draft-5 的 CapabilitiesResponse 未新增 library 字段，两页可用性只能靠
+ * hasRuntimeMethod('GET', path) 方法级门控判定；源码契约已交付 ≠ 活动实例已加载。
+ * 字段口径：查询参数全部 snake_case 白名单（多余字段会 422）；罚款金额为精确十进制
+ * 字符串或 null（禁止 Number() 转换）；raw_start/raw_end 是零基左闭右开的「字符」
+ * 范围（非字节偏移），original_text 已由后端按范围切片；null 一律如实显示，不补写。
+ * ------------------------------------------------------------------ */
+
+export type LibraryKind = 'law' | 'case'
+export type LibraryStatus = 'ready' | 'unpublished'
+
+/** 列表筛选项：page(≥1) / page_size(1..100) / query(≤200) / violation(≤200，仅案例库) / kb_version(≤128，仅 ADMIN) */
+export interface LibraryQuery extends Partial<PageQuery> {
+  query?: string
+  /** 仅案例库：法规库传了会返回 422 violation_filter_case_only */
+  violation?: string
+  /** 仅 ADMIN 可显式选版本，其他角色传了会返回 403 */
+  kbVersion?: string
+}
+
+/** 详情 / 条款正文的可选查询参数 */
+export interface LibraryDetailQuery {
+  kbVersion?: string
+}
+
+/** 子列表（章节 / 条款 / 引用）的可选查询参数 */
+export interface LibraryPartsQuery {
+  page?: number
+  pageSize?: number
+  kbVersion?: string
+}
+
+/** GET /api/library/laws|cases 列表行；可空字段为 null 时前端不补写、不推断 */
+export interface LibraryRecord {
+  doc_version_id: string
+  kind: LibraryKind
+  owner_id: string
+  title: string
+  verification_status: string
+  document_id: string
+  source_file_id: string
+  parse_id: string
+  kb_version: string
+  number?: string | null
+  category?: string | null
+  authority?: string | null
+  published_on?: string | null
+  effective_on?: string | null
+  repealed_on?: string | null
+  effective_status?: string | null
+}
+
+/** status=unpublished + list=[] + total=0 是合法 200 空态，不是错误、不是「没有法规」 */
+export interface LibraryList {
+  status: LibraryStatus
+  kb_version: string | null
+  list: LibraryRecord[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/**
+ * 详情 / 条款正文响应。original_text 为原始 OCR 纯文本（<pre> 渲染，禁止 v-html）；
+ * source_url 仍需 Bearer，绝不能直接塞进 iframe / img，须经认证 Axios → Blob URL。
+ */
+export interface LibraryDetail {
+  record: LibraryRecord
+  original_text: string
+  original_file_name: string
+  text_status: 'ocr_not_manually_verified'
+  /** 案例 / 条款 / 法规的结构化字段；null 或字段为 null 时显示「—（后端未返回）」 */
+  structured: Record<string, unknown> | null
+  source_url: string
+}
+
+/** 子列表分页响应；list 元素字段依接口不同，用泛型区分 */
+export interface LibraryParts<T extends object = LibraryChapter | LibraryArticle | LibraryReference> {
+  list: T[]
+  total: number
+  page: number
+  page_size: number
+}
+export type LibraryChapterParts = LibraryParts<LibraryChapter>
+export type LibraryArticleParts = LibraryParts<LibraryArticle>
+export type LibraryReferenceParts = LibraryParts<LibraryReference>
+
+export interface LibraryChapter {
+  chapter_id: string
+  number: string | null
+  title: string | null
+  ordinal: number | null
+}
+
+export interface LibraryArticle {
+  article_id: string
+  chapter_id: string | null
+  number: string | null
+  title: string | null
+  ordinal: number | null
+}
+
+/** 处罚依据引用：law_version_id / article_id 由后端返回，前端不据此拼接 doc_version_id */
+export interface LibraryReference {
+  reference_id: string
+  law_version_id: string | null
+  article_id: string | null
+  citation: string | null
+  source: string | null
+  method: string | null
+  verification_status: string | null
+}
+
+/** 案例详情 structured 字段 */
+export interface LibraryCaseStructured {
+  region: string | null
+  violation: string | null
+  facts: string | null
+  investigation: string | null
+  evidence_summary: string | null
+  penalty_type: string | null
+  /** 精确十进制字符串或 null；禁止 Number()、toFixed 或任何近似显示 */
+  penalty_amount: string | null
+  penalty_result: string | null
+  field_sources: Record<string, unknown> | null
+  [key: string]: unknown
+}
+
+/** 条款正文 structured 字段；raw_start/raw_end 是字符范围，不是字节偏移 */
+export interface LibraryArticleStructured {
+  article_id: string
+  chapter_id: string | null
+  number: string | null
+  title: string | null
+  ordinal: number | null
+  raw_start: number | null
+  raw_end: number | null
+  page_start: number | null
+  page_end: number | null
+  chunk_ids: string[]
+  [key: string]: unknown
+}
+
+/** 运行期状态表条目（8 条 GET，路径为 OpenAPI 模板形式，供方法级门控比对） */
+export interface LibraryRoute {
+  method: 'GET'
+  path: string
+  page: string
 }

@@ -36,6 +36,8 @@
           </template>
           <el-menu-item index="/knowledge/ingestion">入库管理</el-menu-item>
           <el-menu-item index="/knowledge/search">知识检索</el-menu-item>
+          <el-menu-item index="/library/laws">法规库</el-menu-item>
+          <el-menu-item index="/library/cases">处罚案例库</el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/admin/accounts">
           <el-icon><User /></el-icon><span>账号与权限</span>

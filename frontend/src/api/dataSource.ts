@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { getRuntimeOpenApi } from './frontend'
 import { hasToken } from './client'
 import { toApiError } from './errors'
+import { LIBRARY_LIST_PATHS, LIBRARY_ROUTES } from './library'
 import type { DataSource } from './types'
 
 /**
@@ -19,7 +20,7 @@ import type { DataSource } from './types'
  * principal_id 与 owner_id 分离，写授权由后端按角色 + 范围逐请求判定。
  * 旧 draft-1 的「Token→owner→writers 名单」说明不再适用于当前契约（历史记录保留原事实）。
  *
- * v0.2.3 draft-4（46 路径，handoff e24cbad）补充：ADMIN 拥有全部业务权限（覆盖 draft-2
+ * v0.2.3 draft-4（草稿阶段契约清单，以运行期探测为准）补充：ADMIN 拥有全部业务权限（覆盖 draft-2
  * 「ADMIN 不隐含 REVIEWER」旧口径）；新增账号密码登录 / 登出、管理员账号管理与审计、
  * GET /api/system/capabilities 能力声明、API/错误/任务阶段日志、入库批次 / 预检 / 发布 / 回滚、
  * 检索新筛选（kb_version / issuing_authority / effective_status）与 DELETE /api/documents/{file_id}。
@@ -76,7 +77,7 @@ export const V023_READ_ROUTES = [
   '/api/system/audit-logs'
 ] as const
 
-/** v0.2.3 draft-4 相对 draft-2 新增的 16 条路径（46 路径口径，源码契约清单） */
+/** v0.2.3 draft-4 相对 draft-2 新增的路径（草稿阶段契约清单，以运行期探测为准） */
 export const CONTRACT_ROUTES_V023_DRAFT4: ContractRoute[] = [
   { method: 'POST', path: '/api/auth/login', page: '登录页（账号密码登录，匿名可调用）', group: 'new' },
   { method: 'POST', path: '/api/auth/logout', page: '全局（服务端撤销当前会话）', group: 'new' },
@@ -199,6 +200,40 @@ export function hasIngestionRelease(): boolean {
     hasRuntimeMethod('POST', '/api/ingestion/rollback')
 }
 
+/* ───────────── v0.2.3 draft-5：法规库 / 案例库方法级门控 ─────────────
+ * draft-5 的 CapabilitiesResponse 没有新增 library 字段，不能读能力声明判定可用性；
+ * 两页一律以 GET /api/openapi.json 的方法级探测为准（路径存在 ≠ 方法可用）。
+ * 未加载时页面保持禁用 / 合法空态且不发起请求；源码契约已交付 ≠ 活动实例已加载。
+ * ------------------------------------------------------------------ */
+
+/** draft-5 相对 draft-4 纯增量新增的只读路由（草稿阶段契约清单，以运行期探测为准） */
+export const CONTRACT_ROUTES_V023_DRAFT5: ContractRoute[] = LIBRARY_ROUTES.map((route) => ({
+  method: route.method,
+  path: route.path,
+  page: route.page,
+  group: 'new' as const
+}))
+
+/** 单条 library 路由的方法级门控（8 条全部为 GET） */
+export function hasLibraryRoute(path: string): boolean {
+  return hasRuntimeMethod('GET', path)
+}
+
+/** 法规库列表是否在运行期加载 */
+export function hasLawLibraryList(): boolean {
+  return hasLibraryRoute(LIBRARY_LIST_PATHS.law)
+}
+
+/** 处罚案例库列表是否在运行期加载 */
+export function hasCaseLibraryList(): boolean {
+  return hasLibraryRoute(LIBRARY_LIST_PATHS.case)
+}
+
+/** 8 条 library 只读接口是否全部加载（仅供状态说明，不放宽任何单页门控） */
+export function hasFullLibraryRoutes(): boolean {
+  return CONTRACT_ROUTES_V023_DRAFT5.every((route) => hasLibraryRoute(route.path))
+}
+
 let inflight: Promise<ContractState> | null = null
 
 /** 运行期能力探测；并发调用共用同一 Promise，避免页面切换重复请求 */
@@ -220,14 +255,21 @@ export function probeContract(force = false): Promise<ContractState> {
       runtimePaths.value = paths
       runtimeMethodPaths.value = collectRuntimeMethodPaths(doc)
       const hasV023 = pathsInclude(V023_REVIEW_WRITE_ROUTES, paths)
+      // draft-5：CapabilitiesResponse 无 library 字段，只按运行期方法级声明判定
+      const hasLibraryRoutes = CONTRACT_ROUTES_V023_DRAFT5.every((route) =>
+        runtimeMethodPaths.value.includes(`GET ${route.path}`)
+      )
+      const libraryHint = hasLibraryRoutes
+        ? '；draft-5 法规 / 案例库只读接口已加载'
+        : '；draft-5 法规 / 案例库只读接口未加载，两页保持禁用 / 合法空态'
       contractMeta.value = {
         probedAt: new Date().toISOString(),
         version: doc?.info?.version || '',
         contractVersion: doc?.info?.['x-contract-version'] || '',
         pathCount: paths.length,
         hint: hasNewRoutes
-          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}${paths.includes('/api/auth/login') ? '；draft-4 账号登录 / 管理员账号 / 入库 / 日志接口已加载' : ''}`
-          : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像`
+          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}${paths.includes('/api/auth/login') ? '；draft-4 账号登录 / 管理员账号 / 入库 / 日志接口已加载' : ''}${libraryHint}`
+          : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像${libraryHint}`
       }
       contractState.value = hasNewRoutes ? 'ready' : 'outdated'
     } catch (err) {
