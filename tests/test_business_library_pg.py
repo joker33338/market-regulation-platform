@@ -237,3 +237,25 @@ class BusinessLibraryPGTests(unittest.TestCase):
                 down=(self.sql/'20261113_business_library_source_v2_down.sql').read_text(encoding='utf-8').replace('BEGIN;','').replace('COMMIT;','')
                 with self.assertRaises(psycopg2.Error):c.execute(down)
         finally:connection.rollback();connection.close()
+
+    def test_case_intake_preserves_unknown_structured_fields(self):
+        from qa_core.storage.parsing_results import PostgresResultSink
+        from qa_core.storage.law_intake import receive_case
+        from qa_core.document_parsing.schemas import DocumentResult,PageResult
+        result=DocumentResult('synthetic-case-import','synthetic-case.pdf','.pdf',{},pages=[PageResult(1,'native_pdf','synthetic case decision')],quality={'document_type':'case'})
+        pid=PostgresResultSink(self.dsn).save_import('admin-import','synthetic-case-import','b'*32,result)
+        version=None
+        try:
+            item=receive_case(self.dsn,'admin-import',pid);version=item['doc_version_id']
+            self.assertFalse(item['published']);self.assertFalse(receive_case(self.dsn,'admin-import',pid)['created'])
+            row=self.query('SELECT penalty_amount,violation,facts,penalty_result,field_sources FROM business_library.case_profiles WHERE doc_version_id=%s',(version,))[0]
+            self.assertEqual(row,(None,None,None,None,{}))
+            self.assertEqual(self.query('SELECT kind,verification_status FROM business_library.records WHERE doc_version_id=%s',(version,))[0],('case','pending'))
+            self.assertEqual(self.query('SELECT count(*) FROM public.mr_kb_documents WHERE doc_version_id=%s',(version,))[0][0],0)
+        finally:
+            if version:
+                self.query('DELETE FROM business_library.case_profiles WHERE doc_version_id=%s',(version,))
+                self.query('DELETE FROM business_library.records WHERE doc_version_id=%s',(version,))
+                self.query('DELETE FROM public.mr_document_versions WHERE doc_version_id=%s',(version,))
+            self.query('DELETE FROM document_review.pages WHERE parse_id=%s',(pid,))
+            self.query('DELETE FROM document_review.documents WHERE parse_id=%s',(pid,))

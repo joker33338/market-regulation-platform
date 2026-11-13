@@ -104,3 +104,27 @@ def receive_law(dsn,owner_id,parse_id):
                         'articles':c.fetchone()['count'],'status':'INTAKE_NOT_INDEXED','published':False}
     finally:
         connection.close()
+
+
+def receive_case(dsn,owner_id,parse_id):
+    """接收案例原文与空结构字段，不推断处罚事实、金额、依据或核验结果。"""
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    connection=psycopg2.connect(dsn,connect_timeout=5,application_name='case_catalog_intake')
+    try:
+        with connection,connection.cursor(cursor_factory=RealDictCursor) as c:
+            c.execute("SELECT * FROM document_review.documents WHERE parse_id=%s AND source_location->>'owner_id'=%s",(parse_id,owner_id))
+            source=c.fetchone()
+            if not source:raise MinerUError('document_not_found',404)
+            if not source['requires_review'] or source['quality'].get('document_type')!='case':raise MinerUError('case_intake_requires_pending_source',409)
+            file_id=source['source_location'].get('source_file_id')
+            if not file_id or not source['raw_text'].strip():raise MinerUError('case_intake_source_incomplete',409)
+            doc_id=stable_hash('unverified-source-document-v1',source['document_id'])
+            version=stable_hash('unindexed-case-version-v1',doc_id,source['report_sha256'])
+            metadata={'document_type':'case','owner_id':owner_id,'parse_id':parse_id,'source_file_id':file_id,'processing_status':'INTAKE_NOT_INDEXED','title_basis':'original_filename_unverified','human_verified':False,'publication_eligible':False}
+            c.execute("INSERT INTO public.mr_document_versions(doc_version_id,doc_id,source_hash,law_name,metadata,chunk_count) VALUES(%s,%s,%s,%s,%s,0) ON CONFLICT(doc_version_id) DO NOTHING",(version,doc_id,source['document_id'],source['file_name'],json.dumps(metadata)))
+            c.execute("INSERT INTO business_library.records(doc_version_id,kind,owner_id,parse_id,source_file_id,title,facts_source) VALUES(%s,'case',%s,%s,%s,%s,'original_filename_unverified') ON CONFLICT(doc_version_id) DO NOTHING RETURNING doc_version_id",(version,owner_id,parse_id,file_id,source['file_name']))
+            created=c.fetchone() is not None
+            c.execute('INSERT INTO business_library.case_profiles(doc_version_id) VALUES(%s) ON CONFLICT(doc_version_id) DO NOTHING',(version,))
+            return {'doc_version_id':version,'document_id':doc_id,'created':created,'status':'INTAKE_NOT_INDEXED','published':False}
+    finally:connection.close()
