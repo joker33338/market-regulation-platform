@@ -27,7 +27,8 @@ def project_library(database,version):
                 if not reference:
                     raise IngestionError('候选来源缺少审核绑定，不能同步法规目录')
                 owner=reference['owner_id'];parse_id=reference['parse_id']
-                c.execute("SELECT * FROM document_review.documents WHERE parse_id=%s AND source_location->>'owner_id'=%s FOR SHARE",(parse_id,owner))
+                # 原解析为追加式只读来源；父记录由外键保护，不为行锁授予UPDATE权限。
+                c.execute("SELECT * FROM document_review.documents WHERE parse_id=%s AND source_location->>'owner_id'=%s",(parse_id,owner))
                 source=c.fetchone()
                 if not source or metadata.get('file_sha256')!=source['document_id']:
                     raise IngestionError('法规目录来源身份不一致')
