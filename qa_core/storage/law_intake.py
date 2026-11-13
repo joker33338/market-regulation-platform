@@ -52,7 +52,7 @@ def receive_law(dsn,owner_id,parse_id):
         with connection:
             with connection.cursor(cursor_factory=RealDictCursor) as c:
                 c.execute('''SELECT * FROM document_review.documents WHERE parse_id=%s
-                    AND source_location->>'owner_id'=%s FOR SHARE''',(parse_id,owner_id))
+                    AND source_location->>'owner_id'=%s''',(parse_id,owner_id))
                 source=c.fetchone()
                 if not source:
                     raise MinerUError('document_not_found',404)

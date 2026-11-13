@@ -46,7 +46,9 @@ class BusinessLibraryPGTests(unittest.TestCase):
                 q.execute("INSERT INTO public.mr_chunks VALUES('chunk','l1','synthetic','第一章','第一条',0,'synthetic content','synthetic','hash','{}',%s)",('['+','.join(['0']*1024)+']',))
                 q.execute("INSERT INTO business_library.article_chunks VALUES('ar','l1','chunk')")
                 q.execute("CREATE ROLE library_reader LOGIN; GRANT USAGE ON SCHEMA public,document_review,business_library TO library_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public,document_review,business_library TO library_reader")
+                q.execute('CREATE ROLE library_writer LOGIN; GRANT USAGE ON SCHEMA public,document_review,business_library TO library_writer; GRANT SELECT ON ALL TABLES IN SCHEMA public,document_review,business_library TO library_writer; GRANT INSERT ON public.mr_document_versions TO library_writer; GRANT INSERT ON ALL TABLES IN SCHEMA business_library TO library_writer')
         cls.read=cls.dsn.replace('user=postgres','user=library_reader')
+        cls.write=cls.dsn.replace('user=postgres','user=library_writer')
 
     def setUp(self):
         self.store=LibraryStore(self.read)
@@ -196,12 +198,15 @@ class BusinessLibraryPGTests(unittest.TestCase):
             self.assertFalse(result.requires_review)
             from qa_core.storage.law_intake import receive_law
             self.query("UPDATE document_review.documents SET quality=quality||'{\"document_type\":\"law\"}'::jsonb WHERE parse_id=%s",(parse_id,))
-            received=receive_law(self.dsn,'admin-import',parse_id)
+            with psycopg2.connect(self.write) as connection,connection.cursor() as cursor:
+                cursor.execute("SELECT has_table_privilege(current_user,'document_review.documents','UPDATE')")
+                self.assertFalse(cursor.fetchone()[0])
+            received=receive_law(self.write,'admin-import',parse_id)
             version=received['doc_version_id']
             self.assertFalse(received['published'])
             self.assertEqual(received['status'],'INTAKE_NOT_INDEXED')
             self.assertEqual(received['articles'],1)
-            self.assertFalse(receive_law(self.dsn,'admin-import',parse_id)['created'])
+            self.assertFalse(receive_law(self.write,'admin-import',parse_id)['created'])
             self.assertEqual(self.query('SELECT count(*) FROM public.mr_kb_documents WHERE doc_version_id=%s',(version,))[0][0],0)
         finally:
             if version:
@@ -246,8 +251,8 @@ class BusinessLibraryPGTests(unittest.TestCase):
         pid=PostgresResultSink(self.dsn).save_import('admin-import','synthetic-case-import','b'*32,result)
         version=None
         try:
-            item=receive_case(self.dsn,'admin-import',pid);version=item['doc_version_id']
-            self.assertFalse(item['published']);self.assertFalse(receive_case(self.dsn,'admin-import',pid)['created'])
+            item=receive_case(self.write,'admin-import',pid);version=item['doc_version_id']
+            self.assertFalse(item['published']);self.assertFalse(receive_case(self.write,'admin-import',pid)['created'])
             row=self.query('SELECT penalty_amount,violation,facts,penalty_result,field_sources FROM business_library.case_profiles WHERE doc_version_id=%s',(version,))[0]
             self.assertEqual(row,(None,None,None,None,{}))
             self.assertEqual(self.query('SELECT kind,verification_status FROM business_library.records WHERE doc_version_id=%s',(version,))[0],('case','pending'))

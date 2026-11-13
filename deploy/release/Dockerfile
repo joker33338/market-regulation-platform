@@ -8,6 +8,10 @@ LABEL org.opencontainers.image.title="market-regulation-platform" \
       cn.market-regulation.frontend.revision="${FRONTEND_COMMIT}"
 USER root
 WORKDIR /app
+# 仅清理构建镜像继承的旧代码目录；不挂载、不清理宿主数据或模型。
+RUN rm -rf /app/qa_core /app/tests /app/scripts /app/deploy/release /app/frontend/dist
+EXPOSE 8180
+ENV PYTHONPATH=/app
 COPY qa_core ./qa_core
 COPY deploy/release/application.py ./deploy/release/application.py
 COPY deploy/release/entrypoint.py /opt/workbench/entrypoint.py
