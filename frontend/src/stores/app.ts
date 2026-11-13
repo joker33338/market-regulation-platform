@@ -6,7 +6,6 @@ import { login as apiLogin, logout as apiLogout } from '@/api/accounts'
 import { hasServerLogout } from '@/api/dataSource'
 import { probeContract, resetContractState } from '@/api/dataSource'
 import { loadPrincipal, clearPrincipal } from '@/api/principal'
-import { releaseStatus } from '@/config/release'
 import { toApiError } from '@/api/errors'
 import type { ComponentState, ParseServiceInfo } from '@/api/types'
 
@@ -40,8 +39,8 @@ export const useAppStore = defineStore('app', () => {
   const authMode = ref<'token' | 'password'>(readAuthMode())
   const apiOnline = ref<'unknown' | 'online' | 'offline'>('unknown')
   const serviceInfo = ref<ParseServiceInfo | null>(null)
-  /** v0.2.1 后端 MVP 有限范围 QA PASS；不代表 v0.2.2/v0.2.3 前端已联调或生产可用 */
-  const qaAccepted = ref(releaseStatus.backendQa === 'PASS')
+  /** 本轮统一自测不等同独立QA，不继承旧版PASS。 */
+  const qaAccepted = ref(false)
 
   /** 组件五态：只有真实探活成功才允许 ONLINE；未探测一律 UNKNOWN */
   const apiState = computed<ComponentState>(() => {
