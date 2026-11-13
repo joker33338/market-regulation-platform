@@ -54,7 +54,8 @@ with tempfile.TemporaryDirectory() as directory:
         admin=receipt['access_token'];assert receipt['principal']['data_scope']=='all'
         assert send('GET','/api/admin/accounts')[0]==401
         code,schema,_=send('GET','/api/openapi.json',token=admin)
-        assert code==200 and schema['info']['x-contract-version']=='frontend-api-v0.2.3-draft-4'
+        assert code==200 and schema['info']['x-contract-version']=='frontend-api-v0.2.3-draft-5'
+        assert len(schema['paths'])==54
         for path,method in [('/api/auth/login','post'),('/api/admin/accounts','post'),
                 ('/api/admin/accounts/{principal_id}','patch'),('/api/parse/tasks/{task_id}/logs','get'),
                 ('/api/system/api-logs','get'),('/api/system/error-logs','get'),

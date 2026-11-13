@@ -1,3 +1,5 @@
+最新运行状态见 [v0.2.3本地联调切换交接](v023-local-deployment-20261113.md)：8180已获准切换至draft-5联合镜像，仍待独立QA；下文旧运行状态为历史快照。
+
 # v0.2.2 前后端 API 契约
 
 2026-11-12 新候选：`frontend-api-v0.2.3-draft-4`、46 路径，新增密码账号、ADMIN 全权限、入库/发布和日志/筛选；见 [当前接入包](frontend-v023-draft4-backend-handoff.md) 与 `frontend-openapi-v023-draft4.json`。本页以下为历史 v0.2.2 内容，不代表新候选已部署。
