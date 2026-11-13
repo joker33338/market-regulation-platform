@@ -72,3 +72,6 @@ secrets*.json
 /docs/法律知识库离线入库迁移方案.md
 /docs/ocr-integration/01-现有项目分析.md
 /scripts/demo_mvp.py
+
+# 完成态发布报告包含构建后身份，由跟踪模板生成以避免提交SHA自引用。
+/docs/v0.2.3-release-report.md

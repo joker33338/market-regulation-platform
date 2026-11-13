@@ -50,6 +50,6 @@ class APIImprovementTests(unittest.TestCase):
         self.assertIsNone(body['total'])
         self.assertEqual(body['reason'],'review_store_not_configured')
         schema=self.client.get('/api/openapi.json',headers=self.auth).json()
-        self.assertEqual(schema['info']['version'],'0.2.3-dev')
+        self.assertEqual(schema['info']['version'],'0.2.3')
         self.assertIn('x-contract-version',schema['info'])
         self.assertIn('/api/system/resources',schema['paths'])

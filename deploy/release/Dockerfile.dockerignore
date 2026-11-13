@@ -14,3 +14,9 @@
 !deploy/release/entrypoint.py
 
 !requirements-review.txt
+
+!requirements.txt
+!scripts/
+!scripts/provision_auth_accounts.py
+!scripts/sql/
+!scripts/sql/**

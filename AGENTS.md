@@ -1,7 +1,15 @@
-# Shared safety and role rules
+# v0.2.3 开发与发布规则
 
-Read `docs/qa/round01/README.md` before work. Never push, discard user changes, delete corpus/model/database data, hard reset, clean untracked files, rewrite history, or force-remove branches/worktrees. Do not change the original worktree during round 01.
+默认简体中文。v0.2.3由Agent C单独负责前后端、数据库、集成、自测、GitHub发布及本地Docker部署，不分派其他Agent。唯一长期源码目录为原始仓库目录；其他worktree只读核对，通过Git集成，不能覆盖未提交成果。
 
-Determine your role from `git branch --show-current`: `qa/round1` is QA and `fix/round1` is Fix. QA edits only tests, test helpers, and QA-owned reports. Fix must remain read-only for business source until a committed reproducible QA handoff exists. Fix owns only its designated reports. Do not install/upgrade dependencies or change schemas/services during preparation. Keep confidential outputs ignored and never use external OCR APIs.
+工作前检查分支、完整HEAD、工作区和远程main/标签。旧docs/qa/round01/README.md为历史流程，不限制本轮用户明确授权的唯一主目录开发、main推送和v0.2.3正式注释标签。历史报告不得篡改为新版本结论。
 
-Use `MARKET_REGULATION_TEST_CORPUS` with `pathlib.Path` for read-only corpus traversal. Never log original corpus paths, filenames, or body text into tracked artifacts. Keep sample identifiers anonymous. Secrets, actual corpus paths, models, and environments are local configuration and must not be committed.
+保留合理提交历史，不强制推送、不reset --hard、不clean用户文件、不删历史分支、不默默移动版本标签。发生冲突先分析报告，不直接选择ours/theirs。发布需先功能与测试完成，再推开发分支、main及标签，核对SHA后构建部署。最终main、标签、本地HEAD与镜像OCI必须一致。
+
+PostgreSQL保存正式业务，MySQL仅保存追加式审核，SQLite保留解析任务。正式建库、正式审核账号/写入启用及正式数据迁移需要用户明确授权，不能从一般部署任务推断。不能绕过认证、来源权限、审核或发布门禁。不得将未核验OCR标成人工通过。
+
+源码不得包含Token、密码、DSN、runtime、真实上传、数据库、模型、日志或私密配置。MARKET_REGULATION_TEST_CORPUS通过环境及pathlib.Path只读访问，跟踪报告仅匿名统计，不写原始语料路径、名称或正文。所有新代码注释使用简体中文。
+
+部署前核对活动任务、挂载、数据库及模型，备份当前数据库和状态文件；不中断任务、不删卷、不清历史数据。保留v0.2.2回滚。真实云调用不能作为健康检查，OCR与BGE复用本地模型。
+
+单元/自动化、真实数据库、API集成、浏览器业务、自测未覆盖范围分别记录；不称独立QA。真实写用例仅用获准的隔离状态与合成身份，不能拿生产数据故障测试。本轮仅v0.2.3，不开展下一版本需求。

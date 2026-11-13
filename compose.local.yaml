@@ -15,7 +15,7 @@ services:
       - "127.0.0.1:${LOCAL_APP_PORT:-8180}:8180"
     volumes:
       - type: bind
-        source: ${LOCAL_WORKBENCH_ROOT:?请使用本地工作台启动脚本}/runtime.json
+        source: ${LOCAL_RUNTIME_JSON:?需要显式提供私密runtime文件}
         target: /private/runtime.json
         read_only: true
         bind:

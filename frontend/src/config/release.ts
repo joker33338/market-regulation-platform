@@ -22,20 +22,20 @@
  *  - public 知识库无 ACTIVE 版本时检索返回 unpublished，属真实空态。
  */
 export const releaseStatus = {
-  version: 'v0.2.2',
+  version: 'v0.2.3',
   /** 后端 v0.2.1 MVP 有限范围 QA 结论（历史结论，不覆盖 v0.2.2 新接口） */
-  backendQa: 'PASS',
-  qaDate: '2026-11-11',
-  qaDecisionFile: 'docs/qa/v0.2.1/final-release-decision.md',
-  qaScope: 'v0.2.1 后端 MVP 有限范围验收；不含 v0.2.2 新接口、独立 QA 全验收与生产部署',
+  backendQa: 'SELF_TEST',
+  qaDate: '2026-11-13',
+  qaDecisionFile: 'docs/v0.2.3-release-report.md',
+  qaScope: 'v0.2.3 由 Agent C 统一开发与自测；不作为独立 QA 验收结论',
   /** 历史基线分支（仅追溯，不作当前运行结论） */
-  backendContractBranch: 'feat/backend-api-v0.2.2',
+  backendContractBranch: 'main',
   /** 顶栏 / 页头短标签：不写死活动实例版本，能力以运行期契约探测为准 */
   shortLabel: '真实 API · 运行期契约驱动',
   /** 详细告警 */
   alertTitle: '前端已对接真实接口；能力可用性以运行期契约探测为准',
   alertDescription:
-    '各页面业务数据全部来自后端真实响应，无 DEMO / Mock 回退。哪些接口可用一律以 GET /api/openapi.json 的运行期路径与方法级探测为准：未声明的路由保持禁用 / 空态，绝不调用不存在的接口或伪造成功。draft-4 的账号密码登录、管理员账号管理、运行日志、入库预检 / 批次 / 发布回滚、检索新筛选等能力已在源码交付，须在经授权的隔离实例上验证；源码分支与活动实例是两回事。draft-5 追加法规库与处罚案例库两个只读页面：仅当运行期契约声明对应 GET 方法时才发起请求，未加载时以文字说明 + 控件禁用呈现；status=unpublished 的合法空态不是错误，404 / 422 / 503 一律按真实错误态常显，不把自动提取或待核验字段标成已核验。所有 /api/* 请求需要 Bearer 会话凭证，401 / 403 / 404 / 409 / 422 / 429 / 503 均按真实错误态呈现，不隐藏错误。独立 QA 验收与生产部署尚未进行，本页不签发任何发布结论。',
+    '各页面业务数据全部来自后端真实响应，无 DEMO / Mock 回退。哪些接口可用一律以 GET /api/openapi.json 的运行期路径与方法级探测为准：未声明的路由保持禁用 / 空态，绝不调用不存在的接口或伪造成功。draft-4 的账号密码登录、管理员账号管理、运行日志、入库预检 / 批次 / 发布回滚、检索新筛选等能力已在源码交付，须在经授权的隔离实例上验证；源码分支与活动实例是两回事。draft-5 追加法规库与处罚案例库两个只读页面：仅当运行期契约声明对应 GET 方法时才发起请求，未加载时以文字说明 + 控件禁用呈现；status=unpublished 的合法空态不是错误，404 / 422 / 503 一律按真实错误态常显，不把自动提取或待核验字段标成已核验。所有 /api/* 请求需要 Bearer 会话凭证，401 / 403 / 404 / 409 / 422 / 429 / 503 均按真实错误态呈现，不隐藏错误。v0.2.3 由 Agent C 统一开发、联调与自测，不签发独立 QA_PASS；实际部署与测试范围以版本报告为准。',
   /** 独立前端只读联调是否完成：运行期契约 + 真实 Token + 浏览器逐页验证 */
   frontendIntegrated: true,
   /** 接口契约复核结论 */

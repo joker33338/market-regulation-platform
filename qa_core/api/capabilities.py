@@ -58,7 +58,7 @@ def register_capabilities(app,principal):
     @app.get('/api/system/capabilities',tags=['monitoring'],response_model=CapabilitiesResponse,
              responses={code:{'model':DocumentDeletionError} for code in (401,403,503)})
     def capabilities(identity=Depends(principal)):
-        return {'contract_version':'frontend-api-v0.2.3-draft-5','admin_policy':'all_permissions',
+        return {'contract_version':'frontend-api-v0.2.3','admin_policy':'all_permissions',
                 'identity':principal_info(identity),
                 'password_login':{'implemented':True,'configured':bool(app.state.account_store.filename),'registration':'admin_only'},
                 'review':{'implemented':True,'ledger_configured':app.state.review_ledger is not None,'per_object_gate':True},
