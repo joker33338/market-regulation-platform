@@ -52,7 +52,7 @@ def preview_documents(documents: Iterable[LegalDocument], *, max_chars: int = 80
 
 def ingest_documents(documents: Iterable[LegalDocument], *, database: Database, embeddings,
                      settings: Settings, version: str, namespace: str = "market_regulation",
-                     full_snapshot: bool = False) -> dict:
+                     full_snapshot: bool = False, before_finish=None) -> dict:
     if namespace != "market_regulation":
         raise IngestionError("MVP 每个数据库只支持一个 market_regulation 发布域。")
     if database.postgres and (embeddings.dimension != 1024 or isinstance(embeddings, DemoEmbeddings)):
@@ -99,6 +99,8 @@ def ingest_documents(documents: Iterable[LegalDocument], *, database: Database, 
                                    source_path=document.source_path, metadata=metadata, chunks=chunks)
         if not seen:
             raise IngestionError("没有输入法规，禁止生成空候选版本。")
+        if before_finish is not None:
+            before_finish(database,version)
         database.finish_version(version, stats)
         return {"version": version, "status": "STAGED", **stats}
     except BaseException:

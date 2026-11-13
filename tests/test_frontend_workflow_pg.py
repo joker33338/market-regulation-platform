@@ -40,7 +40,12 @@ class FrontendWorkflowPGTests(unittest.TestCase):
         finally:
             database.close()
         with psycopg2.connect(cls.admin) as connection,connection.cursor() as cursor:
+            cursor.execute(Path('scripts/sql/20261113_business_library_up.sql').read_text(encoding='utf-8'))
+            cursor.execute(Path('scripts/sql/20261113_business_library_source_v2_up.sql').read_text(encoding='utf-8'))
+        with psycopg2.connect(cls.admin) as connection,connection.cursor() as cursor:
             cursor.execute('CREATE ROLE frontend_api_test LOGIN')
+            cursor.execute('GRANT USAGE ON SCHEMA business_library TO frontend_api_test')
+            cursor.execute('GRANT SELECT,INSERT ON ALL TABLES IN SCHEMA business_library TO frontend_api_test')
             cursor.execute('GRANT USAGE ON SCHEMA public,document_review TO frontend_api_test')
             cursor.execute('GRANT SELECT ON ALL TABLES IN SCHEMA document_review TO frontend_api_test')
             cursor.execute('GRANT SELECT ON ALL TABLES IN SCHEMA public TO frontend_api_test')
@@ -62,6 +67,7 @@ class FrontendWorkflowPGTests(unittest.TestCase):
                  row['raw_text'],row['markdown_content'],Json(row['original_result'])))
         reader=fixture.f.reader
         reader.review=ReviewReader(self.runtime)
+        reader.kb_dsn=self.runtime
         reader.kb_factory=lambda:Database(pg_dsn=self.runtime)
         reader.kb_write_factory=reader.kb_factory
         class SyntheticVectors:
@@ -70,7 +76,12 @@ class FrontendWorkflowPGTests(unittest.TestCase):
             signature='synthetic-test-vectors-1024'
             def embed_documents(self,texts):
                 return [[1.0]+[0.0]*1023 for _ in texts]
-        reader.embeddings_factory=SyntheticVectors
+        if os.getenv('WORKFLOW_REAL_BGE')=='1':
+            from qa_core.retrieval.models import LocalEmbeddings
+            from qa_core.config.settings import Settings
+            reader.embeddings_factory=lambda:LocalEmbeddings(Settings.from_env())
+        else:
+            reader.embeddings_factory=SyntheticVectors
         fixture.f.app.state.review_ledger=MySQLReviewLedger(self.mysql)
         from scripts.provision_auth_accounts import provision
         account_file=fixture.f.root/'isolated-accounts.json';password=secrets.token_urlsafe(20)
@@ -97,6 +108,9 @@ class FrontendWorkflowPGTests(unittest.TestCase):
         finally:
             database.close()
         self.assertEqual(fixture.post('publish',{'kb_version':'synthetic-v1','expected_active_version':None}).status_code,200)
+        library=fixture.client.get('/api/library/laws',headers=fixture.f.auth)
+        self.assertEqual(library.status_code,200,library.text)
+        self.assertEqual(library.json()['total'],1)
         result=fixture.client.post('/api/knowledge/search',headers=fixture.f.auth,json={'query':'合成条文','mode':'hybrid'})
         self.assertEqual(result.status_code,200,result.text)
         self.assertEqual(result.json()['count'],1)

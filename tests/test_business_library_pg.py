@@ -220,3 +220,20 @@ class BusinessLibraryPGTests(unittest.TestCase):
         self.assertEqual(len(chapters),1);self.assertEqual(len(articles),2)
         self.assertEqual(text[articles[0]['raw_start']:articles[0]['raw_end']],'第一条 真实正文。\n')
         self.assertEqual(structure_ranges('第一条 文本\n第一条 重复'),([],[]))
+
+    def test_v2_source_binding_and_guarded_downgrade(self):
+        connection=psycopg2.connect(self.dsn)
+        try:
+            with connection.cursor() as c:
+                up=(self.sql/'20261113_business_library_source_v2_up.sql').read_text(encoding='utf-8').replace('BEGIN;','').replace('COMMIT;','')
+                c.execute(up)
+                metadata=json.dumps({'file_sha256':'l1','api_review_reference':{'parse_id':'l1','owner_id':'alice'}})
+                c.execute("INSERT INTO public.mr_document_versions VALUES('indexed-law','law','parsed-evidence-fingerprint','synthetic',%s,0)",(metadata,))
+                c.execute("SAVEPOINT wrong_owner")
+                with self.assertRaises(psycopg2.IntegrityError):
+                    c.execute("INSERT INTO business_library.records(doc_version_id,kind,owner_id,parse_id,source_file_id,title,facts_source) VALUES('indexed-law','law','bob','l1','l1','synthetic','synthetic')")
+                c.execute('ROLLBACK TO SAVEPOINT wrong_owner')
+                c.execute("INSERT INTO business_library.records(doc_version_id,kind,owner_id,parse_id,source_file_id,title,facts_source) VALUES('indexed-law','law','alice','l1','l1','synthetic','synthetic')")
+                down=(self.sql/'20261113_business_library_source_v2_down.sql').read_text(encoding='utf-8').replace('BEGIN;','').replace('COMMIT;','')
+                with self.assertRaises(psycopg2.Error):c.execute(down)
+        finally:connection.rollback();connection.close()

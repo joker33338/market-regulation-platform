@@ -53,9 +53,12 @@ class LocalBatchRepairEdges(unittest.IsolatedAsyncioTestCase):
         self.config = MinerUConfig(enabled=True, mode="local", result_dir=self.root)
         self.repository = TaskRepository(self.root / "tasks.sqlite3")
         self.a, self.b = self.root / "a.pdf", self.root / "b.pdf"
-        # 下方注入解析结果，不需要 OCR、网络或模型。
-        self.a.write_bytes(b"%PDF-1.7 synthetic a")
-        self.b.write_bytes(b"%PDF-1.7 synthetic b")
+        # 重试仍会执行输入安全校验，使用真实可打开的合成PDF。
+        import fitz
+        for path in (self.a,self.b):
+            with fitz.open() as document:
+                document.new_page().insert_text((72,72),path.stem)
+                document.save(path)
 
     def result(self, path):
         from qa_core.utils import file_sha256

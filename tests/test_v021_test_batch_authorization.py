@@ -183,7 +183,7 @@ class HTTPOptionBoundaryTests(unittest.IsolatedAsyncioTestCase):
             router=SimpleNamespace(config=SimpleNamespace(enabled=True))
             service=MinerUService(cfg,TaskRepository(root/'tasks.sqlite3'),dual_router=router)
             with self.assertRaises(MinerUError) as raised:
-                await service.submit('alice','synthetic-request',[p],parse_options={'strategy':'remote',key:value})
+                await service.submit('alice','synthetic-request',[(p.name,p)],parse_options={'strategy':'remote',key:value})
             self.assertEqual(raised.exception.code,'invalid_parse_options')
 
 

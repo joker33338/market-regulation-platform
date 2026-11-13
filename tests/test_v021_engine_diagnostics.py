@@ -90,7 +90,8 @@ class ConstructorFailureContract(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root/'synthetic.png'
-            source.write_bytes(b'synthetic non-confidential fixture')
+            from PIL import Image
+            Image.new('RGB',(64,32),'white').save(source)
             sha = hashlib.sha256(source.read_bytes()).hexdigest()
             local_error = IngestionError('合成本地引擎无法初始化')
             local_error.diagnostic = dict(status='LOCAL_ENGINE_UNAVAILABLE', reason='WINDOWS_POLICY_BLOCKED',

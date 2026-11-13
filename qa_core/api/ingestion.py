@@ -220,6 +220,8 @@ def register_ingestion(app, principal, reader, config):
             database=None
             try:
                 database=reader.kb_write_factory()
+                from qa_core.storage.library_projection import ensure_projection_schema,project_library
+                ensure_projection_schema(database)
                 with database.transaction(read_only=True):
                     if database.one('SELECT status FROM mr_kb_versions WHERE kb_version=:v',{'v':body.kb_version}):
                         raise MinerUError('knowledge_version_exists',409)
@@ -235,7 +237,8 @@ def register_ingestion(app, principal, reader, config):
                 try:
                     reader._embeddings=reader._embeddings or reader.embeddings_factory()
                     result=ingest_documents(documents,database=database,embeddings=reader._embeddings,
-                        settings=Settings.from_env(),version=body.kb_version,full_snapshot=body.full_snapshot)
+                        settings=Settings.from_env(),version=body.kb_version,full_snapshot=body.full_snapshot,
+                        before_finish=project_library)
                 except Exception as error:
                     value.update(status='FAILED',error_code='ingestion_quality_blocked' if isinstance(error,IngestionError) else 'ingestion_failed',
                                  completed_at=datetime.now(timezone.utc).isoformat(),write_performed=None)

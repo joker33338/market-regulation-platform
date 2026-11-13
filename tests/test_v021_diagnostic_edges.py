@@ -80,7 +80,8 @@ class LocalContextFailureEdges(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'synthetic.png'
-            source.write_bytes(b'synthetic-only')
+            from PIL import Image
+            Image.new('RGB',(64,32),'white').save(source)
             sha = hashlib.sha256(source.read_bytes()).hexdigest()
             parser = MagicMock()
             parser.__enter__.side_effect = ImportError('PRIVATE_TOKEN synthetic/private.dll')
