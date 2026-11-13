@@ -73,6 +73,6 @@ def annotate_legacy(app):
                         'schema':{'type':'string','minLength':1,'maxLength':128,'pattern':r'^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$'},
                         'description':'仅ADMIN可显式选择业务owner；其他角色传入返回403。管理员查询默认全局，上传和创建任务默认个人owner。'})
         schema["info"]["version"] = "0.2.3-dev"
-        schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-4"
+        schema["info"]["x-contract-version"] = "frontend-api-v0.2.3-draft-5"
         return schema
     app.openapi = openapi

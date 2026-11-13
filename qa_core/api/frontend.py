@@ -36,6 +36,8 @@ def register_frontend(app, service, config, owner, reader=None, principal=None):
     from .capabilities import register_capabilities
     register_capabilities(app, principal)
     from .contracts import annotate_legacy
+    from .business_library import register_business_library
+    register_business_library(app, principal, reader)
     annotate_legacy(app)
     app.state.frontend_reader = reader
     reader.known_owner_ids=lambda:[identity.owner_id for identity in app.state.auth_registry.principals() if identity.owner_id]
