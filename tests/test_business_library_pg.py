@@ -175,3 +175,24 @@ class BusinessLibraryPGTests(unittest.TestCase):
             rows=keyword_search(db,'synthetic',top_k=5,kb_version='v1')
             self.assertEqual(rows[0]['chunk_id'],'chunk')
         finally:db.close()
+
+    def test_offline_import_pending_and_idempotent(self):
+        from qa_core.storage.parsing_results import PostgresResultSink
+        from qa_core.document_parsing.schemas import DocumentResult,PageResult
+        sink=PostgresResultSink(self.dsn)
+        result=DocumentResult('synthetic-import-hash','synthetic.pdf','.pdf',{},
+                              pages=[PageResult(1,'native_pdf','synthetic import')])
+        parse_id=None
+        try:
+            parse_id=sink.save_import('admin-import','synthetic-import','a'*32,result)
+            self.assertEqual(sink.save_import('admin-import','synthetic-import','a'*32,result),parse_id)
+            row=self.query('SELECT requires_review,source_location,quality,raw_text FROM document_review.documents WHERE parse_id=%s',(parse_id,))[0]
+            self.assertTrue(row[0]);self.assertNotIn('local_task_id',row[1])
+            self.assertEqual(row[1]['owner_id'],'admin-import')
+            self.assertFalse(row[2]['human_verified'])
+            self.assertEqual(row[3],'synthetic import')
+            self.assertFalse(result.requires_review)
+        finally:
+            if parse_id:
+                self.query('DELETE FROM document_review.pages WHERE parse_id=%s',(parse_id,))
+                self.query('DELETE FROM document_review.documents WHERE parse_id=%s',(parse_id,))

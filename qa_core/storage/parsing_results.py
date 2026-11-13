@@ -10,16 +10,36 @@ class PostgresResultSink:
     def __init__(self, dsn):
         self.dsn = dsn
 
-    def save(self, task, file, result):
+    def save_import(self, owner_id, batch_id, file_id, result):
+        """管理员离线资料接收：只存待复核解析，不伪造队列任务或人工审核。"""
+        import re
+        from qa_core.api.principals import identifier
+        from qa_core.document_parsing.schemas import DocumentResult
+        if not identifier(owner_id) or not identifier(batch_id) or not re.fullmatch('[a-f0-9]{32}',file_id):
+            raise MinerUError('invalid_import_identity',422)
+        pending=DocumentResult.from_dict(result.to_dict())
+        pending.requires_review=True
+        if pending.parsing_status=='success':
+            pending.parsing_status='needs_review'
+        pending.quality.update(import_batch_id=batch_id,human_verified=False)
+        return self.save({'owner':owner_id,'id':batch_id},{'id':file_id,'source_file_id':file_id},
+                         pending,import_batch_id=batch_id)
+
+    def save(self, task, file, result, *, import_batch_id=None):
         import psycopg2
         from psycopg2.extras import Json
         payload = result.to_dict()
-        payload["source_location"].update(owner_id=task["owner"], local_task_id=task["id"],
+        payload["source_location"].update(owner_id=task["owner"],
                                           source_file_id=file.get("source_file_id", file["id"]))
+        if import_batch_id:
+            payload['source_location'].pop('local_task_id',None)
+            payload['source_location']['import_batch_id']=import_batch_id
+        else:
+            payload['source_location']['local_task_id']=task['id']
         # 即使页面渲染不同，也保留远端原始 Markdown。
         markdown = result.quality.get("markdown", result.markdown_content)
         digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-        parse_id = stable_hash("parsing-result-v1", task["owner"], task["id"], file["id"])
+        parse_id = stable_hash("import-result-v1" if import_batch_id else "parsing-result-v1", task["owner"], task["id"], file["id"])
         connection = psycopg2.connect(self.dsn, connect_timeout=5, application_name="market_parsing_results")
         try:
             with connection:
