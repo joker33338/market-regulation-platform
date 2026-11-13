@@ -181,8 +181,9 @@ class BusinessLibraryPGTests(unittest.TestCase):
         from qa_core.document_parsing.schemas import DocumentResult,PageResult
         sink=PostgresResultSink(self.dsn)
         result=DocumentResult('synthetic-import-hash','synthetic.pdf','.pdf',{},
-                              pages=[PageResult(1,'native_pdf','synthetic import')])
+                              pages=[PageResult(1,'native_pdf','第一章 总则\n第一条 synthetic import')])
         parse_id=None
+        version=None
         try:
             parse_id=sink.save_import('admin-import','synthetic-import','a'*32,result)
             self.assertEqual(sink.save_import('admin-import','synthetic-import','a'*32,result),parse_id)
@@ -190,9 +191,31 @@ class BusinessLibraryPGTests(unittest.TestCase):
             self.assertTrue(row[0]);self.assertNotIn('local_task_id',row[1])
             self.assertEqual(row[1]['owner_id'],'admin-import')
             self.assertFalse(row[2]['human_verified'])
-            self.assertEqual(row[3],'synthetic import')
+            self.assertEqual(row[3],'第一章 总则\n第一条 synthetic import')
             self.assertFalse(result.requires_review)
+            from qa_core.storage.law_intake import receive_law
+            self.query("UPDATE document_review.documents SET quality=quality||'{\"document_type\":\"law\"}'::jsonb WHERE parse_id=%s",(parse_id,))
+            received=receive_law(self.dsn,'admin-import',parse_id)
+            version=received['doc_version_id']
+            self.assertFalse(received['published'])
+            self.assertEqual(received['status'],'INTAKE_NOT_INDEXED')
+            self.assertEqual(received['articles'],1)
+            self.assertFalse(receive_law(self.dsn,'admin-import',parse_id)['created'])
+            self.assertEqual(self.query('SELECT count(*) FROM public.mr_kb_documents WHERE doc_version_id=%s',(version,))[0][0],0)
         finally:
+            if version:
+                self.query('DELETE FROM business_library.articles WHERE doc_version_id=%s',(version,))
+                self.query('DELETE FROM business_library.chapters WHERE doc_version_id=%s',(version,))
+                self.query('DELETE FROM business_library.records WHERE doc_version_id=%s',(version,))
+                self.query('DELETE FROM public.mr_document_versions WHERE doc_version_id=%s',(version,))
             if parse_id:
                 self.query('DELETE FROM document_review.pages WHERE parse_id=%s',(parse_id,))
                 self.query('DELETE FROM document_review.documents WHERE parse_id=%s',(parse_id,))
+
+    def test_intake_article_ranges(self):
+        from qa_core.storage.law_intake import structure_ranges
+        text='第一章 总则\n第一条 真实正文。\n第二条 其他正文。\n'
+        chapters,articles=structure_ranges(text)
+        self.assertEqual(len(chapters),1);self.assertEqual(len(articles),2)
+        self.assertEqual(text[articles[0]['raw_start']:articles[0]['raw_end']],'第一条 真实正文。\n')
+        self.assertEqual(structure_ranges('第一条 文本\n第一条 重复'),([],[]))
