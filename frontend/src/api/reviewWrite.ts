@@ -7,12 +7,12 @@ import type {
 /**
  * v0.2.3 审核写入与台账只读接口 —— 唯一依据
  * docs/integration/frontend-openapi-v023-draft2.json
- * （info.version=0.2.3-dev / x-contract-version=frontend-api-v0.2.3-draft-2 / 30 路径）
+ * （draft-2 阶段源码快照；当前契约版本与路径数以运行期探测为准）
  *
  * 硬边界：
  *  - 源码契约已交付 ≠ 运行期可用。调用方必须先经 dataSource.hasRuntimeRoutes() 判定；
  *    审核写操作还须详情 review_write_supported=true 且 review_ledger.available=true。
- *  - 正式 8180 当前仍是 0.2.2-api-candidate / 22 路径；本模块接口只应在获准的隔离
+ *  - 活动实例是否加载写路由以运行期方法级探测为准；本模块接口只应在获准的隔离
  *    draft-2 实例上调用，不得默认向正式 8180 发起写入（开发代理有写入保护）。
  *  - 请求只发契约允许的字段；ReviewAction 为 additionalProperties:false。
  *    绝不在 body 发送 operator_id / owner_id / roles 等身份字段（后端返回 422）。

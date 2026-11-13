@@ -139,8 +139,8 @@
         </el-tooltip>
       </div>
       <el-alert v-if="!canDeleteDocuments" type="warning" :closable="false" class="delete-note"
-        title="删除功能需后端接口：当前运行期契约未提供 DELETE /api/documents/{file_id}"
-        description="原始文件为只读证据，前端不会本地隐藏行来假装删除成功。多选与批量下载原件现在即可使用；待后端实现并在 /api/openapi.json 声明该 DELETE 方法后，删除按钮自动解锁，并按真实回执刷新列表。" />
+        title="删除按钮按「运行期方法 + ADMIN 权限」双重门控"
+        :description="`${deleteDisabledHint}。原始文件为只读证据：403（无权）、409（证据链 / 版本冲突）、503（存储不可用）一律保留原行并显示真实错误；仅后端真实成功后重新拉取 GET /api/documents 确认，不本地隐藏行假装删除成功。多选与批量下载原件现在即可使用。`" />
 
       <MrProTable
         ref="tableRef"
@@ -255,6 +255,7 @@ import {
 } from '@/api/dataSource'
 import { downloadSourceFile } from '@/api/documentFiles'
 import { deleteDocument, getDocument, getDocumentHistory, listDocuments } from '@/api/frontend'
+import { isAdminIdentity } from '@/api/principal'
 import { uploadFile, createParseTask, UPLOAD_LIMIT_BYTES, UPLOAD_ALLOWED_EXT, MAX_FILES_PER_TASK } from '@/api/parse'
 import type { DocumentInfo, DocumentList, DocumentQuery, ParseHistory, ParseTask } from '@/api/types'
 
@@ -382,10 +383,19 @@ const tableRef = ref<{ clearSelection: () => void } | null>(null)
 const selectedRows = ref<Record<string, unknown>[]>([])
 const batchBusy = ref(false)
 
-const canDeleteDocuments = computed(() => hasToken() && hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH))
-const deleteDisabledHint = computed(() => hasToken()
-  ? unimplementedHint(`DELETE ${DELETE_DOCUMENT_PATH}`)
-  : '请先在系统监控页配置 API Token')
+const canDeleteDocuments = computed(() =>
+  hasToken() && hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH) && isAdminIdentity.value
+)
+const deleteDisabledHint = computed(() => {
+  if (!hasToken()) return '请先在系统监控页配置 API Token'
+  if (!hasRuntimeMethod('DELETE', DELETE_DOCUMENT_PATH)) {
+    return `运行期 GET /api/openapi.json 未声明 DELETE ${DELETE_DOCUMENT_PATH}（路径存在不等于方法可用），按钮保持禁用`
+  }
+  if (!isAdminIdentity.value) {
+    return '删除仅 ADMIN 可执行（当前身份未确认或不具备管理员权限）：以服务端 Principal 逐请求判定，前端不越权放宽'
+  }
+  return unimplementedHint(`DELETE ${DELETE_DOCUMENT_PATH}`)
+})
 
 function onSelectionChange(rows: Record<string, unknown>[]) {
   selectedRows.value = rows
@@ -422,13 +432,16 @@ async function batchDownload() {
 
 async function confirmDelete(count: number): Promise<boolean> {
   return ElMessageBox.confirm(
-    `将对 ${count} 个文档调用真实 DELETE 接口。原始文件是只读证据，删除须由后端授权并执行；前端不会隐藏列表行来伪造成功，结果以刷新后的列表为准。`,
+    `将对 ${count} 个文档调用真实 DELETE 接口（仅 ADMIN，后端按目标 owner 与证据链逐项校验；403 / 409 / 503 均保留原行）。原始文件是只读证据，前端不会隐藏列表行来伪造成功，结果以刷新后的列表为准。`,
     '确认删除文档',
     { type: 'warning', confirmButtonText: '提交删除请求', cancelButtonText: '取消' }
   ).then(() => true).catch(() => false)
 }
 
-/** 仅按后端真实响应计数：2xx 视为「请求被接受」，随后重新拉取列表确认，不本地移除行 */
+/**
+ * 仅按后端真实响应计数：2xx 视为「请求被接受」，随后重新拉取列表确认。
+ * 403 / 409 / 503 / 网络不明都不从本地列表移除行；重复 404 不计成功；不伪造删除回执。
+ */
 async function submitDeletes(rows: Record<string, unknown>[]) {
   batchBusy.value = true
   let accepted = 0

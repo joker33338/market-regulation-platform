@@ -48,6 +48,12 @@ const routes: RouteRecordRaw[] = [
         name: 'System',
         component: () => import('@/views/SystemView.vue'),
         meta: { title: '系统监控' }
+      },
+      {
+        path: 'admin/accounts',
+        name: 'Accounts',
+        component: () => import('@/views/AccountsView.vue'),
+        meta: { title: '账号与权限管理' }
       }
     ]
   },

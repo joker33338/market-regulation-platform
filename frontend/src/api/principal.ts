@@ -7,14 +7,15 @@ import { contractState, resetContractState } from './dataSource'
 import type { PrincipalInfo, ReviewIdentityFields } from './types'
 
 /**
- * v0.2.3 draft-2 身份层 —— GET /api/auth/me 是全站唯一的「当前登录人员」事实来源。
+ * v0.2.3 draft-4 身份层 —— GET /api/auth/me 是全站唯一的「当前登录人员」事实来源。
  *
  * 硬边界：
  *  - principal_id（实际操作者）与 owner_id（业务数据归属）分离，不能互相推导；
- *  - roles / review_owner_scopes 只用于**展示与收紧**，绝不用于放宽写授权；
+ *  - roles / permissions / data_scope 只用于**展示与收紧**，绝不用于放宽写授权；
  *    审核写按钮仍以运行期契约 + 详情 review_write_supported / review_ledger.available 双门控为准，
  *    最终授权由后端按每次请求的 Principal 与目标文档 owner 判定；
- *  - ADMIN 不隐含 REVIEWER，USER 不具备审核写入能力；
+ *  - draft-4 起 ADMIN 拥有全部业务权限（all_permissions，覆盖 draft-2「ADMIN 不隐含 REVIEWER」
+ *    旧口径）；USER 仍不具备审核写入能力；
  *  - 401/403 立即清除身份与运行期契约缓存，避免凭证失效/角色撤销后残留旧可写状态；
  *    404（范围撤销或对象越界）触发身份重新确认；
  *  - 本模块不读取、不保存、不输出任何凭证或私密 runtime 配置。
@@ -87,13 +88,25 @@ export const isReviewerIdentity = computed(() =>
   principalState.value === 'ready' && !!principal.value?.roles.includes('REVIEWER')
 )
 
+/** 仅展示：当前身份是否具备 ADMIN 角色；draft-4 起 ADMIN 拥有全部业务权限 */
+export const isAdminIdentity = computed(() =>
+  principalState.value === 'ready' && !!principal.value?.roles.includes('ADMIN')
+)
+
+/** 服务端权限口径（draft-4 /auth/me 提供）；缺失时为空，不推断 */
+export const principalPermissions = computed(() =>
+  principalState.value === 'ready' ? (principal.value?.permissions || []) : []
+)
+
 /**
- * 只用于**收紧**：明确已确认身份且不含 REVIEWER 时，页面不得展示可用审核写入能力。
- * 身份未加载 / 加载失败时返回 false，由原双门控继续决定，绝不因未知身份而放宽。
+ * 只用于**收紧**：明确已确认身份且既无 REVIEWER 也无 ADMIN 时，页面不得展示可用审核写入能力。
+ * draft-4 起 ADMIN 全权限（all_permissions），仅含 ADMIN 也可写；身份未加载 / 加载失败时返回
+ * false，由原双门控继续决定，绝不因未知身份而放宽。
  */
 export const identityBlocksWrite = computed(() =>
   principalState.value === 'ready' && !!principal.value &&
-  !principal.value.roles.includes('REVIEWER')
+  !principal.value.roles.includes('REVIEWER') &&
+  !principal.value.roles.includes('ADMIN')
 )
 
 export const principalRoleText = computed(() => {

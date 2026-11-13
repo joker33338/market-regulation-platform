@@ -25,7 +25,7 @@
     </div>
     <el-alert type="info" :closable="false" class="identity-note"
       title="身份口径：frontend-api-v0.2.3-draft-2 / principal-v1"
-      :description="`principal_id 是实际操作者，owner_id 是文档业务归属，两者不能互相推导。USER 不具备审核写入能力，ADMIN 不隐含 REVIEWER；REVIEWER 也只在后端按 review_owner_scopes 与逐对象详情授权后才可写，前端角色仅用于收紧与展示，绝不代替后端授权。事件与回执中的 operator_id / owner_id 由后端给出；旧事件为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。审核通过不等于发布 ACTIVE，退回不等于已创建解析任务。${principalError ? ` 当前身份状态：${principalError}` : ''}`" />
+      :description="`principal_id 是实际操作者，owner_id 是文档业务归属，两者不能互相推导。draft-4 起 ADMIN 拥有全部业务权限（无需再塞入 REVIEWER）；REVIEWER 仍只在后端按 review_owner_scopes 与逐对象详情授权后才可写，USER 不具备审核写入能力。前端角色仅用于收紧与展示，绝不代替后端授权。事件与回执中的 operator_id / owner_id 由后端给出；旧事件为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。审核通过不等于发布 ACTIVE，退回不等于已创建解析任务。${principalError ? ` 当前身份状态：${principalError}` : ''}`" />
 
     <!-- 待复核队列：真实完整语义接口；高度由内容自适应，不再提供上下拖动 -->
     <el-card shadow="never" class="queue-card">
@@ -119,7 +119,7 @@
 
             <div v-else-if="resultTab === 'table'" class="table-pane">
               <el-alert type="info" :closable="false" style="margin-bottom: 12px"
-                title="表格内容来自 original_result.tables（不可信内容，按纯文本展示）"
+                title="表格内容来自 original_result.pages[].tables（不可信内容，按纯文本展示；旧快照回退顶层 tables）"
                 description="后端未提供表格 HTML 渲染契约，前端不执行任何 HTML / 脚本，也不生成占位表格数据。" />
               <div v-if="tableItems.length" class="table-list">
                 <div v-for="(t, i) in tableItems" :key="i" class="table-item">
@@ -308,12 +308,12 @@ import type {
 } from '@/api/types'
 
 /**
- * 审核中心（v0.2.3 draft-2 / frontend-api-v0.2.3-draft-2 / 30 路径）：
+ * 审核中心（v0.2.3 draft-4；路径数与方法以运行期契约探测为准）：
  * - 身份 = GET /api/auth/me：principal_id 是实际操作者，owner_id 是业务数据归属，两者分离。
  *   USER 无审核写入能力，ADMIN 不隐含 REVIEWER；角色只用于展示与**收紧**，不代替后端授权。
  * - 写操作仍以双门控为准 = 运行期 OpenAPI 含 4 条写路径 + 详情 review_write_supported /
  *   review_ledger.available；REVIEWER 能否写某个文档由后端按 review_owner_scopes 逐请求判定。
- *   正式 8180 仍为 0.2.2-api-candidate / 22 路径，第一道门控必然不通过，按钮保持禁用。
+ *   活动实例未在运行期契约中声明这 4 条写路径时，第一道门控不通过，按钮保持禁用。
  * - 提交只发 ReviewAction 白名单字段 + Idempotency-Key / expected_version；
  *   绝不发送 operator_id / owner_id / 自定角色（后端 additionalProperties:false 会 422）。
  * - 401/403/404/409/422/503 分别处理：凭证失效、角色撤销、范围撤销后立即清除旧可写状态；
@@ -383,7 +383,7 @@ const identityGateText = computed(() => {
     return `身份未确认（${principalState.value}），写操作保持禁用；请重新确认身份。${principalError.value}`
   }
   if (identityBlocksWrite.value) {
-    return `当前身份角色 ${principalRoleText.value} 不含 REVIEWER：USER 不具备审核写入能力，ADMIN 不隐含审核权；写操作保持禁用。`
+    return `当前身份角色 ${principalRoleText.value} 既不含 REVIEWER 也不含 ADMIN：draft-4 起 ADMIN 拥有全部业务权限，仅 USER（无审核角色的普通账号）不具备审核写入能力；写操作保持禁用。`
   }
   return ''
 })
@@ -398,7 +398,7 @@ const detailWriteSupported = computed(() =>
 const busy = ref(false)
 /**
  * 双门控仍然是决定条件；身份层只做**收紧**：
- * 身份未确认、或已明确确认不含 REVIEWER（USER / 纯 ADMIN）时一律不展示可用写入能力。
+ * 身份未确认、或已明确确认既无 REVIEWER 也无 ADMIN（draft-4 起 ADMIN 全权限）时一律不展示可用写入能力。
  * 任何本地 roles / review_owner_scopes 都不能让按钮提前解锁——最终授权由后端逐请求判定。
  */
 const canWrite = computed(() =>
@@ -423,19 +423,19 @@ const writeGateLabel = computed(() => ({
 }[writeGate.value]))
 const writeGateTitle = computed(() => ({
   'contract-missing': '当前运行服务未加载 draft-2 审核写入接口，四个写操作保持禁用',
-  'identity-locked': '当前登录人员未确认或不含 REVIEWER 角色，四个写操作保持禁用',
+  'identity-locked': '当前登录人员未确认或不含 REVIEWER / ADMIN 角色，四个写操作保持禁用',
   'detail-locked': '当前对象的审核台账不可用或后端未授予该对象写权限，写操作保持禁用',
   enabled: '已按运行期契约、当前身份与审核详情启用真实审核写入'
 }[writeGate.value]))
 const writeGateDescription = computed(() => ({
-  'contract-missing': '队列 / 详情 / 原件仍来自真实只读接口。draft-2（30 路径）虽已在后端候选交付，但正式 8180 仍为 0.2.2-api-candidate / 22 路径，GET /api/openapi.json 未返回这 4 条写路径，前端不提前解锁、不调用不存在的接口。隔离联调须使用 Agent C 提供的短生命周期入口，不得向正式 8180 写入。',
-  'identity-locked': identityGateText.value || '当前身份不含 REVIEWER 角色，写操作保持禁用。',
-  'detail-locked': '写按钮还须逐对象确认详情返回 review_write_supported=true 且 review_ledger.available=true；台账未配置、存储异常，或当前 principal 未被授予 REVIEWER 角色 / 目标文档 owner 不在后端 review_owner_scopes 时均不置 true。requires_review 只是 OCR 复核信号，不能推导台账状态。',
+  'contract-missing': '队列 / 详情 / 原件仍来自真实只读接口。运行期 GET /api/openapi.json 未声明这 4 条写路径（或方法级门控未通过），前端不提前解锁、不调用不存在的接口。写链路隔离联调须使用经授权的短生命周期入口，不得向未获批准的实例写入。',
+  'identity-locked': identityGateText.value || '当前身份不含 REVIEWER / ADMIN 角色，写操作保持禁用。',
+  'detail-locked': '写按钮还须逐对象确认详情返回 review_write_supported=true 且 review_ledger.available=true；台账未配置、存储异常，或当前 principal 未被授予审核权限（REVIEWER 范围或 ADMIN 全权限）时均不置 true。requires_review 只是 OCR 复核信号，不能推导台账状态。',
   enabled: '写操作使用 Idempotency-Key + expected_version 版本锁；实际操作者由后端按凭证解析的 principal_id 记录，owner_id 是源文档归属，客户端不指定身份。审核通过不授予发布权限、不自动创建解析任务、不修改原始 OCR 与原件。'
 }[writeGate.value]))
 const actionHint = computed(() => {
   if (writeGate.value === 'contract-missing') {
-    return '运行期 OpenAPI 未加载 draft-2 审核写入路由（正式服务仍为 0.2.2-api-candidate / 22 路径），按钮保持禁用，不提前解锁、不伪造成功。'
+    return '运行期 OpenAPI 未声明当前审核写入路由或方法级门控未通过，按钮保持禁用，不提前解锁、不伪造成功。'
   }
   if (writeGate.value === 'identity-locked') {
     return identityGateText.value || '当前身份不具备审核写入能力，按钮保持禁用。'
@@ -568,8 +568,10 @@ async function submitAction() {
     // 每次提交都向后端重新确认身份：凭证失效、角色撤销、范围撤销不得沿用旧的可写状态
     if (principalState.value !== 'ready' || principalNeedsRefresh.value || !principal.value) {
       const current = await loadPrincipal(true)
-      if (!current || !current.roles.includes('REVIEWER')) {
-        const hint = '身份未确认或当前身份不含 REVIEWER，已取消本次提交；请重新确认凭证与审核授权后再试。'
+      // draft-4：REVIEWER 范围授权或 ADMIN 全权限均可写；身份层只做收紧，最终由后端判定
+      const mayWrite = !!current && (current.roles.includes('REVIEWER') || current.roles.includes('ADMIN'))
+      if (!mayWrite) {
+        const hint = '身份未确认或当前身份既无 REVIEWER 也无 ADMIN，已取消本次提交；请重新确认凭证与审核授权后再试。'
         submitError.value = hint
         ElMessage.error(hint)
         return
@@ -602,7 +604,7 @@ async function submitAction() {
       pendingWrite.value = null
       lastReceipt.value = null
     } else if (e.status === 403) {
-      hint = '无权写入（403）：当前 principal 未获 REVIEWER 授权，或角色 / 审核范围已撤销，或目标文档 owner 不在后端 review_owner_scopes。已重新确认身份并刷新详情，不保留旧可写状态。'
+      hint = '无权写入（403）：当前 principal 未获审核授权（REVIEWER 范围或 ADMIN 全权限），或角色 / 审核范围已撤销，或目标文档 owner 不在后端 review_owner_scopes。已重新确认身份并刷新详情，不保留旧可写状态。'
       pendingWrite.value = null
       void loadPrincipal(true)
       void detail.load()
@@ -676,7 +678,15 @@ function asRecords(value: unknown): AnyRecord[] {
 
 const pages = computed<AnyRecord[]>(() => asRecords(detail.data.value?.original_result?.pages))
 const totalPages = computed(() => Math.max(pages.value.length, 1))
-const tableItems = computed<AnyRecord[]>(() => asRecords(detail.data.value?.original_result?.tables))
+/**
+ * 表格读取口径（draft-4 核对修正）：表格挂在 original_result.pages[].tables，
+ * 每页结构化 tables；旧快照的顶层 original_result.tables 仅作兼容回退，不与页内重复拼接。
+ */
+const tableItems = computed<AnyRecord[]>(() => {
+  const fromPages = pages.value.flatMap((p) => asRecords(p.tables))
+  if (fromPages.length) return fromPages
+  return asRecords(detail.data.value?.original_result?.tables)
+})
 
 const currentPageRecord = computed<AnyRecord | undefined>(() =>
   pages.value.find((p) => Number(p.page ?? p.page_number ?? p.page_no ?? p.page_index) === currentPage.value)

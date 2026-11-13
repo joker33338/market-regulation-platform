@@ -2,7 +2,7 @@
  * v0.2.2 前后端契约类型
  *
  * 事实来源（不猜测接口）：
- *  - docs/integration/frontend-openapi.json（OpenAPI 3.1.0，0.2.2-api-candidate，22 路径 / 16 schema）
+ *  - 运行期 GET /api/openapi.json 的实测路径与 schema（离线快照仅作源码参考）
  *  - docs/integration/frontend-api-contract.md
  *  - qa_core/api/schemas.py、common.py、read_store.py、monitoring.py（只读核对）
  * 运行期是否可用由 GET /api/openapi.json 探测决定，类型存在 ≠ 服务已加载。
@@ -93,6 +93,19 @@ export function isTerminalStatus(status: string): boolean {
   return (TERMINAL_TASK_STATUS as readonly string[]).includes(status)
 }
 
+/** 本地明确不可重试的状态：进行中无需重试，已成功完成无需重复处理 */
+const NON_RETRYABLE_TASK_STATUS = ['completed', 'queued', 'pending', 'running', 'processing']
+
+/**
+ * v0.2.3 draft-4 修正：终止态 ≠ 不可恢复。
+ * failed / partial / canceled / timed_out 都是终止态，但后端 POST /api/parse/tasks/{id}/resume
+ * 可能允许恢复；是否可重试由后端逐请求判定（409 / 422 如实提示），前端不凭本地状态表锁死。
+ * 列表「重试」与抽屉「重试任务」共用此规则，避免两处口径不一致。
+ */
+export function canRetryStatus(status: string): boolean {
+  return !NON_RETRYABLE_TASK_STATUS.includes(status)
+}
+
 /* ─────────────── 新增：文档管理 ─────────────── */
 
 /** GET /api/documents · DocumentInfo */
@@ -149,6 +162,10 @@ export type TaskSummary = ParseTask & {
   /** 仅记录过时非空；不存在确定总工作量时不得模拟进度百分比 */
   elapsed_seconds: number | null
   file_mappings: FileMapping[]
+  /** v0.2.3 draft-4：文件完成度（总数 / 终止 / 成功 / 失败与完成比），不是 OCR 阶段进度 */
+  workload?: TaskWorkload | null
+  current_step?: string | null
+  owner_id?: string | null
 }
 
 export type TaskList = ListResponse<TaskSummary>
@@ -228,6 +245,10 @@ export interface SearchRequest {
   query: string
   mode: 'keyword' | 'hybrid'
   limit?: number
+  /** v0.2.3 draft-4 新增筛选；仅运行期能力声明包含时才随请求发送，否则保持 undefined */
+  kbVersion?: string
+  issuingAuthority?: string
+  effectiveStatus?: string
 }
 
 export interface SearchHit {
@@ -252,6 +273,8 @@ export interface SearchResponse {
   list: SearchHit[]
   count: number
   source: string
+  /** v0.2.3 draft-4：后端实际生效的筛选（kb_version / issuing_authority / effective_status） */
+  applied_filters?: Record<string, string>
 }
 
 /* ─────────────── 新增：统计与健康 ─────────────── */
@@ -306,7 +329,7 @@ export interface RuntimeOpenApi {
 
 /* ─────────────── v0.2.3 draft-2 身份、审核台账与监控 ───────────────
  * 依据 docs/integration/frontend-openapi-v023-draft2.json
- * （info.version=0.2.3-dev / x-contract-version=frontend-api-v0.2.3-draft-2 / 30 路径）。
+ * （draft-2 阶段源码快照；当前契约版本与路径数以运行期探测为准）。
  * 相对 draft-1 的关键变化：新增 GET /api/auth/me；principal_id（实际登录人员）
  * 与 owner_id（业务数据归属）分离；roles 为 USER/REVIEWER/ADMIN，ADMIN 不隐含 REVIEWER；
  * 写授权由 review_owner_scopes + 后端逐请求校验决定，旧 owner→writers 说明已不适用。
@@ -326,7 +349,16 @@ export interface PrincipalInfo {
   /** 允许审核写入的目标 owner 白名单；非空也不代表已获写授权，仍以后端逐请求校验为准 */
   review_owner_scopes: string[]
   credential_status: CredentialStatus
+  /** v0.2.3 draft-4：服务端权限口径（ADMIN 为全量）；缺失时按空处理，不推断 */
+  permissions?: string[]
+  /** v0.2.3 draft-4：scoped | all；仅展示用，不作为放宽依据 */
+  data_scope?: string
+  /** v0.2.3 draft-4 兼容保留的旧字段；空列表不否定 ADMIN 删除权 */
+  document_delete_owner_scopes?: string[]
 }
+
+/** draft-4 会话类型：账号密码登录签发的短期 Bearer，或沿用既有独立 Token */
+export type AuthMode = 'password' | 'token'
 
 /** 身份字段在 draft-2 的回执/事件里可为 null：旧事件不补认具体人员 */
 export interface ReviewIdentityFields {
@@ -450,3 +482,283 @@ export type DataSource = 'real' | 'demo'
 
 /** @deprecated 入库批次四态 Mock 遗留类型；v0.2.2 页面已不使用，仅为隔离模块可编译保留 */
 export type BatchState = '已完成' | '执行中' | '失败' | '阻塞'
+
+/* ─────────────── v0.2.3 draft-4：账号密码、管理员账号、能力声明与运行日志 ───────────────
+ * 依据 docs/integration/frontend-openapi-v023-draft4.json
+ * （info.version=0.2.3-dev / 46 路径 / backend handoff e24cbad）。
+ * 关键口径变化（覆盖 draft-2 旧设计）：
+ *  - ADMIN 拥有全部业务权限（all_permissions）；不再要求 ADMIN 额外塞入 REVIEWER；
+ *  - 新增账号密码登录 POST /api/auth/login（匿名）与服务端会话撤销 POST /api/auth/logout；
+ *  - 新增管理员账号管理与账号事件审计、GET /api/system/capabilities 能力声明；
+ *  - 新增 API / 错误日志、任务阶段日志、入库批次 / 预检 / 发布 / 回滚、检索新筛选。
+ * 源码契约已交付 ≠ 运行期可用：调用方必须先经 hasRuntimeMethod() 门控；
+ * 活动实例以运行期契约探测为准；源码契约已交付不等于运行期已加载，未加载时对应能力保持禁用 / 空态。
+ * ------------------------------------------------------------------ */
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  principal: PrincipalInfo
+}
+
+export interface LogoutResponse {
+  revoked: boolean
+}
+
+export interface RoleDefinition {
+  role: PrincipalRole
+  label: string
+  data_scope: string
+  review_write: boolean
+  account_management: boolean
+}
+
+export interface RoleCatalog {
+  admin_policy: string
+  list: RoleDefinition[]
+  safety_gates: string[]
+}
+
+/** 管理员账号（无密码 / 哈希字段，后端不回显） */
+export interface AccountView {
+  username: string
+  principal_id: string
+  owner_id: string | null
+  roles: PrincipalRole[]
+  review_owner_scopes: string[]
+  document_delete_owner_scopes: string[]
+  credential_status: CredentialStatus
+}
+
+export interface AccountCreate {
+  username: string
+  password: string
+  owner_id?: string | null
+  roles?: PrincipalRole[]
+  review_owner_scopes?: string[]
+}
+
+export interface AccountUpdate {
+  roles?: PrincipalRole[] | null
+  review_owner_scopes?: string[] | null
+  credential_status?: CredentialStatus | null
+  password?: string | null
+}
+
+export type AccountPage = ListResponse<AccountView>
+
+export interface AccountEvent {
+  event_id: string
+  timestamp: string
+  operator_id: string
+  target_id: string
+  action: string
+  roles: PrincipalRole[]
+  credential_status: string
+  before: AccountView | null
+  after: AccountView | null
+  password_changed: boolean
+}
+
+export type AccountEventPage = ListResponse<AccountEvent>
+
+/* ─────────────── 能力声明（GET /api/system/capabilities） ─────────────── */
+
+export interface PasswordCapability {
+  implemented: boolean
+  configured: boolean
+  registration: string
+}
+
+export interface ReviewCapability {
+  implemented: boolean
+  ledger_configured: boolean
+  per_object_gate: boolean
+}
+
+export interface IngestionCapability {
+  document_types: string[]
+  review_required: boolean
+  quality_required: boolean
+  manual_revision_export: boolean
+  auto_publish: boolean
+  admin_required: boolean
+  write_configured: boolean
+}
+
+export interface TaskLogCapability {
+  historical_backfill: boolean
+  source: string
+}
+
+export interface OperationalLogCapability {
+  request_bodies: boolean
+  credentials: boolean
+  historical_backfill: boolean
+}
+
+export interface CapabilitiesResponse {
+  contract_version: string
+  admin_policy: string
+  identity: PrincipalInfo
+  password_login: PasswordCapability
+  review: ReviewCapability
+  document_filters: string[]
+  search_filters: string[]
+  search_version_scope: string
+  ingestion: IngestionCapability
+  task_logs: TaskLogCapability
+  operational_logs: OperationalLogCapability
+}
+
+/* ─────────────── 运行日志（API 日志 / 错误日志 / 任务阶段日志） ─────────────── */
+
+export interface LogQuery extends PageQuery {
+  /** ISO 8601 带时区闭区间；仅运行期契约支持时发送 */
+  dateFrom?: string
+  dateTo?: string
+  /** api-logs / error-logs 专用：info | warning | error */
+  level?: string
+}
+
+export interface OperationalLog {
+  event_id: string
+  timestamp: string
+  /** 未确认身份的请求为 null；不把猜测账号写成实际人员 */
+  principal_id: string | null
+  actor_confirmed: boolean
+  method: string
+  route: string
+  status_code: number
+  duration_ms: number
+  level: string
+}
+
+export interface OperationalLogPage {
+  list: OperationalLog[]
+  total: number
+  page: number
+  page_size: number
+  source: string
+  scope: string
+  historical_backfill: boolean
+  truncated: boolean
+}
+
+export interface TaskStageFile {
+  file_id: string
+  status: string
+  error_code: string | null
+}
+
+export interface TaskStageEvent {
+  event_id: string
+  timestamp: string
+  kind: string
+  status: string
+  files: TaskStageFile[]
+}
+
+export interface TaskLogPage {
+  list: TaskStageEvent[]
+  total: number
+  page: number
+  page_size: number
+  source: string
+  /** available=false 且 reason=historical_events_not_recorded：历史未记录，不回填 */
+  available: boolean
+  reason: string | null
+  historical_backfill: boolean
+  truncated: boolean
+  recording_started_at: string | null
+}
+
+/* ─────────────── 入库批次 / 发布 / 回滚（draft-4） ─────────────── */
+
+export interface IngestionDocument {
+  parse_id: string
+  law_name: string
+  law_id: string
+  expected_review_version: number
+}
+
+export interface IngestionBatchRequest {
+  kb_version: string
+  documents: IngestionDocument[]
+  full_snapshot?: boolean
+}
+
+export interface PrecheckItem {
+  parse_id: string
+  review_version: number
+  chunk_count: number
+  quality_passed: boolean | null
+  eligible: boolean
+  error_code: string | null
+}
+
+export interface PrecheckResponse {
+  eligible: boolean
+  documents: PrecheckItem[]
+  active_version: string | null
+  target_exists: boolean
+  write_performed: boolean
+  publish_authorized: boolean
+}
+
+export interface VersionCheckResponse {
+  kb_version: string
+  status: string
+  base_version: string | null
+  active_version: string | null
+  is_active: boolean
+  base_matches_active: boolean
+  publish_eligible: boolean
+  rollback_eligible: boolean
+  write_performed: boolean
+  publish_authorized: boolean
+}
+
+export interface ReleaseRequest {
+  kb_version: string
+  /** 初次发布为 null；与当前 ACTIVE 不一致返回 409 */
+  expected_active_version: string | null
+}
+
+/** 入库 / 发布 / 回滚操作回执（KnowledgeOperation） */
+export interface KnowledgeOperation {
+  operation_id: string
+  operator_id: string
+  action: string
+  kb_version: string
+  status: string
+  created_at: string
+  completed_at: string | null
+  write_performed: boolean | null
+  publish_authorized: boolean
+  result: Record<string, unknown> | null
+  error_code: string | null
+  event_id: string | null
+  execution_live: boolean
+  outcome_unconfirmed: boolean
+  [key: string]: unknown
+}
+
+export type KnowledgeOperationPage = ListResponse<KnowledgeOperation>
+
+/** v0.2.3 draft-4：任务列表 / 详情新增的文件完成度口径（非 OCR 内部阶段百分比） */
+export interface TaskWorkload {
+  unit: 'files'
+  total: number
+  terminal: number
+  succeeded: number
+  failed: number
+  completion_ratio: number | null
+  scope: string
+}

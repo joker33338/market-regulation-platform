@@ -91,19 +91,24 @@
           </span>
         </div>
       </template>
-      <el-descriptions v-if="principal" :column="2" border size="small">
-        <el-descriptions-item label="当前登录人员 principal_id">{{ principal.principal_id }}</el-descriptions-item>
-        <el-descriptions-item label="业务数据归属 owner_id">{{ principal.owner_id || '无个人 owner（纯审核身份）' }}</el-descriptions-item>
+      <!-- 身份字段始终可见：旧实例未返回 /api/auth/me 时如实显示「未确认」，不隐藏字段、不编造值 -->
+      <el-descriptions :column="2" border size="small">
+        <el-descriptions-item label="当前登录人员 principal_id">{{ principal?.principal_id || '未确认' }}</el-descriptions-item>
+        <el-descriptions-item label="业务数据归属 owner_id">{{ principal ? (principal.owner_id || '无个人 owner（纯审核身份）') : '未确认' }}</el-descriptions-item>
         <el-descriptions-item label="角色 roles">{{ principalRoleText }}</el-descriptions-item>
-        <el-descriptions-item label="凭证状态">{{ principal.credential_status }}</el-descriptions-item>
+        <el-descriptions-item label="凭证状态">{{ principal?.credential_status || '未确认' }}</el-descriptions-item>
         <el-descriptions-item label="审核范围 review_owner_scopes" :span="2">{{ principalScopeText }}</el-descriptions-item>
+        <el-descriptions-item label="服务端权限 permissions" :span="2">{{ principalPermissionsText }}</el-descriptions-item>
+        <el-descriptions-item label="数据范围 data_scope" :span="2">{{ principalDataScopeText }}</el-descriptions-item>
         <el-descriptions-item label="确认时间" :span="2">{{ formatTime(principalLoadedAt) }}</el-descriptions-item>
       </el-descriptions>
-      <el-alert v-else type="warning" :closable="false" :title="`身份未确认（${principalState}）`"
-        :description="principalError || 'GET /api/auth/me 未返回有效身份：正式 8180 仍为 v0.2.2（22 路径），该接口只在 draft-2 隔离实例可用。'" />
+      <el-alert v-if="!principal" type="warning" :closable="false" style="margin-top: 10px" :title="`身份未确认（${principalState}）`"
+        :description="principalError || 'GET /api/auth/me 未返回有效身份：该接口是否可用以运行期 GET /api/openapi.json 的方法级探测为准，未加载时不做身份推断。'" />
       <div class="mr-disabled-hint" style="margin-top: 8px">
-        principal_id 是实际操作者，owner_id 是业务数据归属，两者不能互相推导。USER 无审核写入能力，ADMIN 不隐含 REVIEWER；
-        审核可见与可写范围由后端按 review_owner_scopes 与逐请求授权限定，越界返回 404。旧 owner→writers 授权说明自 draft-2 起不再适用。
+        principal_id 是实际操作者，owner_id 是业务数据归属，两者不能互相推导，不能从 owner 反推人员。
+        draft-4 起 ADMIN 拥有全部业务权限（data_scope=all，管理员的账号列表、运行日志与统计均为全局范围而非个人范围），
+        USER 无审核写入能力；写操作以运行期契约、服务端权限与实际方法门禁为准，越界返回 404，无权返回 403。
+        旧 owner→writers 授权说明自 draft-2 起不再适用。
       </div>
     </el-card>
 
@@ -189,27 +194,27 @@
             </el-table-column>
           </el-table>
           <div class="mr-disabled-hint" style="margin-top: 10px">
-            源码契约依据 0.2.3-dev / frontend-api-v0.2.3-draft-2（30 路径，含 GET /api/auth/me）。draft-1（29 路径）的
-            owner→writers 授权说明已不适用；运行期是否可用一律以 GET /api/openapi.json 实测路径与方法为准，
-            未加载时相关功能保持禁用 / 空态，不调用不存在的接口。
+            源码契约依据草稿至 draft-4 的累积路由；路径数与能力以运行期 GET /api/openapi.json 实测结果为准，
+            不写死任何版本号或路径总数。draft-1 的 owner→writers 授权说明已不适用；
+            未加载的路由对应功能保持禁用 / 空态，不调用不存在的接口。
           </div>
         </el-tab-pane>
-        <el-tab-pane :label="`明确不支持（${MISSING_CAPABILITIES.length}）`" name="missing">
+        <el-tab-pane :label="`待运行期验证（${MISSING_CAPABILITIES.length}）`" name="missing">
           <el-table :data="MISSING_CAPABILITIES" size="small">
             <el-table-column label="优先级" width="90">
               <template #default="{ row }">
                 <el-tag :type="row.priority === 'P0' ? 'danger' : 'info'" size="small" effect="plain">{{ row.priority }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="api" label="缺失接口" min-width="320" show-overflow-tooltip />
+            <el-table-column prop="api" label="接口" min-width="320" show-overflow-tooltip />
             <el-table-column prop="usage" label="对应业务" min-width="200" show-overflow-tooltip />
             <el-table-column prop="impact" label="前端处理" min-width="260" show-overflow-tooltip />
           </el-table>
         </el-tab-pane>
       </el-tabs>
       <div class="mr-disabled-hint" style="margin-top: 10px">
-        本表为源码契约清单（离线 OpenAPI 22 个路径＋1 个不出现在公开 schema 中的认证探测端点，按方法列举 {{ CONTRACT_ROUTES.length }} 行），
-        <b>不代表这些接口已在活动 8180 实例上探测成功</b>。运行期结论以 /api/openapi.json 探测为准；
+        本表为源码契约清单（按方法列举 {{ CONTRACT_ROUTES.length }} 行），<b>不代表这些接口已在活动实例上探测成功</b>；
+        活动实例的路径数、契约版本与能力以 /api/openapi.json 运行期探测为准，不沿用固定版本 SHA 或固定路径数；
         详细字段契约与实测结果见 frontend/docs/frontend-api-mapping-v0.2.2.md 与 frontend-api-integration-report.md。
       </div>
     </el-card>
@@ -263,15 +268,93 @@
       <div class="mr-disabled-hint" style="margin-top: 8px">只展示真实审核事件摘要（approve / reject / mark-error / save-revision），不含修订正文；不编造未发生的历史事件。旧事件 operator_id / owner_id 为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。</div>
     </el-card>
 
-    <!-- 无真实 HTTP 数据源的模块：一律空态 -->
-    <div class="card-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 16px">
-      <el-card v-for="m in missingModules" :key="m.title" shadow="never">
-        <template #header><div class="card-head"><span>{{ m.title }}</span><span class="card-sub">接口未实现</span></div></template>
-        <el-empty :image-size="54" :description="m.hint">
-          <span class="mr-disabled-hint">{{ m.api }}</span>
-        </el-empty>
-      </el-card>
-    </div>
+    <!-- v0.2.3 draft-4：运行日志（API / 错误 / 任务阶段），全部按运行期方法级门控 -->
+    <el-card shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="card-head">
+          <span>运行日志 <span class="real-badge">REAL</span></span>
+          <span class="card-sub">仅查询后端真实保存过的事件 · 不含凭证、查询串、请求正文或异常堆栈</span>
+        </div>
+      </template>
+
+      <div class="log-filters">
+        <el-date-picker v-model="logDateRange" type="datetimerange" value-format="YYYY-MM-DDTHH:mm:ss"
+          range-separator="至" start-placeholder="起始时间" end-placeholder="结束时间" size="small" style="width: 340px" />
+        <el-select v-model="logLevel" placeholder="level（仅 API / 错误日志）" clearable size="small" style="width: 200px">
+          <el-option label="info" value="info" />
+          <el-option label="warning" value="warning" />
+          <el-option label="error" value="error" />
+        </el-select>
+        <el-input v-model="taskLogId" placeholder="task_id（任务阶段日志）" clearable size="small" style="width: 240px" @keyup.enter="loadAllLogs" />
+        <el-button type="primary" size="small" @click="loadAllLogs">查询</el-button>
+        <el-button size="small" @click="resetLogFilters">重置</el-button>
+      </div>
+      <div class="mr-disabled-hint" style="margin: 8px 0 4px">
+        时间区间按 ISO 8601 带时区（UTC）发送；后端只查最近 10000 条窗口，truncated=true 时如实标注截断。
+        ADMIN 为全局范围，其他身份仅本人请求，实际范围以响应 <code>scope</code> 为准；
+        historical_backfill=false 表示不回填历史事件。三个列表各自独立分页。
+      </div>
+
+      <el-divider content-position="left">接口调用记录 · GET /api/system/api-logs</el-divider>
+      <el-empty v-if="!routeApiLogs" :image-size="54" description="运行期未加载该接口，不展示演示记录">
+        <span class="mr-disabled-hint">GET /api/openapi.json 未返回 GET /api/system/api-logs；源码契约已交付不等于活动实例已加载。</span>
+      </el-empty>
+      <AsyncPanel v-else :state="apiLogs.state.value" :error="apiLogs.error.value" empty-text="当前筛选范围内暂无 API 调用记录" @retry="apiLogs.load()">
+        <el-table :data="apiLogs.data.value?.list || []" size="small" max-height="260">
+          <el-table-column label="时间" width="180"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+          <el-table-column label="principal_id" width="180" show-overflow-tooltip><template #default="{ row }">{{ identityText(row.principal_id) }}</template></el-table-column>
+          <el-table-column prop="method" label="方法" width="90" />
+          <el-table-column prop="route" label="路由" min-width="240" show-overflow-tooltip />
+          <el-table-column label="状态码" width="90"><template #default="{ row }"><el-tag size="small" :type="row.status_code >= 400 ? 'danger' : 'success'" effect="plain">{{ row.status_code }}</el-tag></template></el-table-column>
+          <el-table-column prop="duration_ms" label="耗时 ms" width="100" align="right" />
+          <el-table-column prop="level" label="level" width="90" />
+        </el-table>
+        <div class="mr-disabled-hint" style="margin-top: 6px">{{ logMeta(apiLogs.data.value) }}</div>
+        <div class="queue-pager"><el-pagination v-model:current-page="apiPage" :page-size="logPageSize" :total="apiLogs.data.value?.total || 0" layout="total, prev, pager, next" small background @current-change="apiLogs.load()" /></div>
+      </AsyncPanel>
+
+      <el-divider content-position="left">错误日志 · GET /api/system/error-logs</el-divider>
+      <el-empty v-if="!routeErrorLogs" :image-size="54" description="运行期未加载该接口，不展示演示记录">
+        <span class="mr-disabled-hint">GET /api/openapi.json 未返回 GET /api/system/error-logs。</span>
+      </el-empty>
+      <AsyncPanel v-else :state="errorLogs.state.value" :error="errorLogs.error.value" empty-text="当前筛选范围内暂无错误日志" @retry="errorLogs.load()">
+        <el-table :data="errorLogs.data.value?.list || []" size="small" max-height="260">
+          <el-table-column label="时间" width="180"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+          <el-table-column label="principal_id" width="180" show-overflow-tooltip><template #default="{ row }">{{ identityText(row.principal_id) }}</template></el-table-column>
+          <el-table-column prop="method" label="方法" width="90" />
+          <el-table-column prop="route" label="路由" min-width="240" show-overflow-tooltip />
+          <el-table-column label="状态码" width="90"><template #default="{ row }"><el-tag size="small" type="danger" effect="plain">{{ row.status_code }}</el-tag></template></el-table-column>
+          <el-table-column prop="duration_ms" label="耗时 ms" width="100" align="right" />
+          <el-table-column prop="level" label="level" width="90" />
+        </el-table>
+        <div class="mr-disabled-hint" style="margin-top: 6px">{{ logMeta(errorLogs.data.value) }}</div>
+        <div class="queue-pager"><el-pagination v-model:current-page="errorPage" :page-size="logPageSize" :total="errorLogs.data.value?.total || 0" layout="total, prev, pager, next" small background @current-change="errorLogs.load()" /></div>
+      </AsyncPanel>
+
+      <el-divider content-position="left">任务阶段日志 · GET /api/parse/tasks/{task_id}/logs</el-divider>
+      <el-alert v-if="taskLogs.data.value && !taskLogs.data.value.available" type="warning" :closable="false" style="margin-bottom: 10px"
+        :title="`历史阶段日志不可用：${taskLogs.data.value.reason || '后端未给出原因'}`"
+        description="后端只返回真实保存过的状态变化；historical_events_not_recorded 表示历史未记录，页面不回填、不补造阶段事件。" />
+      <el-empty v-if="!routeTaskLogs" :image-size="54" description="运行期未加载该接口，不展示演示记录">
+        <span class="mr-disabled-hint">GET /api/openapi.json 未返回 GET /api/parse/tasks/{task_id}/logs。</span>
+      </el-empty>
+      <el-empty v-else-if="!taskLogId.trim()" :image-size="54" description="请填写后端返回的真实 task_id 后查询" />
+      <AsyncPanel v-else :state="taskLogs.state.value" :error="taskLogs.error.value" empty-text="该任务暂无已保存的阶段事件" @retry="taskLogs.load()">
+        <el-table :data="taskLogs.data.value?.list || []" size="small" max-height="260">
+          <el-table-column type="expand">
+            <template #default="{ row }"><pre class="log-pre">{{ asJson(row.files || []) }}</pre></template>
+          </el-table-column>
+          <el-table-column label="时间" width="180"><template #default="{ row }">{{ formatTime(row.timestamp) }}</template></el-table-column>
+          <el-table-column prop="kind" label="事件类型" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="140" />
+          <el-table-column label="文件数" width="90" align="right"><template #default="{ row }">{{ (row.files || []).length }}</template></el-table-column>
+        </el-table>
+        <div class="mr-disabled-hint" style="margin-top: 6px">
+          {{ logMeta(taskLogs.data.value) }} · 记录起始 {{ formatTime(taskLogs.data.value?.recording_started_at || '') }}
+        </div>
+        <div class="queue-pager"><el-pagination v-model:current-page="taskPage" :page-size="logPageSize" :total="taskLogs.data.value?.total || 0" layout="total, prev, pager, next" small background @current-change="taskLogs.load()" /></div>
+      </AsyncPanel>
+    </el-card>
 
     <el-card v-if="!v023Monitoring" shadow="never" style="margin-top: 16px">
       <template #header><div class="card-head"><span>操作审计日志</span><span class="card-sub">运行期未加载 v0.2.3 审计接口</span></div></template>
@@ -301,10 +384,11 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import { tokenStorageMode } from '@/api/client'
 import { getSystemHealth } from '@/api/frontend'
 import { getProcessResources, getAuditLogs } from '@/api/reviewWrite'
+import { listApiLogs, listErrorLogs, getTaskLogs, loadCapabilities } from '@/api/ops'
 import {
   contractState, contractMeta, contractLabel, probeContract,
   CONTRACT_ROUTES, CONTRACT_ROUTES_V023, MISSING_CAPABILITIES,
-  hasV023Monitoring, hasRuntimeRoutes
+  hasV023Monitoring, hasRuntimeRoutes, hasRuntimeMethod
 } from '@/api/dataSource'
 import { releaseStatus } from '@/config/release'
 import {
@@ -312,7 +396,8 @@ import {
   loadPrincipal, principalRoleText, principalScopeText, identityText
 } from '@/api/principal'
 import type {
-  ComponentState, HealthResponse, ProcessResources, AuditLogItem, ListResponse
+  ComponentState, HealthResponse, ProcessResources, AuditLogItem, ListResponse,
+  LogQuery, OperationalLogPage, TaskLogPage
 } from '@/api/types'
 
 /**
@@ -320,7 +405,8 @@ import type {
  * - 组件五态来自 GET /api/system/health 真实响应，不再用静态表或旧接口探活推断
  * - 契约状态来自运行期 GET /api/openapi.json 探测，明确区分「源码已交付」与「活动实例已加载」
  * - 接口总览采用 CONTRACT_ROUTES / MISSING_CAPABILITIES 源码清单，计数不依赖已废弃的静态能力开关
- * - 资源监控、三类日志、操作审计均无 HTTP 实现 → 空态，零 DEMO 记录
+ * - draft-4 运行日志（api-logs / error-logs / 任务阶段日志）按运行期方法级门控接入；
+ *   未加载路由、历史未记录一律真实空态，零 DEMO 记录
  */
 const store = useAppStore()
 const tokenInput = ref(store.token)
@@ -350,6 +436,17 @@ function normalizeState(value: string): ComponentState {
 }
 function stateColorOf(s: ComponentState): string { return STATE_COLOR[s] }
 const stateColor = computed(() => STATE_COLOR[store.apiState])
+/** 服务端权限口径仅展示与收紧，不用作放宽依据；旧实例不返回时如实标注 */
+const principalPermissionsText = computed(() => {
+  const p = principal.value
+  if (principalState.value !== 'ready' || !p) return '未确认'
+  const list = p.permissions || []
+  return list.length ? list.join('、') : '服务端未返回（按角色与逐请求授权判定）'
+})
+const principalDataScopeText = computed(() => {
+  if (principalState.value !== 'ready' || !principal.value) return '未确认'
+  return principal.value.data_scope || '未标注（按 scoped 处理，不代表全局范围）'
+})
 const stateLabel = computed(() => {
   if (store.apiState === 'ONLINE') return '真实探活成功（/api/parse/info 返回 200）；此结论不覆盖 v0.2.2 新接口'
   if (store.apiState === 'OFFLINE') return '探活失败 — 请确认 8180 服务已启动、Token 有效'
@@ -400,11 +497,63 @@ const componentRows = computed<ComponentRow[]>(() =>
   })
 )
 
-const missingModules = [
-  { title: '系统资源', hint: '运行期未加载 v0.2.3 时保持空态', api: 'GET /api/system/resources（源码契约已交付）' },
-  { title: '接口调用记录', hint: '接口未实现', api: 'GET /api/system/api-logs' },
-  { title: '错误日志', hint: '接口未实现', api: 'GET /api/system/error-logs' }
-]
+/* ───────── draft-4 运行日志：三路独立门控 / 独立分页 ───────── */
+const routeApiLogs = computed(() => hasRuntimeMethod('GET', '/api/system/api-logs'))
+const routeErrorLogs = computed(() => hasRuntimeMethod('GET', '/api/system/error-logs'))
+const routeTaskLogs = computed(() => hasRuntimeMethod('GET', '/api/parse/tasks/{task_id}/logs'))
+
+const logDateRange = ref<[string, string] | null>(null)
+const logLevel = ref('')
+const taskLogId = ref('')
+const apiPage = ref(1)
+const errorPage = ref(1)
+const taskPage = ref(1)
+const logPageSize = 20
+
+/** 本地时间字符串 → ISO 8601 UTC（带 Z），满足后端「日期区间必须带时区」 */
+function isoOf(v: string): string {
+  if (!v) return ''
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString()
+}
+function logQuery(page: number): LogQuery {
+  const [from, to] = logDateRange.value || ['', '']
+  return {
+    page, pageSize: logPageSize,
+    dateFrom: isoOf(from), dateTo: isoOf(to), level: logLevel.value
+  }
+}
+const apiLogs = useAsyncData<OperationalLogPage>(
+  (signal) => listApiLogs(logQuery(apiPage.value), signal), { immediate: false }
+)
+const errorLogs = useAsyncData<OperationalLogPage>(
+  (signal) => listErrorLogs(logQuery(errorPage.value), signal), { immediate: false }
+)
+const taskLogs = useAsyncData<TaskLogPage>(
+  (signal) => getTaskLogs(taskLogId.value.trim(), logQuery(taskPage.value), signal), { immediate: false }
+)
+
+function loadAllLogs() {
+  if (routeApiLogs.value) void apiLogs.load()
+  if (routeErrorLogs.value) void errorLogs.load()
+  if (routeTaskLogs.value && taskLogId.value.trim()) void taskLogs.load()
+}
+function resetLogFilters() {
+  logDateRange.value = null
+  logLevel.value = ''
+  taskLogId.value = ''
+  apiPage.value = errorPage.value = taskPage.value = 1
+  loadAllLogs()
+}
+/** 契约就绪 / 路由加载后再请求；未加载时不发请求，界面保持真实空态 */
+watch([routeApiLogs, routeErrorLogs, routeTaskLogs, contractState], () => loadAllLogs(), { immediate: true })
+
+function logMeta(data: OperationalLogPage | TaskLogPage | null): string {
+  if (!data) return ''
+  const scope = 'scope' in data ? ` · scope=${data.scope}` : ''
+  return `source=${data.source}${scope} · total=${data.total} · truncated=${data.truncated} · historical_backfill=${data.historical_backfill}`
+}
+function asJson(v: unknown): string { return JSON.stringify(v ?? {}, null, 2) }
 
 async function saveToken() {
   if (!tokenInput.value || tokenInput.value.length < 32) {
@@ -414,9 +563,9 @@ async function saveToken() {
   await store.saveToken(tokenInput.value)
   await health.load()
   if (store.apiState === 'ONLINE' && contractState.value === 'ready') {
-    ElMessage.success('Token 有效，旧解析接口与 v0.2.2 契约均已就绪')
+    ElMessage.success('Token 有效，旧解析接口与运行期契约均已就绪')
   } else if (store.apiState === 'ONLINE') {
-    ElMessage.warning('Token 有效，但活动实例未加载 v0.2.2 契约，新接口暂不可用')
+    ElMessage.warning('Token 有效，但运行期契约探测未通过，新接口暂不可用')
   } else {
     ElMessage.warning('Token 已保存到当前会话，但未能连接后端，请确认服务已启动')
   }
@@ -427,6 +576,8 @@ async function reprobe() {
   try {
     await probeContract(true)
     await Promise.all([health.load(), loadPrincipal(true)])
+    loadAllLogs()
+    void loadCapabilities()
   } finally {
     probing.value = false
   }
@@ -446,6 +597,9 @@ onMounted(() => {
 .conn-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .conn-note { font-size: 13px; color: var(--mr-text-2); }
 .token-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.log-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.queue-pager { display: flex; justify-content: flex-end; margin-top: 8px; }
+.log-pre { font-family: var(--mr-font); font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; margin: 0; padding: 8px; }
 .security-note {
   margin-top: 12px; padding: 12px 14px; border: 1px solid #d5e5ff;
   background: #f5f9ff; border-radius: var(--mr-radius);

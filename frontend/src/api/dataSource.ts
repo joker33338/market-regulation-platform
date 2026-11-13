@@ -9,14 +9,21 @@ import type { DataSource } from './types'
  *
  * 重大变更（相对 v0.2.1）：能力开关**不再硬编码 true/false**。
  * 「源码已交付」与「运行期可用」是两件事：
- *   - 后端 feat/backend-api-v0.2.2 @ 4fc4cf1 已实现 22 条路径并导出离线 OpenAPI 快照；
+ *   - v0.2.2 基线曾导出离线 OpenAPI 快照；draft-4 起路径数、契约版本与能力一律以运行期探测为准，
+ *     不写死版本 SHA 或路径总数；
  *   - 但活动 8180 实例仍为 v0.2.1 旧镜像，实测新接口全部 404。
  * 因此页面一律以运行期 GET /api/openapi.json 的探测结果为准：
  *   ready → 允许真实数据渲染；其余状态 → AsyncPanel 显示明确异常态 + 重试，绝不回退 DEMO。
  *
- * v0.2.3 draft-2（30 路径）补充：新增 GET /api/auth/me 作为当前登录人员的唯一事实来源；
- * principal_id 与 owner_id 分离，写授权由后端按 REVIEWER 角色 + review_owner_scopes 逐请求判定。
+ * v0.2.3 draft-2 阶段补充：新增 GET /api/auth/me 作为当前登录人员的唯一事实来源；
+ * principal_id 与 owner_id 分离，写授权由后端按角色 + 范围逐请求判定。
  * 旧 draft-1 的「Token→owner→writers 名单」说明不再适用于当前契约（历史记录保留原事实）。
+ *
+ * v0.2.3 draft-4（46 路径，handoff e24cbad）补充：ADMIN 拥有全部业务权限（覆盖 draft-2
+ * 「ADMIN 不隐含 REVIEWER」旧口径）；新增账号密码登录 / 登出、管理员账号管理与审计、
+ * GET /api/system/capabilities 能力声明、API/错误/任务阶段日志、入库批次 / 预检 / 发布 / 回滚、
+ * 检索新筛选（kb_version / issuing_authority / effective_status）与 DELETE /api/documents/{file_id}。
+ * 活动实例是否加载上述能力一律以本模块的方法级探测为准：源码已交付 ≠ 运行期可用。
  */
 
 export type ContractState =
@@ -55,7 +62,7 @@ export const contractLabel = computed<Record<ContractState, string>>(() => ({
   error: '探测失败'
 }))
 
-/** v0.2.3 新增路由（draft-1 为 29 路径；draft-2 再增 /api/auth/me 共 30 路径） */
+/** v0.2.3 草稿阶段新增路由；当前可用路径一律以运行期方法级探测为准 */
 export const V023_IDENTITY_ROUTE = '/api/auth/me'
 export const V023_REVIEW_WRITE_ROUTES = [
   '/api/review/{parse_id}/approve',
@@ -68,6 +75,26 @@ export const V023_READ_ROUTES = [
   '/api/system/resources',
   '/api/system/audit-logs'
 ] as const
+
+/** v0.2.3 draft-4 相对 draft-2 新增的 16 条路径（46 路径口径，源码契约清单） */
+export const CONTRACT_ROUTES_V023_DRAFT4: ContractRoute[] = [
+  { method: 'POST', path: '/api/auth/login', page: '登录页（账号密码登录，匿名可调用）', group: 'new' },
+  { method: 'POST', path: '/api/auth/logout', page: '全局（服务端撤销当前会话）', group: 'new' },
+  { method: 'GET', path: '/api/auth/roles', page: '账号管理（角色定义口径）', group: 'new' },
+  { method: 'GET', path: '/api/admin/accounts', page: '账号管理（账号列表）', group: 'new' },
+  { method: 'POST', path: '/api/admin/accounts', page: '账号管理（创建账号）', group: 'new' },
+  { method: 'PATCH', path: '/api/admin/accounts/{principal_id}', page: '账号管理（角色/范围/状态/密码）', group: 'new' },
+  { method: 'GET', path: '/api/admin/account-events', page: '账号管理（账号变更审计）', group: 'new' },
+  { method: 'GET', path: '/api/system/capabilities', page: '系统监控（能力声明）', group: 'new' },
+  { method: 'GET', path: '/api/system/api-logs', page: '系统监控（API 访问日志）', group: 'new' },
+  { method: 'GET', path: '/api/system/error-logs', page: '系统监控（错误日志）', group: 'new' },
+  { method: 'GET', path: '/api/parse/tasks/{task_id}/logs', page: '解析中心（任务阶段日志）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/precheck', page: '入库管理（入库预检，只读）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/batches', page: '入库管理（创建入库批次，ADMIN）', group: 'new' },
+  { method: 'GET', path: '/api/ingestion/batches', page: '入库管理（批次历史）', group: 'new' },
+  { method: 'GET', path: '/api/ingestion/version-check', page: '入库管理（版本技术条件）', group: 'new' },
+  { method: 'POST', path: '/api/ingestion/publish、/rollback', page: '入库管理（发布 / 回滚，ADMIN）', group: 'new' }
+]
 
 /** 运行期 OpenAPI 实际返回的路径；源码里存在某接口不等于活动服务已加载 */
 export const runtimePaths = ref<string[]>([])
@@ -129,6 +156,49 @@ export function hasV023Identity(): boolean {
   return hasRuntimeRoutes([V023_IDENTITY_ROUTE])
 }
 
+/* ───────────── v0.2.3 draft-4 方法级门控（8180 正式实例未加载时一律 false） ───────────── */
+
+/** POST /api/auth/login 是否可用：账号密码登录表单据此显示/提交 */
+export function hasPasswordLogin(): boolean {
+  return hasRuntimeMethod('POST', '/api/auth/login')
+}
+
+/** POST /api/auth/logout 是否可用：登出才尝试服务端撤销，否则仅清本机会话 */
+export function hasServerLogout(): boolean {
+  return hasRuntimeMethod('POST', '/api/auth/logout')
+}
+
+/** 管理员账号管理是否可用（GET /api/admin/accounts 方法级） */
+export function hasAdminAccounts(): boolean {
+  return hasRuntimeMethod('GET', '/api/admin/accounts')
+}
+
+/** 运行日志（API 日志 / 错误日志）是否可用 */
+export function hasOperationalLogs(kind: 'api-logs' | 'error-logs'): boolean {
+  return hasRuntimeMethod('GET', `/api/system/${kind}`)
+}
+
+/** 任务阶段日志是否可用 */
+export function hasTaskLogs(): boolean {
+  return hasRuntimeMethod('GET', '/api/parse/tasks/{task_id}/logs')
+}
+
+/** 入库批次（历史查询）是否可用 */
+export function hasIngestionBatches(): boolean {
+  return hasRuntimeMethod('GET', '/api/ingestion/batches')
+}
+
+/** 入库预检（只读）是否可用 */
+export function hasIngestionPrecheck(): boolean {
+  return hasRuntimeMethod('POST', '/api/ingestion/precheck')
+}
+
+/** 发布 / 回滚（ADMIN 写操作）是否可用 */
+export function hasIngestionRelease(): boolean {
+  return hasRuntimeMethod('POST', '/api/ingestion/publish') &&
+    hasRuntimeMethod('POST', '/api/ingestion/rollback')
+}
+
 let inflight: Promise<ContractState> | null = null
 
 /** 运行期能力探测；并发调用共用同一 Promise，避免页面切换重复请求 */
@@ -156,7 +226,7 @@ export function probeContract(force = false): Promise<ContractState> {
         contractVersion: doc?.info?.['x-contract-version'] || '',
         pathCount: paths.length,
         hint: hasNewRoutes
-          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}`
+          ? `运行期 OpenAPI 返回 ${paths.length} 条路径（${doc?.info?.version || '版本未知'}）；${hasV023 ? 'v0.2.3 审核台账等新增路由已加载，写按钮仍须逐对象确认写授权' : '未加载 v0.2.3 新增路由，审核写入等能力保持禁用'}${paths.includes('/api/auth/login') ? '；draft-4 账号登录 / 管理员账号 / 入库 / 日志接口已加载' : ''}`
           : `运行期 OpenAPI 仅返回 ${paths.length} 条路径，缺少 /api/documents 等新增路由；活动实例仍是旧镜像`
       }
       contractState.value = hasNewRoutes ? 'ready' : 'outdated'
@@ -287,15 +357,15 @@ export function isDemo(_key: CapabilityKey): boolean {
 }
 
 export const MISSING_CAPABILITIES: MissingCapability[] = [
-  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'draft-2 源码契约已交付；运行期未加载路由、当前 principal 无 REVIEWER 角色、目标 owner 不在后端审核范围，或详情双门控未通过时保持禁用，绝不本地假成功' },
+  { priority: 'P0', api: 'POST /api/review/{parse_id}/approve', usage: '审核通过', impact: 'draft-2 起源码契约已交付；运行期未加载路由、当前 principal 无审核权限、目标 owner 不在授权范围，或详情双门控未通过时保持禁用，绝不本地假成功' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/reject', usage: '退回重新解析', impact: '同上：双门控（运行期路径 + 详情 review_write_supported / review_ledger.available）' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/mark-error', usage: '标记识别错误', impact: '同上：必填 reason 与真实 page，失败按 409/422/403/503 明确提示' },
   { priority: 'P0', api: 'POST /api/review/{parse_id}/save-revision', usage: '保存人工修订（含审计留痕）', impact: '同上：修订正文按不可信纯文本渲染，不覆盖原始解析结果' },
-  { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: '入库页「发起入库批次」禁用' },
-  { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: '入库页不开放发布/回滚' },
-  { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: '解析中心日志仅能展示 public(task) 真实字段' },
-  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: '仍无真实持久化事件来源，系统监控保持「未接入」空态，不编造历史事件' },
-  { priority: 'P1', api: 'DELETE /api/documents/{file_id}', usage: '文档删除（单行 / 多选批量）', impact: 'v0.2.2 与 v0.2.3 契约均只声明 GET，原始证据只读；前端多选可用，删除按钮按运行期方法级门控保持禁用，不做本地假删除' }
+  { priority: 'P1', api: 'POST /api/ingestion/batches', usage: '正式入库批次 / 批次授权', impact: 'draft-4 源码契约已交付（ADMIN + 幂等键）；运行期未加载路由或非 ADMIN 时保持禁用' },
+  { priority: 'P1', api: 'POST /api/ingestion/publish、/rollback', usage: 'ACTIVE 发布与回滚', impact: 'draft-4 源码契约已交付（ADMIN + expected_active_version + 幂等键）；运行期未加载或独立入库写库未配置（503）时如实报错，不本地假成功' },
+  { priority: 'P1', api: 'GET /api/parse/tasks/{task_id}/logs', usage: '结构化解析阶段日志', impact: 'draft-4 源码契约已交付；运行期未加载路由时解析中心日志按钮禁用；历史未记录任务返回 available=false，不回填' },
+  { priority: 'P1', api: 'GET /api/system/api-logs、/error-logs', usage: 'API 访问日志 / 错误日志', impact: 'draft-4 源码契约已交付；运行期未加载路由时系统监控保持「未接入」空态，不编造历史事件' },
+  { priority: 'P1', api: 'DELETE /api/documents/{file_id}', usage: '文档删除（单行 / 多选批量）', impact: 'draft-4 源码契约已声明（仅 ADMIN，未形成证据链的软删除）；运行期按方法级门控解锁，403/409/503 不本地移除行，成功后重新拉取列表确认' }
 ]
 
 /** v0.2.3 draft-2 相对 v0.2.2 新增的 8 条路径（源码契约清单，运行期是否可用看 hasRuntimeRoutes） */

@@ -25,7 +25,7 @@
       :closable="false"
       show-icon
       title="后端服务未加载所需契约路由"
-      description="运行期探测 /api/openapi.json 失败或缺少新增路由：正式 8180 仍为 v0.2.2（22 路径），v0.2.3 draft-2 的 30 路径需在获准隔离实例上验证。按后端交付约定，切换镜像需用户明确授权；本页不会用离线快照、Mock 或 DEMO 冒充真实响应。"
+      description="运行期探测 /api/openapi.json 失败或未声明所需路由 / 方法：活动实例的路径数与契约版本一律以实测为准，不沿用离线快照中的数字。新契约须在经授权的隔离实例上验证，切换镜像需用户明确授权；本页不会用离线快照、Mock 或 DEMO 冒充真实响应。"
     >
       <template #default>
         <p v-if="error" class="ap-detail">{{ error }}</p>

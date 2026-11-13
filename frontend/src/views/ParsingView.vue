@@ -128,7 +128,11 @@
               <el-button text size="small" type="primary" @click="queryRealTaskById(String(row.taskId))">详情</el-button>
               <el-button text size="small" @click="viewLogs(String(row.taskId))">日志</el-button>
               <el-button text size="small" @click="gotoPreview(String(row.taskId), String(row.firstFileId))">Chunk 预览</el-button>
-              <el-button text size="small" :disabled="isTerminalStatus(String(row.status))" @click="retryById(String(row.taskId))">重试</el-button>
+              <el-tooltip :content="canRetryStatus(String(row.status))
+                ? '提交 POST /api/parse/tasks/{task_id}/resume；是否可恢复以后端返回为准'
+                : '任务进行中或已成功完成，无需重试'" placement="top">
+                <span><el-button text size="small" :disabled="!canRetryStatus(String(row.status))" @click="retryById(String(row.taskId))">重试</el-button></span>
+              </el-tooltip>
             </template>
           </el-table-column>
         </template>
@@ -172,7 +176,7 @@
             <el-button size="small" @click="loadResults">标准化结果</el-button>
             <el-button size="small" @click="loadErrors">错误原因</el-button>
             <el-button size="small" :disabled="!realDetail.files.length" @click="downloadArtifact">下载解析产物</el-button>
-            <el-button size="small" @click="retryReal">重试任务</el-button>
+            <el-button size="small" :disabled="!canRetryStatus(realDetail.status)" @click="retryReal">重试任务</el-button>
             <el-button size="small" :disabled="isTerminalStatus(realDetail.status)" @click="cancelReal">取消任务</el-button>
             <el-button size="small" :disabled="!realDetail.files.length" @click="gotoPreview(realDetail.task_id, realDetail.files[0].file_id)">Chunk 预览</el-button>
           </div>
@@ -211,7 +215,7 @@ import {
   resumeParseTask, cancelParseTask, createParseTask
 } from '@/api/parse'
 import {
-  isTerminalStatus, type ComponentState, type HealthResponse,
+  isTerminalStatus, canRetryStatus, type ComponentState, type HealthResponse,
   type ParseTask, type TaskList, type TaskQuery
 } from '@/api/types'
 import type { LoadState } from '@/api/types'

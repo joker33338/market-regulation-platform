@@ -76,7 +76,7 @@ function hintOf(status: number, kind: ApiErrorKind, code: string): string {
         ? `凭证无效、被停用/撤销或未认证${suffix}，请在系统监控页配置有效会话凭证`
         : `无权访问（HTTP 403）${suffix}：当前 principal 无该操作权限，或目标不在 REVIEWER 审核范围`
     case 'outdated':
-      return `接口不存在（HTTP 404）${suffix}：活动实例未加载该契约路由（正式 8180 仍为 v0.2.2 / 22 路径）`
+      return `接口不存在（HTTP 404）${suffix}：活动实例未在运行期契约中声明该路由或方法（以 GET /api/openapi.json 实测为准）`
     case 'unavailable':
       return status === 0
         ? '无法连接后端服务，请确认 8180 端口与 Vite 代理可用'

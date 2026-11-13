@@ -37,6 +37,9 @@
           <el-menu-item index="/knowledge/ingestion">入库管理</el-menu-item>
           <el-menu-item index="/knowledge/search">知识检索</el-menu-item>
         </el-sub-menu>
+        <el-menu-item index="/admin/accounts">
+          <el-icon><User /></el-icon><span>账号与权限</span>
+        </el-menu-item>
         <el-menu-item index="/system">
           <el-icon><Setting /></el-icon><span>系统监控</span>
         </el-menu-item>
@@ -70,9 +73,10 @@
                 <el-dropdown-item disabled>业务数据归属：{{ principalOwnerText }}</el-dropdown-item>
                 <el-dropdown-item disabled>角色：{{ principalRoleText }}</el-dropdown-item>
                 <el-dropdown-item disabled>审核范围：{{ principalScopeText }}</el-dropdown-item>
+                <el-dropdown-item disabled>登录方式：{{ store.authMode === 'password' ? '账号密码（服务端会话）' : 'API Token（独立凭证）' }}</el-dropdown-item>
                 <el-dropdown-item divided @click="refreshIdentity">重新确认身份（GET /api/auth/me）</el-dropdown-item>
                 <el-dropdown-item @click="goSystem">API Token 配置</el-dropdown-item>
-                <el-dropdown-item divided @click="logout">清除 Token</el-dropdown-item>
+                <el-dropdown-item divided @click="logout">{{ store.authMode === 'password' ? '退出登录（撤销会话）' : '清除 Token' }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -89,8 +93,9 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
-  Monitor, FolderOpened, Cpu, View, Collection, Setting, UserFilled, ArrowDown
+  Monitor, FolderOpened, Cpu, View, Collection, Setting, UserFilled, ArrowDown, User
 } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { releaseStatus } from '@/config/release'
@@ -136,8 +141,21 @@ function probe() {
 function goSystem() {
   router.push('/system')
 }
-function logout() {
-  store.logout()
+
+/**
+ * 退出登录：账号会话先尝试服务端撤销（POST /api/auth/logout，仅 draft-4 新会话支持）；
+ * 旧独立 Token（409）或网络失败只清本机会话，并如实提示，不宣称服务端已撤销。
+ */
+async function logout() {
+  const wasPassword = store.authMode === 'password'
+  const revoked = await store.logout()
+  if (wasPassword) {
+    if (revoked) ElMessage.success('会话已在服务端撤销，本地凭证已清除')
+    else ElMessage.warning('已清除本机会话；服务端撤销未确认（旧 Token 不支持或网络失败）')
+  } else {
+    ElMessage.success('已清除本机会话凭证（旧独立 Token 不支持服务端撤销）')
+  }
+  router.push('/login')
 }
 
 onMounted(() => {
