@@ -45,13 +45,13 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'library/laws',
-        name: 'LawLibrary',
+        name: 'LibraryLaws',
         component: () => import('@/views/LawLibraryView.vue'),
         meta: { title: '法规库' }
       },
       {
         path: 'library/cases',
-        name: 'CaseLibrary',
+        name: 'LibraryCases',
         component: () => import('@/views/CaseLibraryView.vue'),
         meta: { title: '处罚案例库' }
       },

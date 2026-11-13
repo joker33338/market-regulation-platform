@@ -339,7 +339,29 @@ html { scrollbar-color: #b9c9e2 #f2f5fa; }
 .lib-source-fallback { padding: 14px; font-size: 13px; color: var(--mr-text-2); }
 .lib-desc { margin-bottom: 4px; }
 .mono { font-family: monospace; font-size: 12px; }
+/* ───────── Phase 2：L1/L2 两层状态区、页内主从、窄屏卡片列表 ───────── */
+.lib-state { min-height: 24px; }
+.lib-l1 { padding: 4px 0; }
+.lib-l1-head { display: flex; align-items: center; gap: 10px; }
+.lib-l1-title { font-size: 15px; font-weight: 600; color: var(--mr-text-1); }
+.lib-l1-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.lib-crumbs { margin: 2px 0 12px; font-size: 13px; }
+.lib-detail-card { margin-top: 14px; }
+.lib-card-list { display: flex; flex-direction: column; gap: 10px; }
+.lib-record-card {
+  padding: 12px; border: 1px solid var(--mr-line); border-radius: var(--mr-radius);
+  background: var(--mr-surface); box-shadow: var(--mr-shadow);
+}
+.lib-record-title { font-size: 14px; font-weight: 600; color: var(--mr-text-1); margin-bottom: 6px; word-break: break-word; }
+.lib-record-meta {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  font-size: 12px; color: var(--mr-text-2); margin-bottom: 5px; word-break: break-word;
+}
 @media (max-width: 1366px) {
   .lib-filter-row { gap: 8px; }
   .lib-field-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .lib-crumbs { margin-bottom: 10px; }
+  .lib-record-card { padding: 10px; }
 }

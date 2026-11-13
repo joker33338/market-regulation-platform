@@ -20,7 +20,7 @@ import type {
  * 事实边界：
  *  - 相对 draft-4 为纯增量 8 条 GET，无删除、无既有方法变更；CapabilitiesResponse
  *    未新增 library 字段，可用性只能由 hasRuntimeMethod('GET', path) 方法级门控决定。
- *  - 页面在路由未加载时**不调用本模块任何函数**（useAsyncData immediate:false + watch），
+ *  - 页面在路由未加载时**不调用本模块任何函数**（页面局部 useLibraryQuery 门控先行），
  *    因此本模块不做能力探测；探测结果由调用方负责。
  *  - 查询参数全部 snake_case 白名单；附加未知字段会 422。法规库绝不构造 violation 键，
  *    kb_version 只由调用方在 ADMIN 身份下传入；空值一律不发送。
@@ -28,12 +28,12 @@ import type {
  *  - source_url 仍需 Bearer：原件字节必须走 documentFiles.getSourceFile() 的认证
  *    ArrayBuffer → Blob URL 路径，绝不能直接塞进 iframe / img。
  *
- * 404 语义修正（不改全局错误层）：
- *  - errors.ts 的 NEW_API_MARKERS 不含 /api/library/，useAsyncData.kindToState 会把
- *    not-found / outdated 误映射为「后端服务未加载所需契约路由」。本模块在每个请求内
- *    用 .catch() 把 404 / 422 / 503 重新抛成 kind='error' 的 ApiError 并给出准确中文提示，
- *    让 AsyncPanel 走 el-alert type=error 常显分支；其它错误（401 / 403 / 5xx / 网络）
- *    原样抛出，仍由统一错误层处理。
+ * 错误归一化定位（兜底，不参与页面门控 / 状态映射）：
+ *  - 页面状态一律由 src/views/library/useLibraryQuery.ts 按 status + code 精确映射；
+ *    门控态只由 hasToken → probeContract → hasRuntimeMethod 判定，绝不从响应 404 反推；
+ *  - 本模块仅在 .catch() 内把 404 / 422 / 503 重抛为保留 status 与 code 的 ApiError，
+ *    避免异常穿透到页面；hint 只是兜底文案，页面使用 Phase 2 统一文案、不展示这里原文。
+ *  - 其它错误原样抛出，仍由统一错误层处理；不改 errors.ts / useAsyncData / AsyncPanel。
  */
 
 /** 8 条 draft-5 路由（OpenAPI 模板路径，供页面展示运行期状态表与方法级门控） */
@@ -61,13 +61,14 @@ export const LIBRARY_ARTICLES_PATH = '/api/library/laws/{doc_version_id}/article
 export const LIBRARY_ARTICLE_PATH = '/api/library/laws/{doc_version_id}/articles/{article_id}'
 export const LIBRARY_REFERENCES_PATH = '/api/library/cases/{doc_version_id}/references'
 
-const HINT_404 = '未找到该对象，或它不在当前身份的可见范围内；后端对越界与不存在统一返回 404，不泄露对象是否存在'
-const HINT_422 = '请求参数不被接受（422），请检查分页 / 筛选参数'
-const HINT_503_SCHEMA = '已发布版本存在，但新版库结构未安装（503），这不是空数据，请联系维护方'
+/* 兜底文案（Phase 2 口径）：页面不展示这里的 hint，只按 status + code 取统一文案 */
+const HINT_404 = '未找到该对象，或它不在当前身份的可见范围内。出于安全考虑不区分「不存在」与「无权访问」，请返回列表重新选择。'
+const HINT_422 = '请求参数不被接受（422）：请检查分页与筛选参数；空值一律不发送。'
+const HINT_503_SCHEMA = '已发布版本存在，但新库 Schema 未安装（library_schema_not_installed）。这不是空数据，请联系管理员完成安装后重试。'
 
 /**
- * 把 library 接口的 404 / 422 / 503 归一化为 kind='error'，避免 AsyncPanel 的
- * outdated 分支误报「运行期探测失败 / 路由未声明」，也避免 503 被当成空数据。
+ * 兜底：把 library 接口的 404 / 422 / 503 重抛为保留 status / code 的 ApiError，
+ * 仅用于避免异常穿透；页面状态不依赖这里的 kind 或 hint。
  * 其它错误原样抛出，交给统一错误层。
  */
 function normalizeLibraryError(err: unknown): never {
@@ -77,14 +78,14 @@ function normalizeLibraryError(err: unknown): never {
   }
   if (e.status === 422) {
     const hint = e.code === 'violation_filter_case_only'
-      ? `${HINT_422}（violation_filter_case_only：violation 仅案例库支持，法规库不得发送该参数）`
+      ? '请求参数不被接受（422，violation_filter_case_only）：violation 仅案例库支持，法规库不得发送该参数。'
       : HINT_422
     throw new ApiError(422, e.code, 'error', hint)
   }
   if (e.status === 503) {
     const hint = e.code === 'library_schema_not_installed'
       ? HINT_503_SCHEMA
-      : `知识库读取服务暂不可用（503${e.code ? `，${e.code}` : ''}），这不是空数据，请稍后重试或联系维护方`
+      : '后端服务暂不可用或请求失败：未展示任何替代数据，请稍后重试。'
     throw new ApiError(503, e.code, 'error', hint)
   }
   throw e
