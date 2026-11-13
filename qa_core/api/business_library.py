@@ -174,7 +174,11 @@ class LibraryStore(ReviewReader):
 
 
 def register_business_library(app,principal,reader):
-    router=APIRouter(tags=['business-library'])
+    def version_access(kb_version:str|None=Query(None,min_length=1,max_length=128),identity=Depends(principal)):
+        if kb_version is not None and not identity.is_admin:
+            raise MinerUError('library_version_selection_admin_only',403)
+
+    router=APIRouter(tags=['business-library'],dependencies=[Depends(version_access)])
 
     def store():
         if not reader.kb_dsn:

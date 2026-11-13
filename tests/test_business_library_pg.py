@@ -153,6 +153,7 @@ class BusinessLibraryPGTests(unittest.TestCase):
             self.assertEqual(r.json()['total'],1)
             self.assertEqual(f.client.get('/api/library/cases/c2',headers=f.auth).status_code,404)
             self.assertEqual(f.client.get('/api/library/laws?page_size=0',headers=f.auth).status_code,422)
+            self.assertEqual(f.client.get('/api/library/laws?kb_version=v1',headers=f.auth).status_code,403)
             schema=f.client.get('/api/openapi.json',headers=f.auth).json()
             self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-draft-5')
             self.assertEqual(f.client.get('/api/system/capabilities',headers=f.auth).json()['contract_version'],schema['info']['x-contract-version'])
