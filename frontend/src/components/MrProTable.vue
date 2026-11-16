@@ -7,6 +7,7 @@
           v-if="col.search?.el === 'input'"
           v-model="searchModel[col.prop]"
           :placeholder="col.search.placeholder || `搜索${col.label}`"
+          :aria-label="col.label"
           clearable
           style="width: 220px"
           @keyup.enter="search"
@@ -16,6 +17,7 @@
           v-model="searchModel[col.prop]"
           :placeholder="col.search.placeholder || col.label"
           clearable
+          :aria-label="col.label"
           style="width: 150px"
           @change="search"
         >
@@ -44,6 +46,7 @@
       <div v-if="$slots.toolbar" class="mr-pro-tools"><slot name="toolbar" /></div>
     </div>
 
+    <div v-if="!searchColumns.length && $slots.toolbar" class="mr-pro-tools"><slot name="toolbar" /></div>
     <AsyncPanel :state="state" :error="error" @retry="emit('retry')">
       <template #empty>
         <slot name="empty">
@@ -186,7 +189,7 @@ const sortBy = ref('')
 const order = ref('')
 const searchModel = reactive<Record<string, unknown>>({})
 const searchColumns = computed(() => props.columns.filter((c) => !!c.search))
-const tableRef = ref<{ clearSelection: () => void } | null>(null)
+const tableRef = ref<{ clearSelection: () => void; clearSort: () => void } | null>(null)
 
 function onSelectionChange(rows: Record<string, unknown>[]) {
   emit('selection-change', rows)
@@ -235,6 +238,7 @@ function reset() {
   initModel()
   sortBy.value = ''
   order.value = ''
+  tableRef.value?.clearSort()
   emit('filter-reset')
   search()
 }

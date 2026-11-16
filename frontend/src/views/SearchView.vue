@@ -24,26 +24,26 @@
         <el-input
           v-model="query"
           size="large"
-          placeholder="输入法规名称、条号或业务关键词（内容原样提交后端，前端不做语义补全）"
+          placeholder="输入法规名称、条号或业务关键词" aria-label="检索关键词" maxlength="2000"
           clearable
           @keyup.enter="runSearch"
         >
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
         <el-button type="primary" size="large" :disabled="!canSearch" :loading="search.loading.value" @click="runSearch">检索</el-button>
-        <el-button size="large" @click="clearQuery">清空</el-button>
+        <el-button size="large" @click="clearQuery">重置</el-button>
       </div>
-      <div class="filter-row">
-        <el-select v-model="mode" size="small" style="width: 200px">
+      <div class="filter-row" role="group" aria-label="检索筛选条件">
+        <el-select v-model="mode" aria-label="检索方式" size="small" style="width: 200px">
           <el-option label="keyword（关键词，不加载模型）" value="keyword" />
           <el-option label="hybrid（BGE-M3 混合检索）" value="hybrid" />
         </el-select>
-        <span class="limit-label">返回条数 limit</span>
-        <el-input-number v-model="limit" :min="1" :max="50" :step="1" size="small" controls-position="right" style="width: 110px" />
+        <span class="limit-label">返回条数</span>
+        <el-input-number v-model="limit" aria-label="返回条数" :min="1" :max="50" :step="1" size="small" controls-position="right" style="width: 110px" />
         <el-tooltip v-for="f in SEARCH_FILTERS" :key="f.key" :content="filterTooltip(f)" placement="top">
           <span>
             <el-input
-              v-model="filterValues[f.key]"
+              v-model="filterValues[f.key]" :aria-label="f.label" :maxlength="f.key === 'kbVersion' ? 128 : f.key === 'issuingAuthority' ? 200 : 80"
               :placeholder="f.label"
               clearable
               size="small"
@@ -60,6 +60,8 @@
       </div>
     </el-card>
 
+    <p v-if="filtersDirty" class="filter-feedback" role="status">筛选条件已修改，请点击检索应用。下方仍为上次提交的结果。</p>
+
     <!-- 结果区：尚未检索 / unpublished / 无命中 / 真实命中 分别明确呈现 -->
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>
@@ -75,6 +77,8 @@
         </div>
       </template>
 
+      <p v-if="submittedQuery" class="filter-feedback">已提交查询：{{ submittedQuery }} · {{ submittedMode === 'hybrid' ? '混合检索' : '关键词检索' }} · 最多 {{ submittedLimit }} 条</p>
+      <div v-if="appliedFiltersText" class="applied-filters">后端实际生效筛选 <code class="mono">{{ appliedFiltersText }}</code></div>
       <AsyncPanel :state="search.state.value" :error="search.error.value" @retry="runSearch">
         <template #empty>
           <el-empty :image-size="70" :description="emptyDescription">
@@ -92,9 +96,6 @@
           </el-empty>
         </template>
 
-        <div v-if="appliedFiltersText" class="applied-filters">
-          后端实际生效筛选 <code class="mono">{{ appliedFiltersText }}</code>
-        </div>
 
         <el-alert type="success" :closable="false" style="margin-bottom: 12px"
           title="以下法条文本与元数据均来自后端真实响应"
@@ -175,12 +176,15 @@ const query = ref('')
 const submittedQuery = ref('')
 const mode = ref<SearchRequest['mode']>('keyword')
 const limit = ref(8)
+const submittedMode = ref<SearchRequest['mode']>('keyword')
+const submittedLimit = ref(8)
+const filtersDirty = computed(() => !!submittedQuery.value && (query.value.trim() !== submittedQuery.value || mode.value !== submittedMode.value || limit.value !== submittedLimit.value || JSON.stringify(activeFilters()) !== JSON.stringify(submittedFilters.value)))
 
 /* draft-4 新筛选：key 为 UI 状态，field 为后端能力声明 / 请求体字段名 */
 type FilterKey = 'kbVersion' | 'issuingAuthority' | 'effectiveStatus'
 interface SearchFilterDef { key: FilterKey; field: string; label: string }
 const SEARCH_FILTERS: SearchFilterDef[] = [
-  { key: 'kbVersion', field: 'kb_version', label: 'kb_version（已发布版本）' },
+  { key: 'kbVersion', field: 'kb_version', label: '已发布版本（留空使用当前版本）' },
   { key: 'issuingAuthority', field: 'issuing_authority', label: '发布机关' },
   { key: 'effectiveStatus', field: 'effective_status', label: '效力状态' }
 ]
@@ -232,7 +236,7 @@ const canSearch = computed(() =>
 
 const search = useAsyncData<SearchResponse>(
   (signal) => searchKnowledge(
-    { query: submittedQuery.value, mode: mode.value, limit: limit.value, ...submittedFilters.value },
+    { query: submittedQuery.value, mode: submittedMode.value, limit: submittedLimit.value, ...submittedFilters.value },
     signal
   ),
   { immediate: false }
@@ -255,14 +259,19 @@ onMounted(async () => {
 })
 
 function runSearch() {
-  if (!query.value.trim() || search.loading.value) return
+  if (!canSearch.value) return
   submittedQuery.value = query.value.trim()
   submittedFilters.value = activeFilters()
+  submittedMode.value = mode.value
+  submittedLimit.value = limit.value
   void search.load()
 }
 
 function clearQuery() {
   query.value = ''
+  mode.value = 'keyword'
+  limit.value = 8
+  search.error.value = ''
   submittedQuery.value = ''
   submittedFilters.value = {}
   for (const f of SEARCH_FILTERS) filterValues[f.key] = ''

@@ -5,37 +5,42 @@
 
     <!-- 筛选条：门控未通过时「文字说明 + 控件 disabled」双重可辨 -->
     <el-card shadow="never" class="lib-filter-card" data-lib-section="filter">
-      <div class="lib-filter-row">
-        <span class="lib-filter-label">query（≤200）</span>
+      <div class="lib-filter-row" role="group" aria-label="资料筛选">
+        <span class="lib-filter-label">标题 / 文号 / 案号关键词</span>
         <el-input v-model="draft.query" size="small" maxlength="200" clearable :disabled="!canQuery"
-          data-lib-field="query" placeholder="标题 / 关键词（原样提交后端）" style="width: 210px"
+          data-lib-field="query" aria-label="资料关键词" placeholder="输入标题、文号或案号" style="width: 210px"
           @keyup.enter="applyFilters" />
         <!-- 法规库整体隐藏 violation 控件（非仅禁用），也绝不发送该参数 -->
         <template v-if="isCase">
-          <span class="lib-filter-label">violation（≤200，仅案例库）</span>
+          <span class="lib-filter-label">违法行为</span>
           <el-input v-model="draft.violation" size="small" maxlength="200" clearable :disabled="!canQuery"
-            data-lib-field="violation" placeholder="违法行为" style="width: 190px" @keyup.enter="applyFilters" />
+            data-lib-field="violation" aria-label="违法行为" placeholder="输入违法行为关键词" style="width: 190px" @keyup.enter="applyFilters" />
         </template>
         <!-- kb_version 仅 ADMIN 提供 -->
         <template v-if="isAdminIdentity">
-          <span class="lib-filter-label">kb_version（≤128）</span>
+          <span class="lib-filter-label">已发布版本</span>
           <el-input v-model="draft.kbVersion" size="small" maxlength="128" clearable :disabled="!canQuery"
-            data-lib-field="kb_version" placeholder="仅 ADMIN 可显式选择版本" style="width: 200px"
+            data-lib-field="kb_version" aria-label="知识库版本" placeholder="留空使用当前已发布版本" style="width: 200px"
             @keyup.enter="applyFilters" />
         </template>
-        <span v-else class="lib-filter-label">kb_version：仅 ADMIN 可显式选择版本</span>
+        <span v-else class="lib-filter-label">当前已发布版本</span>
         <el-button size="small" type="primary" :disabled="!canQuery" @click="applyFilters">查询</el-button>
         <el-button size="small" :disabled="!canQuery" @click="resetFilters">清空筛选</el-button>
         <el-button size="small" :disabled="!canQuery" @click="runList">刷新</el-button>
+      </div>
+      <div class="filter-feedback" aria-live="polite">
+        <span>已应用：{{ appliedSummary }}</span>
+        <el-tag v-if="filtersDirty" type="warning" size="small">条件已修改，点击查询生效</el-tag>
       </div>
       <div class="mr-disabled-hint">{{ filterNote }}</div>
     </el-card>
 
     <!-- 运行期状态表：8 条 GET 方法级门控结果，静态契约信息，不发起任何业务请求 -->
+    <details class="technical-details"><summary>接口与数据范围说明</summary>
     <el-card shadow="never" class="lib-routes-card" data-lib-section="routes">
       <template #header>
         <div class="card-head">
-          <span>draft-5 运行期接口状态 <span class="real-badge">REAL</span></span>
+          <span>运行期接口状态 <span class="real-badge">REAL</span></span>
           <span class="card-sub">GET /api/openapi.json 方法级探测 · 路径存在 ≠ 方法可用</span>
         </div>
       </template>
@@ -62,6 +67,8 @@
       </div>
     </el-card>
 
+    </details>
+
     <!-- 页内主从 + 面包屑：详情不注册路由，刷新即丢弃当前 id -->
     <el-breadcrumb v-if="view !== 'list'" separator="/" class="lib-crumbs">
       <el-breadcrumb-item>
@@ -81,7 +88,7 @@
       <template #header>
         <div class="card-head">
           <span>{{ listTitle }} <span class="real-badge">REAL</span></span>
-          <span class="card-sub">{{ listMeta }}</span>
+          <span class="lib-result-meta">{{ listMeta }}</span>
         </div>
       </template>
 
@@ -358,7 +365,7 @@ const detailPath = LIBRARY_DETAIL_PATHS[props.kind]
 const store = useAppStore()
 
 function fmt(value: unknown): string {
-  if (value === null || value === undefined || value === '') return LIB_COPY.nullShort
+  if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
@@ -385,15 +392,29 @@ function snapshot(p: number, size: number): LibraryQuery {
   }
 }
 
+const appliedSummary = computed(() => [submitted.value.query && `关键词：${submitted.value.query}`, submitted.value.violation && `违法行为：${submitted.value.violation}`, submitted.value.kbVersion && `版本：${submitted.value.kbVersion}`].filter(Boolean).join('；') || '全部可见资料 · 当前已发布版本')
+const filtersDirty = computed(() => JSON.stringify(snapshot(page.value, pageSize.value)) !== JSON.stringify(submitted.value))
 const filterNote = computed(() => LIB_COPY.filterNote(isCase.value, isAdminIdentity.value))
+
+function closeDetailForFilter() {
+  view.value = 'list'
+  activeRecord.value = null
+  activeArticleId.value = ''
+  releaseSource()
+  detailQuery.clear()
+  partsQuery.clear()
+  articleQuery.clear()
+}
 
 function applyFilters() {
   if (!canQuery.value) return
+  closeDetailForFilter()
   page.value = 1
   submitted.value = snapshot(1, pageSize.value)
   runList()
 }
 function resetFilters() {
+  closeDetailForFilter()
   draft.query = ''
   draft.violation = ''
   draft.kbVersion = ''
@@ -543,7 +564,7 @@ const listTitle = computed(() => (isCase.value ? '处罚案例列表' : '法规�
 const listMeta = computed(() => {
   const d = listQuery.data.value
   return d
-    ? `GET ${listPath} · status=${d.status} · kb_version=${d.kb_version || '—'} · total=${d.total} · page=${d.page}/${d.page_size}`
+    ? `共 ${d.total} 条 · 第 ${d.page} 页 · 每页 ${d.page_size} 条 · 版本 ${d.kb_version || '尚未发布'}`
     : `GET ${listPath} · 尚未加载`
 })
 const partsHint = computed(() => isCase.value

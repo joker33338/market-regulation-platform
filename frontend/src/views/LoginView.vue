@@ -11,22 +11,22 @@
         <!-- ① 账号密码登录（v0.2.3 draft-4；当前 8180 v0.2.2 未加载该接口，提交后如实报错） -->
         <el-tab-pane label="账号登录" name="password">
           <el-form label-position="top" @submit.prevent>
-            <el-form-item label="用户名">
+            <el-form-item label="用户名" for="login-username">
               <el-input
-                v-model="username"
+                id="login-username" v-model="username" aria-label="用户名" maxlength="64"
                 size="large"
-                placeholder="3–64 位字母 / 数字 / _ . @ -"
+                placeholder="请输入用户名"
                 autocomplete="username"
                 @keyup.enter="loginByPassword"
               />
             </el-form-item>
-            <el-form-item label="密码">
+            <el-form-item label="密码" for="login-password">
               <el-input
-                v-model="password"
+                id="login-password" v-model="password" aria-label="密码" maxlength="256"
                 type="password"
                 size="large"
                 show-password
-                placeholder="12–256 个字符"
+                placeholder="请输入密码"
                 autocomplete="current-password"
                 @keyup.enter="loginByPassword"
               />
@@ -36,14 +36,12 @@
             登录
           </el-button>
           <div class="mode-note">
-            POST /api/auth/login（匿名）：成功签发短期 Bearer（1 小时）并返回服务端身份；
-            用户名不存在与密码错误统一提示 401，不暴露账号是否存在；连续失败会触发后端限流 429。
-            密码不存浏览器、不入日志，登录后仅保存 Bearer 到内存 + sessionStorage。
+            使用管理员分配的账号登录。登录失败时请核对用户名和密码，或联系管理员；多次失败后请稍后重试。
           </div>
         </el-tab-pane>
 
         <!-- ② 既有 API Token 模式（8180 v0.2.2 唯一可用） -->
-        <el-tab-pane label="API Token（开发期）" name="token">
+        <el-tab-pane label="访问凭证登录" name="token">
           <el-input
             v-model="token"
             type="password"
@@ -62,11 +60,11 @@
         </el-tab-pane>
       </el-tabs>
 
-      <div class="login-security">
+      <details class="login-security"><summary>登录与凭证安全说明</summary>
         <p><b>开发期</b>：Token / Bearer 仅存于内存 + sessionStorage（会话级），关闭标签页即失效，不写 localStorage、不打印日志。</p>
         <p><b>生产环境</b>：应使用服务端安全会话（HttpOnly Cookie / BFF），前端不长期持有访问 Token。</p>
         <p>MinerU 官方 API Key 与数据库口令只存在于 FastAPI 后端，浏览器绝不接触。</p>
-      </div>
+      </details>
       <el-alert type="warning" :closable="false" style="margin-top: 14px"
         :title="releaseStatus.alertTitle" :description="releaseStatus.qaScope + '；页面业务数据均来自真实接口，未就绪或出错时显示明确异常态，不回退演示数据。'" />
     </el-card>
@@ -129,6 +127,7 @@ async function loginByToken() {
     ElMessage.warning('Token 长度不足 32 位')
     return
   }
+  if (loading.value) return
   loading.value = true
   try {
     await store.saveToken(token.value)
@@ -145,8 +144,8 @@ async function loginByToken() {
 </script>
 
 <style scoped>
-.login-wrap { height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--mr-navy); }
-.login-card { width: 460px; }
+.login-wrap { min-height: 100dvh; padding:24px 12px; display: flex; align-items: center; justify-content: center; background: var(--mr-navy); }
+.login-card { width: 460px; max-width:100%; }
 .login-brand { text-align: center; margin-bottom: 24px; }
 .login-mark { width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 10px; background: var(--mr-primary); color: #fff; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .login-brand h1 { font-size: 18px; margin: 0 0 6px; }
@@ -155,4 +154,5 @@ async function loginByToken() {
 .login-security { margin-top: 14px; padding: 10px 12px; background: #f5f9ff; border: 1px solid #d5e5ff; border-radius: var(--mr-radius); }
 .login-security p { margin: 4px 0; font-size: 12px; color: var(--mr-text-2); line-height: 1.7; }
 .login-security b { color: #1e40af; }
+@media(max-width:600px) { .login-wrap { align-items:flex-start; } .login-brand { margin-bottom:16px; } }
 </style>

@@ -1,4 +1,5 @@
 import client from './client'
+import { ApiError } from './errors'
 import type {
   DocumentInfo, DocumentList, DocumentQuery, ParseHistory, TaskList, TaskQuery,
   ReviewQueue, ReviewDetail, PreviewRequest, PreviewResponse,
@@ -163,6 +164,20 @@ export function listKbVersions(
       ...signalOf(signal)
     })
     .then((r) => r.data)
+}
+
+/** 分页完整读取版本后再本地筛选；失败不把半份列表当全量结果。 */
+export async function listAllKbVersions(signal?: AbortSignal): Promise<KbVersionList> {
+  const first = await listKbVersions({ page: 1, pageSize: 100 }, signal)
+  if (first.total > 10000) throw new ApiError(422, 'version_list_limit', 'limit', '版本超过一万条，当前无法完整筛选，请联系管理员')
+  const rows = [...first.list]
+  for (let page = 2; rows.length < first.total; page++) {
+    const next = await listKbVersions({ page, pageSize: 100 }, signal)
+    if (next.total !== first.total || !next.list.length) throw new ApiError(409, 'version_list_changed', 'conflict', '版本列表正在变化，请刷新后重新筛选')
+    rows.push(...next.list)
+  }
+  if (rows.length !== first.total || new Set(rows.map(row => row.kb_version)).size !== first.total) throw new ApiError(409, 'version_list_changed', 'conflict', '版本列表正在变化，请刷新后重新筛选')
+  return { ...first, list: rows, page: 1, page_size: 100 }
 }
 
 /** GET /api/knowledge/versions/{version} */

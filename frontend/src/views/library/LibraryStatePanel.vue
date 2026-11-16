@@ -21,6 +21,7 @@
         :title="errorTitle" :description="query.hint.value">
         <template #default>
           <div class="lib-l1-actions">
+            <el-button size="small" @click="retry">重试查询</el-button>
             <el-button v-if="showBackParent" size="small" @click="emit('back-parent')">返回上一级</el-button>
             <el-button v-if="showBackList" size="small" @click="emit('back-list')">返回列表</el-button>
           </div>

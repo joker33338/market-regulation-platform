@@ -1,41 +1,33 @@
-/**
- * 注释性文字统一折叠：默认只显示一个「说明 ▾」入口，点击展开原文，再点收起。
- *
- * 设计取舍：
- * - 用 document 级事件委托，不修改任何页面模板，Vue 重渲染 / 路由切换后依然生效；
- * - 折叠样式见 styles/index.css，同样不依赖模板改动；
- * - 错误提示（el-alert--error）与含按钮、链接、输入框的说明块不参与折叠，
- *   避免把「重试」「刷新」等真实操作入口一起藏掉；
- * - 展开状态只存在于当前 DOM，不写 localStorage，刷新后恢复默认收起。
- */
-
-const TEXT_SELECTOR = '.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .page-desc, .dp-note'
-const INTERACTIVE_SELECTOR = 'button, a, .el-button, input, select, textarea, [role="button"]'
-
-function hasInteractive(el: Element): boolean {
-  return !!el.querySelector(INTERACTIVE_SELECTOR)
-}
-
-function toggleNote(el: Element): void {
-  el.classList.toggle('is-note-open')
-}
-
+/** 折叠说明支持键盘操作；错误和包含真实操作的块保持展开。 */
+const TEXT = '.mr-disabled-hint, .hint-text, .action-hint, .card-sub, .source-hint, .dp-note'
+const CONTROLS = 'button, a, input, select, textarea, .el-button, [role="button"]'
 export function setupNoteToggle(): void {
-  document.addEventListener('click', (event) => {
+  const root = document.getElementById('app')
+  if (!root) return
+  function decorate() {
+    const blocks = [...root!.querySelectorAll(TEXT), ...root!.querySelectorAll('.el-alert:not(.el-alert--error):has(.el-alert__description)')]
+    for (const el of blocks) {
+      if (el.querySelector(CONTROLS) || el.closest('.el-alert--error')) continue
+      el.setAttribute('data-mr-note', '')
+      el.setAttribute('role', 'button')
+      el.setAttribute('tabindex', '0')
+      el.setAttribute('aria-expanded', String(el.classList.contains('is-note-open')))
+      el.setAttribute('aria-label', '展开或收起说明')
+    }
+  }
+  function toggle(el: Element) { el.classList.toggle('is-note-open'); el.setAttribute('aria-expanded', String(el.classList.contains('is-note-open'))) }
+  root.addEventListener('click', event => {
     const target = event.target
     if (!(target instanceof Element)) return
-    // 点到真实控件时交还给控件本身，不触发折叠
-    if (target.closest(INTERACTIVE_SELECTOR)) return
-
-    const textBlock = target.closest(TEXT_SELECTOR)
-    if (textBlock && !hasInteractive(textBlock)) {
-      toggleNote(textBlock)
-      return
-    }
-
-    const alert = target.closest('.el-alert:not(.el-alert--error)')
-    if (!alert) return
-    if (!alert.querySelector('.el-alert__description') || hasInteractive(alert)) return
-    toggleNote(alert)
+    const note = target.closest('[data-mr-note]')
+    if (!note || note.querySelector(CONTROLS)) return
+    const control = target.closest(CONTROLS)
+    if (control && control !== note) return
+    toggle(note)
   })
+  root.addEventListener('keydown', event => {
+    if ((event.key === 'Enter' || event.key === ' ') && event.target instanceof Element && event.target.matches('[data-mr-note]')) { event.preventDefault(); toggle(event.target) }
+  })
+  new MutationObserver(decorate).observe(root, { childList: true, subtree: true })
+  decorate()
 }

@@ -1,6 +1,7 @@
 <template>
   <div class="async-panel">
-    <div v-if="state === 'loading'" class="ap-loading" v-loading="true">
+    <div v-if="state === 'loading'" class="ap-loading" role="status" aria-live="polite" aria-busy="true">
+      <el-skeleton :rows="3" animated />
       <span class="ap-loading-text">{{ loadingText }}</span>
     </div>
 
@@ -91,7 +92,7 @@ withDefaults(
     emptyText?: string
     loadingText?: string
   }>(),
-  { error: '', emptyText: '暂无数据', loadingText: '正在从后端加载真实数据…' }
+  { error: '', emptyText: '暂无数据', loadingText: '正在加载，请稍候…' }
 )
 
 const emit = defineEmits<{ (e: 'retry'): void }>()
@@ -99,6 +100,7 @@ const emit = defineEmits<{ (e: 'retry'): void }>()
 
 <style scoped>
 .ap-loading {
+  flex-direction:column; padding:24px; gap:12px;
   position: relative;
   min-height: 140px;
   display: flex;

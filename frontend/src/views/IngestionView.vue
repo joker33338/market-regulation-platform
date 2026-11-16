@@ -103,8 +103,16 @@
             <span class="card-sub">GET /api/knowledge/versions · public 只读</span>
           </div>
         </template>
+        <div class="version-filters" role="group" aria-label="知识库版本筛选">
+          <el-input v-model="versionKeyword" aria-label="版本号关键词" placeholder="搜索版本号" clearable />
+          <el-select v-model="versionStatus" aria-label="版本状态" placeholder="全部状态" clearable><el-option v-for="status in versionStatuses" :key="status" :label="status" :value="status" /></el-select>
+          <el-checkbox v-model="versionActiveOnly">仅当前生效</el-checkbox>
+          <el-button @click="resetVersionFilters">重置筛选</el-button>
+          <el-button :loading="versions.loading.value" @click="versions.load()">刷新版本</el-button>
+        </div>
+        <p v-if="versions.data.value" class="filter-feedback" role="status">已完整加载 {{ versions.data.value?.total ?? 0 }} 个可见版本，符合条件 {{ filteredVersions.length }} 个。筛选作用于全部已加载版本。</p>
         <AsyncPanel :state="versions.state.value" :error="versions.error.value" empty-text="public 知识库暂无版本记录（后端返回空列表）" @retry="versions.load()">
-          <el-table :data="versions.data.value?.list || []" size="small" highlight-current-row max-height="260" @current-change="onSelectVersion">
+          <el-table :data="visibleVersions" size="small" highlight-current-row max-height="260" @current-change="onSelectVersion">
             <el-table-column prop="kb_version" label="kb_version" min-width="170" show-overflow-tooltip />
             <el-table-column prop="status" label="状态" width="110" />
             <el-table-column label="ACTIVE" width="80">
@@ -117,9 +125,10 @@
               <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
             </el-table-column>
           </el-table>
+          <el-empty v-if="filteredVersions.length === 0" :image-size="54" description="没有符合条件的版本"><el-button @click="resetVersionFilters">清空版本筛选</el-button></el-empty>
           <div class="queue-pager">
-            <el-pagination v-model:current-page="versionPage" :page-size="versionPageSize" :total="versions.data.value?.total || 0"
-              layout="total, prev, pager, next" small background @current-change="versions.load()" />
+            <el-pagination v-model:current-page="versionPage" :page-size="versionPageSize" :total="filteredVersions.length"
+              layout="total, prev, pager, next" small background />
           </div>
         </AsyncPanel>
       </el-card>
@@ -283,13 +292,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import {
-  previewTaskFile, previewReviewResult, listKbVersions, getKbVersion
+  previewTaskFile, previewReviewResult, listAllKbVersions, getKbVersion
 } from '@/api/frontend'
 import {
   contractState, contractLabel, hasRuntimeMethod
@@ -387,8 +396,20 @@ const versionPageSize = 10
 const selectedVersion = ref('')
 
 const versions = useAsyncData<KbVersionList>(
-  (signal) => listKbVersions({ page: versionPage.value, pageSize: versionPageSize }, signal)
+  (signal) => listAllKbVersions(signal)
 )
+const versionKeyword = ref('')
+const versionStatus = ref('')
+const versionActiveOnly = ref(false)
+const filteredVersions = computed(() => (versions.data.value?.list || []).filter(row =>
+  (!versionKeyword.value.trim() || row.kb_version.toLowerCase().includes(versionKeyword.value.trim().toLowerCase())) &&
+  (!versionStatus.value || row.status === versionStatus.value) && (!versionActiveOnly.value || row.active)
+))
+const visibleVersions = computed(() => filteredVersions.value.slice((versionPage.value - 1) * versionPageSize, versionPage.value * versionPageSize))
+const versionStatuses = computed(() => [...new Set((versions.data.value?.list || []).map(row => row.status))])
+watch([versionKeyword, versionStatus, versionActiveOnly], () => { versionPage.value = 1 })
+watch(() => versions.data.value, () => { versionPage.value = 1 })
+function resetVersionFilters() { versionKeyword.value = ''; versionStatus.value = ''; versionActiveOnly.value = false; versionPage.value = 1 }
 const versionDetail = useAsyncData<VersionInfo>(
   (signal) => getKbVersion(selectedVersion.value, signal),
   { immediate: false, isEmpty: () => false }
@@ -625,4 +646,6 @@ function formatTime(v: string) { return v ? String(v).replace('T', ' ').slice(0,
 @media (max-width: 1366px) {
   .version-grid { grid-template-columns: 1fr; }
 }
+.version-filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.version-filters .el-input,.version-filters .el-select { width:180px; max-width:100%; }
 </style>
