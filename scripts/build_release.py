@@ -17,7 +17,7 @@ def run(args,**kwargs):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--revision',default='HEAD')
-    parser.add_argument('--base-image',default='market-regulation-workbench:candidate-v023-joint-d28cc81f-f477d8c85')
+    parser.add_argument('--base-image',default='market-regulation-runtime:v0.2.3-py312')
     parser.add_argument('--tag')
     parser.add_argument('--node',default=os.getenv('NODE_BINARY') or shutil.which('node'))
     args=parser.parse_args()

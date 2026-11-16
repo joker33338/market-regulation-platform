@@ -1,4 +1,4 @@
-ARG LOCAL_BASE_IMAGE=market-regulation-workbench:candidate-v023-joint-d28cc81f-f477d8c85
+ARG LOCAL_BASE_IMAGE=market-regulation-runtime:v0.2.3-py312
 FROM ${LOCAL_BASE_IMAGE}
 ARG SOURCE_COMMIT
 ARG FRONTEND_COMMIT
