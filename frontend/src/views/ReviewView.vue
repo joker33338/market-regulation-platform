@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">文档审核中心</h1>
-        <p class="page-desc">解析结果人工复核 —— 原始解析结果只读，人工修订须留痕，不得覆盖原始证据文件</p>
+        <p class="page-desc">对照原件核对正文，修订保留历史；审核通过后继续准备入库，发布需明确确认。</p>
       </div>
       <div class="header-tags">
         <el-tag :type="writeGate === 'enabled' ? 'success' : 'warning'" effect="plain">{{ writeGateLabel }}</el-tag>
@@ -14,6 +14,7 @@
     <el-alert :type="writeGate === 'enabled' ? 'success' : 'warning'" :closable="false" class="review-notice"
       :title="writeGateTitle" :description="writeGateDescription" />
 
+    <details class="review-technical"><summary>查看权限与接口详情</summary>
     <!-- 当前登录人员（GET /api/auth/me）与业务数据归属分离展示 -->
     <div class="identity-bar">
       <div class="identity-item"><span>当前登录人员</span><b class="mono">{{ principalIdText }}</b></div>
@@ -27,12 +28,13 @@
       title="身份口径：frontend-api-v0.2.3-draft-2 / principal-v1"
       :description="`principal_id 是实际操作者，owner_id 是文档业务归属，两者不能互相推导。draft-4 起 ADMIN 拥有全部业务权限（无需再塞入 REVIEWER）；REVIEWER 仍只在后端按 review_owner_scopes 与逐对象详情授权后才可写，USER 不具备审核写入能力。前端角色仅用于收紧与展示，绝不代替后端授权。事件与回执中的 operator_id / owner_id 由后端给出；旧事件为 null 时显示「未知（历史记录）」，不把历史 owner 补认成具体人员。审核通过不等于发布 ACTIVE，退回不等于已创建解析任务。${principalError ? ` 当前身份状态：${principalError}` : ''}`" />
 
+    </details>
     <!-- 待复核队列：真实完整语义接口；高度由内容自适应，不再提供上下拖动 -->
     <el-card shadow="never" class="queue-card">
       <template #header>
         <div class="card-head">
           <span>待复核队列 <span class="real-badge">REAL</span></span>
-          <span class="card-sub">GET /api/review?requires_review=true · 数据源 document_review.documents</span>
+          <span class="card-sub">异常优先 · 审核与发布分别记录</span>
         </div>
       </template>
       <AsyncPanel :state="queue.state.value" :error="queue.error.value" empty-text="当前没有待人工复核的文档（后端返回空列表）" @retry="queue.load()">
@@ -40,8 +42,7 @@
           <el-table-column prop="file_name" label="文件名称" min-width="220" show-overflow-tooltip />
           <el-table-column prop="parsing_status" label="解析状态" width="110" />
           <el-table-column label="需复核" width="80"><template #default="{ row }"><el-tag size="small" :type="row.requires_review ? 'warning' : 'info'" effect="plain">{{ row.requires_review ? '是' : '否' }}</el-tag></template></el-table-column>
-          <el-table-column prop="imported_at" label="入库时间" width="170"><template #default="{ row }">{{ formatTime(row.imported_at) }}</template></el-table-column>
-          <el-table-column label="parse_id" min-width="160" show-overflow-tooltip><template #default="{ row }"><code class="mono">{{ row.parse_id }}</code></template></el-table-column>
+          <el-table-column prop="imported_at" label="接收时间" width="170"><template #default="{ row }">{{ formatTime(row.imported_at) }}</template></el-table-column>
         </el-table>
         <div class="queue-pager">
           <el-pagination v-model:current-page="queuePage" :page-size="queuePageSize" :total="queue.data.value?.total || 0"
@@ -67,7 +68,7 @@
         <div class="pane-toolbar">
           <div class="pane-head-left">
             <span class="pane-title">原始文件预览</span>
-            <span class="source-hint">GET /api/parse/files/{source_file_id}/source</span>
+            <span class="source-hint">原始证据 · 只读预览</span>
           </div>
           <el-button class="expand-btn" size="small" :icon="expandedPane === 'preview' ? Close : FullScreen"
             title="放大后可按 Esc 或点击空白区域还原" @click="togglePane('preview')">
@@ -89,7 +90,7 @@
         :body-style="{ padding: 0, display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }">
         <div class="pane-toolbar">
           <el-tabs v-model="resultTab" class="result-tabs">
-            <el-tab-pane label="OCR 文本" name="text" />
+            <el-tab-pane v-if="reviewedTextSupported" label="当前审核正文" name="reviewed" /><el-tab-pane label="原始 OCR 文本" name="text" />
             <el-tab-pane label="Markdown" name="markdown" />
             <el-tab-pane label="JSON" name="json" />
             <el-tab-pane label="表格结构" name="table" />
@@ -113,7 +114,11 @@
           </div>
 
           <div class="result-body">
-            <pre v-if="resultTab === 'text'" class="result-pre">{{ pageText || '〔后端未返回该页 OCR 文本〕' }}</pre>
+            <AsyncPanel v-if="resultTab==='reviewed'" :state="reviewed.state.value" :error="reviewed.error.value" @retry="reviewed.load()">
+              <el-alert :type="reviewed.data.value?.approved?'success':'warning'" :closable="false" :title="reviewed.data.value?.approved?'当前正文已审核通过':'当前正文待审核，尚未发布'" description="整页修订仅应用于审核副本，原始OCR和原文件保持不变。" />
+              <pre class="result-pre">{{reviewed.data.value?.pages.find(page=>page.page_number===currentPage)?.text || '当前页未取得审核正文'}}</pre>
+            </AsyncPanel>
+            <pre v-else-if="resultTab === 'text'" class="result-pre">{{ pageText || '〔后端未返回该页 OCR 文本〕' }}</pre>
             <pre v-else-if="resultTab === 'markdown'" class="result-pre">{{ detail.data.value?.markdown_content || '〔后端未返回 Markdown〕' }}</pre>
             <pre v-else-if="resultTab === 'json'" class="result-pre">{{ originalResultJson }}</pre>
 
@@ -203,7 +208,7 @@
             </div>
           </div>
 
-          <div class="meta-bar">
+          <details class="review-technical"><summary>查看文件来源与处理记录</summary><div class="meta-bar">
             <span>文件：<b>{{ detail.data.value?.file_name || '—' }}</b></span>
             <span>parse_id：<code class="mono">{{ detail.data.value?.parse_id || '—' }}</code></span>
             <span>task_id：<code class="mono">{{ detail.data.value?.task_id || '—' }}</code></span>
@@ -213,18 +218,19 @@
             <span>文档所属人（后端事件/回执 owner_id）：<b class="mono">{{ documentOwnerText }}</b></span>
             <span>SHA256：<code class="mono">{{ expectedSha256 ? expectedSha256.slice(0, 16) + '…' : '由 /source 响应头校验' }}</code></span>
             <span v-if="ledger">台账：v{{ expectedVersion }} / {{ ledger.status || '—' }}（{{ detail.data.value?.review_write_supported ? '已获写授权' : '未获写授权' }}）</span>
-          </div>
+          </div></details>
         </AsyncPanel>
 
         <!-- 底部操作：运行期契约 + 审核详情双门控；未通过时保持禁用，绝不本地假成功 -->
         <div class="action-bar">
           <el-tooltip v-for="a in actions" :key="a.key" :content="actionHint" placement="top" :disabled="canWrite">
             <span>
-              <el-button :type="a.type" :disabled="!canWrite" :loading="busy && activeAction === a.key" @click="openAction(a.key)">
+              <el-button :type="a.type" :disabled="!canWrite || a.key==='save-revision' && !reviewedTextSupported" :loading="busy && activeAction === a.key" @click="openAction(a.key)">
                 {{ a.label }}
               </el-button>
             </span>
           </el-tooltip>
+          <el-button v-if="lastReceipt?.action==='approve' && detail.data.value?.source_file_id" type="primary" plain @click="returnToFiles">到工作台继续处理</el-button>
           <el-button v-if="canWrite" size="small" text type="primary" :loading="detail.loading.value" @click="refreshAfterWrite">刷新台账</el-button>
         </div>
         <div class="action-hint" :class="canWrite ? '' : 'mr-disabled-hint'">{{ actionHint }}</div>
@@ -235,10 +241,10 @@
     <div v-if="expandedPane" class="pane-backdrop" @click="expandedPane = null" />
 
     <!-- 审核写入确认：只有双门控通过才可打开；提交结果以后端回执 write_performed 为准 -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="620px" :close-on-click-modal="false" @closed="resetDialog">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="min(620px, 94vw)" :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy" @closed="resetDialog">
       <el-alert type="info" :closable="false" style="margin-bottom: 12px"
-        :title="`台账版本 ${expectedVersion} · ${currentParseId}`"
-        description="提交只发送 ReviewAction 白名单字段、Idempotency-Key 与 expected_version；实际操作者由后端按凭证解析的 principal_id 记录，owner_id 为源文档业务归属，客户端绝不发送 operator_id / owner_id / 自定角色（否则后端 422）。审核通过不授予发布权限、不自动创建解析任务，原始解析结果与原件保持只读。结果未确认的重试沿用同一键与同一请求；内容或台账版本变化会换键作为新操作。" />
+        :title="`当前审核记录版本 ${expectedVersion}`"
+        description="系统会核对当前权限、原始文件和审核版本，保存操作者及处理历史。整页修订只替换审核副本；审核通过后仍需确认发布。提交结果不明确时，请保留内容直接重试。" />
       <el-alert v-if="retryingSameRequest" type="warning" :closable="false" style="margin-bottom: 12px"
         title="结果未确认：同键同请求重试"
         description="本次提交的内容与台账版本未改变，将沿用同一 Idempotency-Key 与同一请求重发，以取回后端原回执；不据错误码断定没有写入。若修改正文、理由、页码，或详情刷新后台账版本变化，则作为新操作生成新键。" />
@@ -265,9 +271,9 @@
           <el-form-item label="页码" required>
             <el-input-number v-model="form.page" :min="1" :max="totalPages" />
           </el-form-item>
-          <el-form-item label="修订正文" required>
+          <el-form-item label="该页完整修订正文" required>
             <el-input v-model="form.content" type="textarea" :rows="9" maxlength="200000" show-word-limit
-              placeholder="原样保存，保留前导空格与换行；按不可信纯文本渲染，不执行 HTML" />
+              placeholder="填写该页完整正文，将替换该页正文副本；保留原始 OCR。保存后须再次审核通过才能入库。" />
           </el-form-item>
         </template>
       </el-form>
@@ -283,14 +289,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRoute,useRouter } from 'vue-router'
 import { Connection, FullScreen, Close } from '@element-plus/icons-vue'
 import AsyncPanel from '@/components/AsyncPanel.vue'
 import DocumentPreview from '@/components/document/DocumentPreview.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { listReviews, getReviewDetail } from '@/api/frontend'
+import { reviewedText,workbenchReviewQueue } from '@/api/workbench'
 import { toApiError } from '@/api/errors'
 import {
-  contractState, contractLabel, hasV023ReviewWriteRoutes, hasV023ReviewEvents
+  contractState, contractLabel, hasV023ReviewWriteRoutes, hasV023ReviewEvents,hasRuntimeMethod
 } from '@/api/dataSource'
 import {
   principal, principalState, principalError, principalNeedsRefresh,
@@ -324,6 +332,7 @@ import type {
  * - Markdown / 表格 / 人工修订一律纯文本，不使用 v-html，不执行不可信 HTML。
  */
 
+const workbenchRouter=useRouter()
 const queuePage = ref(1)
 const queuePageSize = 10
 const currentParseId = ref('')
@@ -353,7 +362,7 @@ onBeforeUnmount(() => {
 })
 
 const queue = useAsyncData<ReviewQueue>(
-  (signal) => listReviews({ page: queuePage.value, pageSize: queuePageSize, requiresReview: true }, signal)
+  (signal) => hasRuntimeMethod('GET','/api/workbench/review-queue')?workbenchReviewQueue(queuePage.value,queuePageSize,signal):listReviews({ page: queuePage.value, pageSize: queuePageSize, requiresReview: true }, signal)
 )
 const detail = useAsyncData<ReviewDetail>(
   (signal) => getReviewDetail(currentParseId.value, signal),
@@ -361,6 +370,24 @@ const detail = useAsyncData<ReviewDetail>(
 )
 // 尚未选择队列记录时显示明确空态，而非无限 loading
 detail.state.value = 'empty'
+
+
+const workbenchRoute = useRoute()
+function returnToFiles(){
+  const destination=String(workbenchRoute.query.return_to || '')
+  if(destination && workbenchRouter.resolve(destination).name==='Documents')void workbenchRouter.push(destination)
+  else void workbenchRouter.push({path:'/documents',query:{file:detail.data.value?.source_file_id,keyword:detail.data.value?.file_name}})
+}
+watch(() => workbenchRoute.query.parse, value => {
+  if (typeof value === 'string' && value) { currentParseId.value = value; void detail.load() }
+}, { immediate: true })
+
+const reviewedTextSupported=computed(()=>hasRuntimeMethod('GET','/api/review/{parse_id}/reviewed-text'))
+const reviewed=useAsyncData(signal=>reviewedText(currentParseId.value,signal),{immediate:false,isEmpty:()=>false})
+reviewed.state.value='empty'
+watch([()=>resultTab.value,()=>detail.data.value?.review_ledger?.version,()=>currentParseId.value],()=>{
+  if(resultTab.value==='reviewed' && reviewedTextSupported.value && currentParseId.value)void reviewed.load()
+})
 
 type ReviewActionKey = ReviewActionName
 const actions = [
@@ -425,13 +452,13 @@ const writeGateTitle = computed(() => ({
   'contract-missing': '当前运行服务未加载 draft-2 审核写入接口，四个写操作保持禁用',
   'identity-locked': '当前登录人员未确认或不含 REVIEWER / ADMIN 角色，四个写操作保持禁用',
   'detail-locked': '当前对象的审核台账不可用或后端未授予该对象写权限，写操作保持禁用',
-  enabled: '已按运行期契约、当前身份与审核详情启用真实审核写入'
+  enabled: '可以审核此文档'
 }[writeGate.value]))
 const writeGateDescription = computed(() => ({
   'contract-missing': '队列 / 详情 / 原件仍来自真实只读接口。运行期 GET /api/openapi.json 未声明这 4 条写路径（或方法级门控未通过），前端不提前解锁、不调用不存在的接口。写链路隔离联调须使用经授权的短生命周期入口，不得向未获批准的实例写入。',
   'identity-locked': identityGateText.value || '当前身份不含 REVIEWER / ADMIN 角色，写操作保持禁用。',
   'detail-locked': '写按钮还须逐对象确认详情返回 review_write_supported=true 且 review_ledger.available=true；台账未配置、存储异常，或当前 principal 未被授予审核权限（REVIEWER 范围或 ADMIN 全权限）时均不置 true。requires_review 只是 OCR 复核信号，不能推导台账状态。',
-  enabled: '写操作使用 Idempotency-Key + expected_version 版本锁；实际操作者由后端按凭证解析的 principal_id 记录，owner_id 是源文档归属，客户端不指定身份。审核通过不授予发布权限、不自动创建解析任务、不修改原始 OCR 与原件。'
+  enabled: '请对照原件核对正文和表格。修订会保留历史，保存后需要再次审核；审核通过后可继续准备入库，发布仍需确认。'
 }[writeGate.value]))
 const actionHint = computed(() => {
   if (writeGate.value === 'contract-missing') {
@@ -531,6 +558,7 @@ function resetDialog() {
 }
 function openAction(key: ReviewActionKey) {
   if (!canWrite.value) return
+  if(key==='save-revision' && !reviewedTextSupported.value){ElMessage.warning('当前服务尚未启用整页修订，请更新服务后再操作');return}
   activeAction.value = key
   pendingWrite.value = null
   submitError.value = ''
@@ -590,7 +618,8 @@ async function submitAction() {
     lastReceipt.value = receipt
     pendingWrite.value = null
     dialogVisible.value = false
-    ElMessage.success(`审核写入成功：${receipt.action} · 台账 v${receipt.version} · 操作者 ${identityText(receipt.operator_id)} · 文档所属人 ${identityText(receipt.owner_id)}（event_id ${receipt.event_id.slice(0, 8)}…）`)
+    ElMessage.success(receipt.action==='save-revision'?'整页修订已保存，请核对当前审核正文后再次审核':receipt.action==='approve'?'审核通过，确认资料信息后系统将自动准备入库，发布仍需确认':'审核处理已记录，原文件和历史结果保留')
+    if(reviewedTextSupported.value && (receipt.action==='save-revision' || receipt.action==='approve'))resultTab.value='reviewed'
     await Promise.all([
       detail.load(),
       eventsSupported.value ? events.load() : Promise.resolve()
@@ -653,6 +682,7 @@ function clearCurrentObject() {
   submitError.value = ''
   detail.data.value = null
   detail.state.value = 'empty'
+
   events.data.value = null
   events.state.value = 'empty'
 }

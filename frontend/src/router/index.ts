@@ -16,8 +16,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'documents',
         name: 'Documents',
+        component: () => import('@/views/FileWorkbenchView.vue'),
+        meta: { title: '文件处理工作台' }
+      },
+      {
+        path: 'documents/advanced',
+        name: 'DocumentAdvanced',
         component: () => import('@/views/DocumentsView.vue'),
-        meta: { title: '文档管理' }
+        meta: { title: '文件高级操作' }
       },
       {
         path: 'parsing',
@@ -34,8 +40,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'knowledge/ingestion',
         name: 'Ingestion',
+        component: () => import('@/views/WorkbenchIngestionView.vue'),
+        meta: { title: '入库与发布' }
+      },
+      {
+        path: 'knowledge/ingestion/advanced',
+        name: 'IngestionAdvanced',
         component: () => import('@/views/IngestionView.vue'),
-        meta: { title: '知识库入库管理' }
+        meta: { title: '知识库高级操作' }
       },
       {
         path: 'knowledge/search',

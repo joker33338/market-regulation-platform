@@ -21,7 +21,7 @@
           <el-icon><Monitor /></el-icon><span>首页工作台</span>
         </el-menu-item>
         <el-menu-item index="/documents">
-          <el-icon><FolderOpened /></el-icon><span>文档管理</span>
+          <el-icon><FolderOpened /></el-icon><span>文件处理工作台</span>
         </el-menu-item>
         <el-menu-item index="/parsing">
           <el-icon><Cpu /></el-icon><span>智能解析中心</span>
@@ -33,7 +33,7 @@
           <template #title>
             <el-icon><Collection /></el-icon><span>法规知识库</span>
           </template>
-          <el-menu-item index="/knowledge/ingestion">入库管理</el-menu-item>
+          <el-menu-item index="/knowledge/ingestion">入库与发布</el-menu-item>
           <el-menu-item index="/knowledge/search">知识检索</el-menu-item>
           <el-menu-item index="/library/laws">法规库</el-menu-item>
           <el-menu-item index="/library/cases">处罚案例库</el-menu-item>

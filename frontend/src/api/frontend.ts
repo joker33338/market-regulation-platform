@@ -204,6 +204,7 @@ export function searchKnowledge(body: SearchRequest, signal?: AbortSignal): Prom
   if (body.kbVersion) payload.kb_version = body.kbVersion
   if (body.issuingAuthority) payload.issuing_authority = body.issuingAuthority
   if (body.effectiveStatus) payload.effective_status = body.effectiveStatus
+  if (body.documentType) payload.document_type = body.documentType
   return client
     .post<SearchResponse>('/api/knowledge/search', payload, signalOf(signal))
     .then((r) => r.data)

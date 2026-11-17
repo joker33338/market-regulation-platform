@@ -110,6 +110,7 @@ export function makeReviewActionBody(
   } else {
     if (input.page !== undefined) body.page = input.page
     if (input.content !== undefined) body.content = input.content
+    body.revision_scope = 'page_body_v1'
   }
   return body
 }

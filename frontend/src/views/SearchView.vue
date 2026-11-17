@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">法规知识检索</h1>
+        <h1 class="page-title">知识检索</h1>
         <p class="page-desc">public ACTIVE 知识库 · 法条级定位 · 结果以后端真实返回为准（前端不生成任何法律原文）</p>
       </div>
       <div class="header-tags">
@@ -24,7 +24,7 @@
         <el-input
           v-model="query"
           size="large"
-          placeholder="输入法规名称、条号或业务关键词" aria-label="检索关键词" maxlength="2000"
+          placeholder="输入资料名称、章节或业务关键词" aria-label="检索关键词" maxlength="2000"
           clearable
           @keyup.enter="runSearch"
         >
@@ -34,6 +34,7 @@
         <el-button size="large" @click="clearQuery">重置</el-button>
       </div>
       <div class="filter-row" role="group" aria-label="检索筛选条件">
+        <el-select v-if="searchFilterEnabled('document_type')" v-model="documentType" aria-label="检索资料类别" size="small" style="width:160px"><el-option label="法规" value="law"/><el-option label="处罚案例" value="case"/><el-option label="全部授权资料" value="all"/></el-select>
         <el-select v-model="mode" aria-label="检索方式" size="small" style="width: 200px">
           <el-option label="keyword（关键词，不加载模型）" value="keyword" />
           <el-option label="hybrid（BGE-M3 混合检索）" value="hybrid" />
@@ -87,7 +88,7 @@
                 请输入检索词并点击「检索」；结果只来自 POST /api/knowledge/search 的真实响应，本页不生成任何法规原文。
               </template>
               <template v-else>
-                本页不会生成任何法规名称、条号、原文或结论；接口异常时显示错误态而非空结果，不会以演示数据填充。
+                本页不会生成任何资料名称、条号、原文或结论；接口异常时显示错误态而非空结果，不会以演示数据填充。
               </template>
             </p>
             <el-button size="small" :disabled="!canSearch" @click="runSearch">
@@ -104,7 +105,7 @@
         <div v-for="(hit, i) in hits" :key="`${hit.chunk_id}-${i}`" class="hit-card">
           <div class="hit-head">
             <span class="hit-index num">{{ i + 1 }}</span>
-            <b>{{ hit.regulation_name || '〔后端未返回法规名称〕' }}</b>
+            <b>{{ hit.regulation_name || '〔后端未返回资料名称〕' }}</b>
             <el-tag v-if="hit.article_no" size="small" effect="plain">{{ hit.article_no }}</el-tag>
             <el-tag v-if="hit.chapter" size="small" type="info" effect="plain">{{ hit.chapter }}</el-tag>
             <span class="hit-score">
@@ -174,11 +175,12 @@ import type { SearchRequest, SearchResponse, SearchHit } from '@/api/types'
  */
 const query = ref('')
 const submittedQuery = ref('')
+const documentType=ref<'law'|'case'|'all'>('law'),submittedDocumentType=ref<'law'|'case'|'all'>('law')
 const mode = ref<SearchRequest['mode']>('keyword')
 const limit = ref(8)
 const submittedMode = ref<SearchRequest['mode']>('keyword')
 const submittedLimit = ref(8)
-const filtersDirty = computed(() => !!submittedQuery.value && (query.value.trim() !== submittedQuery.value || mode.value !== submittedMode.value || limit.value !== submittedLimit.value || JSON.stringify(activeFilters()) !== JSON.stringify(submittedFilters.value)))
+const filtersDirty = computed(() => !!submittedQuery.value && (query.value.trim() !== submittedQuery.value || mode.value !== submittedMode.value || documentType.value !== submittedDocumentType.value || limit.value !== submittedLimit.value || JSON.stringify(activeFilters()) !== JSON.stringify(submittedFilters.value)))
 
 /* draft-4 新筛选：key 为 UI 状态，field 为后端能力声明 / 请求体字段名 */
 type FilterKey = 'kbVersion' | 'issuingAuthority' | 'effectiveStatus'
@@ -236,7 +238,7 @@ const canSearch = computed(() =>
 
 const search = useAsyncData<SearchResponse>(
   (signal) => searchKnowledge(
-    { query: submittedQuery.value, mode: submittedMode.value, limit: submittedLimit.value, ...submittedFilters.value },
+    { query: submittedQuery.value, mode: submittedMode.value, limit: submittedLimit.value, ...submittedFilters.value,...(searchFilterEnabled('document_type')?{documentType:submittedDocumentType.value}:{}) },
     signal
   ),
   { immediate: false }
@@ -263,6 +265,7 @@ function runSearch() {
   submittedQuery.value = query.value.trim()
   submittedFilters.value = activeFilters()
   submittedMode.value = mode.value
+  submittedDocumentType.value=documentType.value
   submittedLimit.value = limit.value
   void search.load()
 }
@@ -270,6 +273,7 @@ function runSearch() {
 function clearQuery() {
   query.value = ''
   mode.value = 'keyword'
+  documentType.value='law'
   limit.value = 8
   search.error.value = ''
   submittedQuery.value = ''

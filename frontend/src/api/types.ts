@@ -244,6 +244,7 @@ export type VersionInfo = KbVersionItem
 export interface SearchRequest {
   query: string
   mode: 'keyword' | 'hybrid'
+  documentType?: 'law' | 'case' | 'all'
   limit?: number
   /** v0.2.3 draft-4 新增筛选；仅运行期能力声明包含时才随请求发送，否则保持 undefined */
   kbVersion?: string
@@ -387,6 +388,7 @@ export interface ReviewActionBody {
   page?: number | null
   content?: string | null
   span?: string | null
+  revision_scope?: 'page_body_v1'
 }
 
 /** 200 回执：write_performed 为真实写入结果，前端不自行判定成功 */
@@ -686,6 +688,7 @@ export interface IngestionDocument {
   law_name: string
   law_id: string
   expected_review_version: number
+  document_type?: 'law' | 'case'
 }
 
 export interface IngestionBatchRequest {
@@ -835,7 +838,7 @@ export interface LibraryDetail {
   record: LibraryRecord
   original_text: string
   original_file_name: string
-  text_status: 'ocr_not_manually_verified'
+  text_status: 'ocr_not_manually_verified' | 'reviewed_copy'
   /** 案例 / 条款 / 法规的结构化字段；null 或字段为 null 时显示「—（后端未返回）」 */
   structured: Record<string, unknown> | null
   source_url: string
