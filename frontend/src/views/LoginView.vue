@@ -7,6 +7,7 @@
         <p>智能文档解析 · 法规结构化 · 知识检索</p>
       </div>
 
+      <el-alert v-if="route.query.reason === 'expired'" type="warning" :closable="false" title="登录已失效，请重新登录。" style="margin-bottom:16px" />
       <el-tabs v-model="mode">
         <!-- ① 账号密码登录（v0.2.3 draft-4；当前 8180 v0.2.2 未加载该接口，提交后如实报错） -->
         <el-tab-pane label="账号登录" name="password">
@@ -73,13 +74,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { safeLoginReturn } from '@/router/authNavigation'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { releaseStatus } from '@/config/release'
 import { toApiError } from '@/api/errors'
 
 const router = useRouter()
+const route = useRoute()
+function returnAfterLogin() { return router.replace(safeLoginReturn(router, route.query.redirect)) }
 const store = useAppStore()
 
 const mode = ref<'password' | 'token'>('password')
@@ -104,7 +108,7 @@ async function loginByPassword() {
     } else {
       ElMessage.success('登录成功，身份以 GET /api/auth/me 确认为准')
     }
-    router.push('/dashboard')
+    await returnAfterLogin()
   } catch (err) {
     password.value = ''
     const e = toApiError(err)
@@ -132,10 +136,10 @@ async function loginByToken() {
   try {
     await store.saveToken(token.value)
     if (store.apiState === 'ONLINE') {
-      router.push('/dashboard')
+      await returnAfterLogin()
     } else {
       ElMessage.warning('Token 已保存到当前会话，但后端未响应；页面将显示异常态，不会回退演示数据')
-      router.push('/dashboard')
+      await returnAfterLogin()
     }
   } finally {
     loading.value = false

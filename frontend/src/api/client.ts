@@ -85,7 +85,12 @@ client.interceptors.response.use(
   (error: AxiosError) => {
     const apiError = toApiError(error)
     // 只广播状态码，不携带响应正文/凭证；身份层订阅后清除旧可写状态
-    if (apiError.status === 401 || apiError.status === 403 || apiError.status === 404) {
+    const currentToken = getToken()
+    const sentAuthorization = String(error.config?.headers?.Authorization || '')
+    const loginRequest = error.config?.url?.split('?')[0] === '/api/auth/login'
+    // 密码错误属于登录表单；旧凭据的延迟响应也不能清掉刚建立的新会话。
+    if (!loginRequest && currentToken && sentAuthorization === `Bearer ${currentToken}` &&
+        (apiError.status === 401 || apiError.status === 403 || apiError.status === 404)) {
       emitAuthStateChange(apiError.status)
     }
     return Promise.reject(apiError)

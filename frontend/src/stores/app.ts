@@ -88,15 +88,20 @@ export const useAppStore = defineStore('app', () => {
         void e // 409/网络失败：仅清本机会话，不宣称服务端已撤销
       }
     }
+    clearLocalSession()
+    return revoked
+  }
+
+  /** 凭证失效时只清除本机状态，不递归调用服务端退出接口。 */
+  function clearLocalSession() {
     clearToken()
     token.value = ''
     authMode.value = 'token'
     writeAuthMode('token')
     apiOnline.value = 'unknown'
     serviceInfo.value = null
-    clearPrincipal('已清除会话凭证')
+    clearPrincipal('会话已清除，请重新登录')
     resetContractState()
-    return revoked
   }
 
   /** 旧解析接口唯一真实探活：GET /api/parse/info */
@@ -118,6 +123,6 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     token, authMode, apiOnline, apiState, serviceInfo, qaAccepted,
-    saveToken, passwordLogin, logout, probeBackend, probeAll
+    saveToken, passwordLogin, logout, clearLocalSession, probeBackend, probeAll
   }
 })

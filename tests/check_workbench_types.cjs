@@ -4,7 +4,7 @@ const root=path.resolve('frontend'),ts=require(path.join(root,'node_modules/type
 const {parse}=require(path.join(root,'node_modules/@vue/compiler-sfc'))
 const config=ts.readConfigFile(path.join(root,'tsconfig.json'),ts.sys.readFile)
 const parsed=ts.parseJsonConfigFileContent(config.config,ts.sys,root)
-const changed=['src/views/FileWorkbenchView.vue','src/views/WorkbenchIngestionView.vue','src/views/ReviewView.vue','src/views/SearchView.vue',
+const changed=['src/views/LoginView.vue','src/layout/AppLayout.vue','src/views/FileWorkbenchView.vue','src/views/WorkbenchIngestionView.vue','src/views/ReviewView.vue','src/views/SearchView.vue',
 'src/components/workbench/PrepareDocumentsDialog.vue','src/components/workbench/BulkReviewDialog.vue','src/components/workbench/BatchUploadPanel.vue','src/components/workbench/ReviewBatchResults.vue']
 const virtual=new Map()
 for(const relative of changed){

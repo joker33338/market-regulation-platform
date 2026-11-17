@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=18186)
     parser.add_argument("--dist", type=Path, required=True)
+    parser.add_argument("--login-fixture", action="store_true")
     args = parser.parse_args()
     for key in ("PARSING_RESULT_PG_DSN", "PG_DSN", "KNOWLEDGE_WRITE_PG_DSN",
                 "REVIEW_MYSQL_CONFIG_JSON", "AUTH_ACCOUNTS_FILE", "PARSING_API_TOKENS_JSON"):
@@ -25,6 +26,12 @@ def main():
     with tempfile.TemporaryDirectory() as state:
         config = MinerUConfig(enabled=True, result_dir=Path(state))
         app = create_app(config, tokens={"a"*32: "alice", "b"*32: "bob"})
+        if args.login_fixture:
+            from scripts.provision_auth_accounts import provision
+            password = os.environ['LOGIN_TEST_PASSWORD']
+            filename = Path(state) / 'synthetic-accounts.json'
+            provision(filename, 'synthetic-login-admin', password)
+            app.state.account_store.filename = str(filename)
         @asynccontextmanager
         async def isolated_lifespan(application):
             # 页面测试只提交持久化任务，不将合成夹具送入引擎。
