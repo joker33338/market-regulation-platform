@@ -1,3 +1,7 @@
+"""解析资源配置及输入安全检查。
+
+限制文件大小、页数、图片像素和解压规模，缓存命中也不能跳过原件检查；
+资源拒绝沿安全错误码向上传递，不能依靠切换解析引擎绕过。"""
 from __future__ import annotations
 
 import os
@@ -115,4 +119,3 @@ class ParsingConfig:
             raise IngestionError("缺少完整本地模型：" + "、".join(missing) +
                                  "。请显式运行 scripts/prepare_ocr_models.py；解析时不会下载。")
         return paths
-

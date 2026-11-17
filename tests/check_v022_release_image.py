@@ -1,3 +1,7 @@
+"""历史 v0.2.2 镜像的隔离页面与接口探针。
+
+本脚本固定旧契约的 22 个路径，仅适用于对应历史镜像；不得用于判定
+当前 v0.2.3 契约是否完整。执行会设置进程环境并创建临时应用。"""
 import os
 os.environ.update(MINERU_RESULT_DIR='/tmp/release-check', MINERU_ENABLED='0', DUAL_OCR_ENABLED='0', PARSING_API_TOKENS_JSON='{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"synthetic"}')
 os.environ.pop('PARSING_RESULT_PG_DSN',None)

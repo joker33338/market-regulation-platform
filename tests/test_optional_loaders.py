@@ -1,3 +1,4 @@
+"""可选文档加载器回归；缺失依赖时明确跳过，不作为真实 OCR 质量证明。"""
 from __future__ import annotations
 
 import importlib.util
@@ -65,4 +66,3 @@ class OptionalLoaders(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

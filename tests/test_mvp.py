@@ -1,3 +1,4 @@
+"""早期端到端业务回归，使用临时状态及测试替身验证入库与检索约束。"""
 from __future__ import annotations
 
 import contextlib
@@ -339,4 +340,3 @@ class EmbeddingContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

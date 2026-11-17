@@ -18,6 +18,7 @@ def lock(root):
 
 @contextmanager
 def lifecycle(root):
+    """对上传元数据和任务提交使用同一进程间文件锁，超时返回对象忙而非执行部分写入。"""
     try:
         with lock(root):
             yield
@@ -27,6 +28,7 @@ def lifecycle(root):
 
 @asynccontextmanager
 async def async_lifecycle(root):
+    """在线程中等待文件锁，协程取消后仍等待获取结果并释放锁，防止后台线程遗留锁。"""
     guard=lock(root)
     acquire=asyncio.create_task(asyncio.to_thread(guard.acquire))
     try:
@@ -60,6 +62,10 @@ def assert_active(path):
 
 
 def delete_document(reader,principal,file_id,references):
+    """先核验身份、历史任务及所有知识库引用，再将元数据隔离。
+
+    原件字节始终保留；共享生命周期锁覆盖检查与提交，避免并发提交任务
+    绕过删除门禁。任一必需检查失败都不能返回删除成功。"""
     if not re.fullmatch('[a-f0-9]{32}',file_id):
         raise MinerUError('invalid_file_id',422)
     owner=principal.owner_id

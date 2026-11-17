@@ -12,6 +12,7 @@ from uuid import uuid4
 ROOT=Path(__file__).resolve().parents[1]
 
 def run(args,**kwargs):
+    """执行既有构建步骤，失败立即停止，不自动安装或升级依赖。"""
     return subprocess.run(args,check=True,**kwargs)
 
 def main():

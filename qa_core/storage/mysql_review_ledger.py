@@ -34,6 +34,7 @@ class MySQLReviewLedger:
 
     @contextmanager
     def connection(self):
+        """每次操作独立事务；完整成功才提交，约束冲突转为业务冲突，其余异常回滚并释放连接。"""
         import pymysql
         connection = pymysql.connect(**self.config, charset='utf8mb4', autocommit=False,
             connect_timeout=5, read_timeout=10, write_timeout=10, local_infile=False,
@@ -63,6 +64,7 @@ class MySQLReviewLedger:
             return cursor.fetchone() or {'version': 0, 'status': 'unreviewed', 'current_revision': None}
 
     def verify_for_ingestion(self, owner, parse_id, source_digest, expected_version):
+        """按真实 owner 和解析身份复核批准状态、审核版本与源摘要，拒绝复用旧批准。"""
         with self.connection() as connection,connection.cursor() as cursor:
             cursor.execute('SELECT version,status,current_revision,source_digest FROM review_heads WHERE owner_key=%s AND parse_id=%s',
                            (digest(owner),parse_id))
@@ -73,6 +75,10 @@ class MySQLReviewLedger:
 
     @contextmanager
     def verified_ingestion_scope(self, references):
+        """按固定顺序锁定审核头，保持共享锁直到调用方的入库或发布阶段结束。
+
+        用于阻止审核撤销与发布并发穿透；MySQL 与 PostgreSQL 仍是不同事务，
+        调用方必须保留操作回执与结果不确定时的恢复记录。"""
         with self.connection() as connection,connection.cursor() as cursor:
             for reference in sorted(references,key=lambda value:(digest(value['owner_id']),value['parse_id'])):
                 cursor.execute('SELECT version,status,current_revision,source_digest FROM review_heads WHERE owner_key=%s AND parse_id=%s FOR SHARE',
@@ -114,6 +120,10 @@ class MySQLReviewLedger:
         return {'list': rows, 'total': total, 'page': page, 'page_size': page_size, 'source': 'mysql.review_events'}
 
     def apply(self, owner, parse_id, action, body, request_key, source_digest, *, operator_id):
+        """根据真实操作者生成幂等键，锁定对象审核头后追加事件并更新当前版本。
+
+        相同请求重放原回执；参数变化、来源变化或版本不符均拒绝。
+        事件记录操作者与数据 owner，不覆盖 OCR 原文，也不执行知识库发布。"""
         if not operator_id:
             raise MinerUError('principal_required',403)
         owner_key, key_hash = digest(owner), digest(canonical({'principal_id':operator_id,'key':request_key}))

@@ -1,3 +1,4 @@
+"""文档解析回归：覆盖结构转换、质量判断、资源限制及引擎兼容。"""
 from __future__ import annotations
 
 import json
@@ -410,4 +411,3 @@ class DocumentParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

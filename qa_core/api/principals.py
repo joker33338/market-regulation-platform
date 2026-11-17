@@ -11,6 +11,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 
 
 def identifier(value):
+    """校验公开身份标识格式；凭证与用户身份的解析由后续配置校验负责。"""
     return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}', value) is not None
 
 
@@ -40,6 +41,7 @@ class Principal:
 
     @property
     def read_owners(self):
+        """普通用户仅查询本人数据，审核员追加授权范围，管理员返回全局选择器。"""
         if self.is_admin:
             from qa_core.access import ALL_OWNERS
             return ALL_OWNERS
@@ -49,13 +51,16 @@ class Principal:
         return tuple(sorted(set(owners)))
 
     def can_delete(self, owner_id):
+        """仅有效管理员可进入删除流程；对象存在性及证据引用仍由生命周期层检查。"""
         return self.is_admin and isinstance(owner_id,str) and bool(owner_id)
 
     def can_review(self, owner_id):
+        """有效管理员拥有审核权限；普通审核员必须命中显式 owner 授权范围。"""
         return self.credential_status=='active' and (self.is_admin or 'REVIEWER' in self.roles and owner_id in self.review_owner_scopes)
 
 
 def owner_selector(principal):
+    """将身份授权范围转成查询选择器；保留管理员全局范围标记，供存储层统一识别。"""
     scopes = principal.read_owners
     from qa_core.access import is_all_owners
     if is_all_owners(scopes):

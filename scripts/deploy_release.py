@@ -14,12 +14,14 @@ NAME='market-regulation-app-1'
 
 
 def command(*args):
+    """执行 Docker 操作并捕获输出；失败使用固定提示，避免泄露私密配置。"""
     result=subprocess.run(['docker',*args],capture_output=True)
     if result.returncode:raise RuntimeError('Docker操作失败；未输出私密配置')
     return result.stdout
 
 
 def inspect(name):
+    """读取本机容器或镜像配置，调用方只展示筛选后的身份信息。"""
     return json.loads(command('inspect',name))[0]
 
 

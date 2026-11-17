@@ -293,6 +293,7 @@ def register_ingestion(app, principal, reader, config):
             database.close()
 
     def release_endpoint(action):
+        """生成发布或回滚处理器；权限、幂等回执及审核来源复核均在服务端执行。"""
         @guarded
         def release(body: ReleaseRequest,idempotency_key: str=Header(min_length=1,max_length=128),identity=Depends(principal)):
             grant(identity,action,body.kb_version)
