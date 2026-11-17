@@ -138,3 +138,14 @@ class WorkbenchHTTPTests(unittest.TestCase):
                         await asyncio.sleep(0.05)
                     self.assertEqual(len(self.f.service.repository.owned_tasks('alice')),2)
         asyncio.run(verify())
+
+    def test_error_contract_is_independent_of_eager_router_annotation(self):
+        schema=self.f.app.openapi()
+        response=schema['paths']['/api/workbench/documents']['get']['responses']
+        for status in ('401','403','404','409','422','429','503'):
+            response.pop(status,None)
+        rebuilt=self.f.app.openapi()
+        for status in ('401','403','404','409','422','429','503'):
+            error=rebuilt['paths']['/api/workbench/documents']['get']['responses'][status]
+            self.assertEqual(error['content']['application/json']['schema'],
+                             {'$ref':'#/components/schemas/DocumentDeletionError'})

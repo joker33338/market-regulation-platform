@@ -61,6 +61,28 @@ def annotate_legacy(app):
     def openapi():
         schema = default_openapi()
         schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)
+        # 新版FastAPI可延迟展开include_router；最终Schema兜底不依赖内部路由对象形态。
+        from .document_delete import DocumentDeletionError
+        error_model = DocumentDeletionError.model_json_schema(ref_template="#/components/schemas/{model}")
+        models = schema["components"]["schemas"]
+        models.update(error_model.pop("$defs", {}))
+        models["DocumentDeletionError"] = error_model
+        for path, operations in schema.get("paths", {}).items():
+            if not path.startswith("/api/"):
+                continue
+            for method, operation in operations.items():
+                if method not in {"get", "post", "put", "patch", "delete", "head", "options"}:
+                    continue
+                responses = operation.setdefault("responses", {})
+                for status in (401, 403, 404, 409, 422, 429, 503):
+                    default = {"description": "认证、权限、门禁、限流或服务不可用",
+                               "content": {"application/json": {"schema": {
+                                   "$ref": "#/components/schemas/DocumentDeletionError"}}}}
+                    responses.setdefault(str(status), default)
+                    content = responses[str(status)].get("content", {}).get("application/json", {})
+                    if status == 422 and content.get("schema", {}).get("$ref") == "#/components/schemas/HTTPValidationError":
+                        # 全局校验异常处理器返回机器错误包络，不使用框架默认detail数组。
+                        responses[str(status)] = default
         for route in app.routes:
             dependant=getattr(route,'dependant',None)
             dependencies=getattr(dependant,'dependencies',())
