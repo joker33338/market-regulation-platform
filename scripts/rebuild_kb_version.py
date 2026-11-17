@@ -1,4 +1,4 @@
-"""KnowForge-style entry name, forwarding to the offline ingestion CLI."""
+"""兼容 KnowForge 风格的命令入口，实际转发到离线入库命令行。"""
 import sys
 from pathlib import Path
 

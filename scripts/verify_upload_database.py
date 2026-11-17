@@ -1,7 +1,6 @@
-"""End-to-end local UI API -> official parser -> existing test PostgreSQL.
+"""以生成的单页 PDF 验证本地上传、官方解析及测试 PostgreSQL 链路。
 
-Uses a generated one-page PDF only. Never accepts a corpus path.
-"""
+不接收真实语料路径；执行涉及外部请求和隔离数据库写入，须事先确认环境及授权。"""
 import argparse
 import json
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""Fetch public government test materials; create clearly labelled scan derivatives."""
+"""获取公开政府测试材料并生成明确标记的扫描衍生样本，执行会访问网络及写入文件。"""
 from __future__ import annotations
 import argparse
 import json

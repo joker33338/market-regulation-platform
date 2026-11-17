@@ -1,4 +1,4 @@
-"""Opt-in existing document_review schema tests; no DDL or data deletion."""
+"""显式启用的既有 document_review 结构验证，不执行 DDL 或删除原有数据。"""
 import os
 import unittest
 from uuid import uuid4

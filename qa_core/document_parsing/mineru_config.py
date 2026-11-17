@@ -1,4 +1,4 @@
-"""Application-side remote parser configuration; never imports model runtimes."""
+"""应用侧远程解析配置及校验，不导入本地推理模型运行时。"""
 from dataclasses import dataclass, field
 import os
 from pathlib import Path

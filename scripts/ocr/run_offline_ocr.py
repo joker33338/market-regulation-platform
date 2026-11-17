@@ -1,4 +1,4 @@
-"""Offline OCR candidate generation and explicit human review."""
+"""离线 OCR 候选生成及显式人工复核命令入口。"""
 from __future__ import annotations
 
 import argparse

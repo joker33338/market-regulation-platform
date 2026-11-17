@@ -1,8 +1,7 @@
-"""Quality-guided local parsing with explicitly authorized official-cloud fallback.
+"""基于质量结果选择解析候选，并按显式授权决定是否使用官方云端回退。
 
-Candidates are durable before selection. The existing sink receives only the final
-immutable result; remote subtasks reuse the existing resumable MinerU lifecycle.
-"""
+先持久化候选，再执行选择；已有存储适配器只接收最终结果。远端子任务复用
+MinerU 的可恢复生命周期。配置了凭据不代表本模块可以绕过文件外传授权。"""
 import asyncio
 from dataclasses import dataclass, field, replace
 import json
@@ -24,7 +23,7 @@ from .schemas import DocumentResult
 
 
 def persist_result(path, result):
-    """Crash-safe checkpoint; only generated files in the task output directory."""
+    """把候选检查点写入任务输出目录的受控生成文件，供中断后恢复选择结果。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.candidate-', delete=False) as stream:
         temporary = Path(stream.name)

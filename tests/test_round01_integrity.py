@@ -1,4 +1,4 @@
-"""Read-only package/import and container build-context preflight."""
+"""只读检查包导入及容器构建上下文，不启动正式部署。"""
 import importlib
 from pathlib import Path
 import unittest

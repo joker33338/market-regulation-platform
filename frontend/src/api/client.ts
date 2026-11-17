@@ -42,7 +42,7 @@ function writeSession(value: string) {
 try {
   localStorage.removeItem(LEGACY_TOKEN_KEY)
 } catch {
-  /* ignore */
+  /* 浏览器禁止访问本地存储时忽略清理失败，继续使用内存和会话存储。 */
 }
 
 export function getToken(): string {

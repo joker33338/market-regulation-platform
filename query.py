@@ -1,4 +1,4 @@
-"""Compatibility entry point: ask(question, stream=True), with richer citations."""
+"""兼容查询入口，保留 ask(question, stream=True) 调用方式并返回更完整的来源引用。"""
 from __future__ import annotations
 
 import json
@@ -22,7 +22,7 @@ def build_prompt(question: str, hits: list[dict]) -> str:
 
 def ask(question: str, stream: bool = True, *, database: Database | None = None,
         embeddings=None, generate: bool = False) -> dict:
-    """Legacy keys remain. Generation is optional; retrieval is fully offline."""
+    """保留旧版返回字段；文本生成按配置启用，检索支持离线执行。"""
     owned = database is None
     if database is None:
         if os.getenv("PG_DSN"):

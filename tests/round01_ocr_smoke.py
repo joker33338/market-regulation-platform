@@ -1,4 +1,4 @@
-"""Bounded offline real-document smoke; never prints document content."""
+"""有资源限制的离线真实文档冒烟探针，不打印文档正文；执行前须确认样本授权。"""
 import json
 import os
 from pathlib import Path

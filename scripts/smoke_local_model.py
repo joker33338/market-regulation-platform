@@ -1,4 +1,4 @@
-"""Run the copied real BGE model against an isolated local SQLite database."""
+"""以真实本地 BGE 和独立 SQLite 执行验证；运行会创建测试数据及版本状态。"""
 from __future__ import annotations
 
 import json

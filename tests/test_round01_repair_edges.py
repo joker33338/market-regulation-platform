@@ -1,4 +1,4 @@
-"""Focused R01-004/005 boundaries: immutable artifacts and durable local progress."""
+"""聚焦 R01-004/005 的边界：产物不可变及本机进度持久化。"""
 import asyncio
 from collections import Counter
 from pathlib import Path

@@ -1,4 +1,7 @@
-"""One lazy local Paddle worker; strict offline guard never affects the business process."""
+"""按需启动的本地 Paddle 隔离工作进程。
+
+离线网络限制施加在工作进程内，避免影响业务进程的数据库和接口连接；
+模型加载、超时和工作进程回收由本模块管理。"""
 from __future__ import annotations
 
 import importlib.metadata

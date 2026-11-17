@@ -1,4 +1,4 @@
-"""Deterministic identities, adapted from KnowForge qa_core/utils.py."""
+"""确定性身份及通用工具，由 KnowForge qa_core/utils.py 适配而来。"""
 from __future__ import annotations
 
 import hashlib
@@ -25,5 +25,5 @@ def json_text(value: object) -> str:
 
 
 class IngestionError(ValueError):
-    """An actionable error safe to display without connection credentials."""
+    """可安全展示给用户的业务错误，不应携带数据库凭据或连接信息。"""
 

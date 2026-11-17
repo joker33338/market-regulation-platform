@@ -1,4 +1,7 @@
-"""Bounded archive validation, atomic result storage and existing-schema adapter."""
+"""远端解析产物的安全校验、落盘与统一协议转换。
+
+限制压缩成员数量及展开体积，拒绝路径穿越和歧义文件，再使用临时文件替换
+写入产物。仅已知结构化块可进入法律正文，不根据 Markdown 猜测未知结构。"""
 import io
 import json
 import os
@@ -14,6 +17,11 @@ from .normalizer import normalize_text, table_from_html
 
 
 def unpack(payload: bytes, config) -> dict[str, bytes]:
+    """校验压缩包后返回文件名到字节内容的映射，不直接把压缩成员解压到磁盘。
+
+    同时校验原始名称、规范化名称、重复路径、链接及加密标记，并限制成员数
+    和展开体积。官方与自托管产物按不同协议检查必需文件；CRC 或 ZIP 结构
+    异常转为固定业务错误，避免把外部异常正文回显给用户。"""
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
             members = archive.infolist()
@@ -56,6 +64,11 @@ def unpack(payload: bytes, config) -> dict[str, bytes]:
 
 
 def store_artifacts(payload, directory: Path, config):
+    """校验完整产物后逐文件写入受控结果目录，并返回已验证的内容映射。
+
+    每个文件使用独占临时文件再原子替换，禁止符号链接或目录逃逸。
+    原子性仅针对单个文件，不代表整个产物目录具有跨文件事务；失败时调用方
+    仍需依据任务状态决定重试，不能将部分文件视为完整成功。"""
     if config.output_formats in {("docx",), ("html",)}:
         # Tasks 契约规定这些产物以独立文件下载。
         result = {"document." + config.output_formats[0]: payload}
@@ -94,7 +107,7 @@ def store_artifacts(payload, directory: Path, config):
 
 
 def normalize_artifacts(task, file, artifacts, *, mock=False):
-    """Only known structured-content blocks become legal source lines; no Markdown guessing."""
+    """按官方或自托管结构化协议转换产物，不从未知 Markdown 段落猜测法律正文。"""
     official = task.get("provider") == "official"
     try:
         if official:

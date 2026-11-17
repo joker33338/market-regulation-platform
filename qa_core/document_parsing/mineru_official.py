@@ -1,8 +1,7 @@
-"""Official public v4 API adapter, distinct from the self-hosted 4.1 Tasks API.
+"""官方公共 v4 API 适配器，与自托管 4.1 Tasks API 分离。
 
-Contract: https://mineru.net/apiManage/docs. Public data_id is a caller association,
-not a self-hosted server file_id. No undocumented public cancellation is attempted.
-"""
+契约参考 https://mineru.net/apiManage/docs。公共 data_id 是调用方关联标识，
+不能当作自托管服务 file_id；不尝试文档未定义的公共取消操作。"""
 import time
 from urllib.parse import quote
 from uuid import uuid4

@@ -1,4 +1,4 @@
-"""Read-only corpus inventory; emits anonymous aggregate evidence only."""
+"""只读语料盘点，仅输出匿名聚合证据，不记录原文件名或正文。"""
 import hashlib
 import importlib.metadata as metadata
 import json

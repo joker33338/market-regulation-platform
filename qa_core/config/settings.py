@@ -1,4 +1,7 @@
-"""Independent configuration; never imports the old project's .env."""
+"""独立运行配置。
+
+集中声明路径、模型及切分规则的默认值；不导入旧工程的 .env，避免不同工作区
+的私密配置互相污染。实际环境变量的读取方式以本模块实现为准。"""
 from __future__ import annotations
 
 import os

@@ -1,4 +1,6 @@
-"""Keep lifecycle operations separate from ingestion and online retrieval."""
+"""知识库版本生命周期管理，与候选入库及在线检索分离。
+
+版本构建不等于发布；调用方必须通过权限、来源及审核门禁后才能切换活动版本。"""
 from qa_core.storage.database import Database
 
 

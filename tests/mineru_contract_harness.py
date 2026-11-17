@@ -1,8 +1,7 @@
-"""QA reference driver, NOT a production MinerU implementation.
+"""历史 QA 契约参考驱动，不是生产 MinerU 实现。
 
-Fix must run the same scenarios against its real client before acceptance.
-All network in this harness requires an explicit httpx.MockTransport.
-"""
+验收时仍须对真实客户端运行相同场景；本驱动的网络访问必须显式注入
+httpx.MockTransport，不能借测试入口访问真实服务。"""
 import io
 import zipfile
 from pathlib import PurePosixPath

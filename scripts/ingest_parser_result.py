@@ -1,4 +1,4 @@
-"""Explicit reviewed-result to existing SQLite KB adapter; never publishes automatically."""
+"""将明确复核的解析结果适配到已有 SQLite 知识库，不自动发布。"""
 import argparse
 from dataclasses import replace
 import json

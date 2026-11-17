@@ -1,4 +1,4 @@
-"""Create ignored local runtime configuration; print no credentials."""
+"""生成受 Git 忽略的本机运行配置，不打印凭据。"""
 import argparse
 import json
 import os

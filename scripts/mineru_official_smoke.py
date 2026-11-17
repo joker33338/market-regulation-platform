@@ -1,8 +1,7 @@
-"""Official v4 smoke using a generated PDF only. Resume a previously created batch.
+"""仅用程序生成 PDF 执行官方 v4 冒烟检查，可恢复已创建的批次。
 
-The receipt and all results must stay in an ignored local directory. Credentials
-are read only from the process environment; never print URLs or server bodies.
-"""
+回执和结果必须写入 Git 忽略目录；凭据仅从进程环境读取，不能打印请求 URL
+或服务端正文。执行前须单独核对真实外部调用授权。"""
 import argparse
 import hashlib
 import io

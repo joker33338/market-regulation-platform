@@ -318,7 +318,8 @@ import type {
 /**
  * 审核中心（v0.2.3 draft-4；路径数与方法以运行期契约探测为准）：
  * - 身份 = GET /api/auth/me：principal_id 是实际操作者，owner_id 是业务数据归属，两者分离。
- *   USER 无审核写入能力，ADMIN 不隐含 REVIEWER；角色只用于展示与**收紧**，不代替后端授权。
+ *   USER 无审核写入能力；当前契约下 ADMIN 拥有全部业务权限，REVIEWER 受授权范围限制。
+ *   前端仅据身份收紧展示，最终权限由后端逐请求判定。
  * - 写操作仍以双门控为准 = 运行期 OpenAPI 含 4 条写路径 + 详情 review_write_supported /
  *   review_ledger.available；REVIEWER 能否写某个文档由后端按 review_owner_scopes 逐请求判定。
  *   活动实例未在运行期契约中声明这 4 条写路径时，第一道门控不通过，按钮保持禁用。

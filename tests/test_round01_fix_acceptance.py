@@ -1,8 +1,8 @@
-"""Independent QA regression against Fix, with synthetic local fixtures only.
+"""历史独立 QA 对 Fix 的回归，仅使用本地合成夹具。
 
-At the original QA baseline these cases skip because the new modules are absent.
-Use run_round01_validation.py --source <isolated-fix-checkout> to test Fix.
-"""
+在原 QA 基线缺少新增模块时，相应用例会跳过；可使用
+run_round01_validation.py --source 指定隔离的 Fix 源码。
+本文件的存在不能证明当前版本已经独立验收。"""
 import importlib.util
 import io
 import json

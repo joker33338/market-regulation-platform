@@ -1,4 +1,4 @@
-"""Small transport objects keep the offline pipeline free of web dependencies."""
+"""离线法规处理的数据传输对象，保持与 Web 框架依赖分离。"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

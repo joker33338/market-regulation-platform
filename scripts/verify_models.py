@@ -1,4 +1,4 @@
-"""Verify local model files; optional source comparison proves a complete copy."""
+"""核验本地模型文件，可选择与来源比较以确认复制完整性；执行前检查清单写入副作用。"""
 from __future__ import annotations
 
 import argparse

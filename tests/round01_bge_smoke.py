@@ -1,4 +1,4 @@
-"""Offline synthetic BGE dimension check; no corpus or remote model."""
+"""离线合成 BGE 维度检查，不读取真实语料或远端模型。"""
 import json
 from pathlib import Path
 from qa_core.config.settings import Settings

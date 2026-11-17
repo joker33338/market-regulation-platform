@@ -1,4 +1,4 @@
-"""Authenticated real FastAPI endpoints, with an injected synthetic transport."""
+"""通过注入合成传输层验证真实 FastAPI 路由的认证与解析契约。"""
 import importlib.util
 import json
 from pathlib import Path

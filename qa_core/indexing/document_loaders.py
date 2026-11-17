@@ -1,4 +1,7 @@
-"""Loaders adapted from KnowForge; preserve PDF pages and DOCX body order."""
+"""由 KnowForge 加载器适配而来的只读文档输入层。
+
+支持 TXT、Markdown、PDF 和 DOCX，保留 PDF 原页号及 DOCX 正文顺序。
+已批准的 OCR 复核稿按记录恢复页级来源；无文本层 PDF 不在这里自动启动 OCR。"""
 from __future__ import annotations
 
 import re
@@ -15,11 +18,18 @@ W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 def _text_lines(path: Path) -> list[SourceLine]:
+    """按 UTF-8（兼容 BOM）读取文本，按物理行生成逻辑第 1 页的来源行。
+
+    行号从 1 开始；读取失败向调用方传播，不尝试猜测其他编码。"""
     text = path.read_text(encoding="utf-8-sig")
     return [SourceLine(line, 1, index) for index, line in enumerate(text.splitlines(), 1)]
 
 
 def _reviewed_ocr_lines(path: Path, review: dict) -> list[SourceLine]:
+    """按已批准复核稿的换页符恢复页号，并与记录中的原行位置对照。
+
+    页数必须一致，否则拒绝加载。仅当本行文字与原记录完全一致时复用 bbox；
+    新增或修改的行保留页号与行号，但不伪造原识别框。"""
     result = []
     pages = path.read_text(encoding="utf-8-sig").split("\f")
     original_pages = review.get("pages", [])
@@ -35,6 +45,10 @@ def _reviewed_ocr_lines(path: Path, review: dict) -> list[SourceLine]:
 
 
 def _docx_lines(path: Path) -> list[SourceLine]:
+    """按 DOCX 正文节点顺序提取段落，保留换行及制表符。
+
+    本加载路径不支持表格，发现表格立即拒绝，避免丢失附件内容。页号统一为
+    逻辑第 1 页；它不是 Word 排版后的页号，也不会调用 Office 排版引擎。"""
     with ZipFile(path) as archive:
         body = ET.fromstring(archive.read("word/document.xml")).find(W + "body")
     if body is None:
@@ -60,6 +74,10 @@ def _docx_lines(path: Path) -> list[SourceLine]:
 
 
 def _pdf_lines(path: Path) -> list[SourceLine]:
+    """读取 PDF 文本层，按页和阅读顺序生成带文本块坐标的来源行。
+
+    仅处理文本块；页号与行号从 1 开始，bbox 为块级而非逐字坐标。
+    任一页无可用文字即要求先完成 OCR 和人工复核，不在此处自动调用引擎。"""
     try:
         import fitz
     except ImportError as exc:
@@ -81,6 +99,12 @@ def _pdf_lines(path: Path) -> list[SourceLine]:
 
 
 def load_file(path: str | Path, *, law_name: str | None = None, law_id: str | None = None) -> LegalDocument:
+    """只读加载一个受支持文档，返回含来源哈希、来源行和复核元数据的 LegalDocument。
+
+    优先采用已批准的 OCR 复核稿，否则按后缀选择文本、DOCX 或 PDF 文本层。
+    未指定 law_name 时，从首个有效行尝试提取标题，仍缺失则使用文件名。
+    不支持的格式、空正文或不满足来源要求的输入会抛出 IngestionError。
+    此步骤只准备对象，不生成向量、不写数据库，也不自动批准文档。"""
     path = Path(path).resolve()
     review = read_review(path)
     if path.suffix.lower() not in SUPPORTED_SUFFIXES:
@@ -108,6 +132,10 @@ def load_file(path: str | Path, *, law_name: str | None = None, law_id: str | No
 
 
 def collect_files(path: str | Path) -> list[Path]:
+    """收集输入路径下受支持的文档，目录输入按路径排序以便重复执行时顺序稳定。
+
+    单文件输入原样返回，后缀校验由 load_file 负责。目录不存在或目录内没有
+    受支持文件时抛出 IngestionError；本函数只遍历路径，不移动或删除原件。"""
     root = Path(path)
     if root.is_file():
         return [root]

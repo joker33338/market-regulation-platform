@@ -1,4 +1,4 @@
-"""PP-OCRv5 service with page-level provenance and untouched recognized text."""
+"""PP-OCRv5 页级文字识别服务，保留页级来源及未经改写的识别文本。"""
 from __future__ import annotations
 
 from qa_core.utils import IngestionError

@@ -1,6 +1,6 @@
-"""REVIEW ONLY: explicit approval required; never run by default orchestration.
-Preserves only cleanup; original legacy method assertions remain unchanged.
-"""
+"""仅供审阅的 PostgreSQL 验证入口，须明确授权，不由默认编排自动执行。
+
+保留清理相关状态，沿用原始旧版测试断言；不能将历史预期直接当作当前契约。"""
 import argparse,json,os,re,sys
 from pathlib import Path
 from unittest.mock import patch

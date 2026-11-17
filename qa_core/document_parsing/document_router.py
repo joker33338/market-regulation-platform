@@ -1,4 +1,7 @@
-"""Unified local-file entry. Native, OCR and structure are chosen page by page."""
+"""本地文件解析统一入口。
+
+结合文本层、图片及表格线索按页选择原生提取、OCR 或版面结构引擎。
+线索只用于路由，不保证表格必然被正确恢复；最终质量与复核状态另行评估。"""
 from __future__ import annotations
 
 import logging
@@ -38,7 +41,7 @@ def looks_multicolumn(page) -> bool:
 
 
 def has_vector_grid(page) -> bool:
-    """Detect ruled PDF layouts even when cells are empty and no table is extracted."""
+    """检查 PDF 矢量线段是否构成表格线索，包括空单元格导致未抽出表格的情况。"""
     horizontal = vertical = 0
     for drawing in page.get_drawings():
         for item in drawing.get('items', []):
@@ -51,7 +54,7 @@ def has_vector_grid(page) -> bool:
 
 
 def has_hidden_text_layer(page) -> bool:
-    """Detect an existing invisible OCR layer, rather than visible PDF text."""
+    """识别不可见 OCR 文本层的线索，区分普通可见 PDF 文本；不是 OCR 质量判定。"""
     traces = page.get_texttrace()
     total = sum(len(span.get("chars", [])) for span in traces)
     hidden = sum(len(span.get("chars", [])) for span in traces if span.get("type") == 3)
@@ -59,7 +62,7 @@ def has_hidden_text_layer(page) -> bool:
 
 
 def has_text_table_hint(page) -> bool:
-    """Aligned text is a routing hint, never a replacement for verified cells."""
+    """检查文本对齐产生的表格路由线索；该线索不能替代经核对的单元格结构。"""
     for table in page.find_tables(strategy="text").tables:
         rows = [[str(cell or "").strip() for cell in row] for row in table.extract()]
         rows = [row for row in rows if sum(bool(cell) for cell in row) >= 2]
@@ -72,7 +75,7 @@ def has_text_table_hint(page) -> bool:
 
 
 def has_grid(image_path: Path) -> bool:
-    """A routing hint, not a claim that all table layouts can be detected."""
+    """聚合页面的表格线索供引擎选择，不保证能够检测所有表格布局。"""
     try:
         import cv2
         import numpy as np
@@ -329,7 +332,10 @@ class DocumentParser:
 
 
 def export_result(result: DocumentResult, output_root: str | Path) -> dict:
-    """Names are generated from a hash, never from an untrusted file name."""
+    """按文档哈希生成输出名称，避免使用不可信原文件名决定目录。
+
+    该入口写入结果及相关素材，调用方必须提供受控输出目录；导出不等于
+    审核批准、向量构建或知识库发布。"""
     from qa_core.utils import stable_hash
     directory = Path(output_root) / (result.document_id or stable_hash(result.file_name, result.error_message))
     directory.mkdir(parents=True, exist_ok=True)

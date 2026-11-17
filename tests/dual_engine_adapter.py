@@ -1,8 +1,7 @@
-"""QA protocol adapter: exercise production routing; replace only OCR/HTTP inputs.
+"""历史 QA 协议适配器：执行真实业务路由，仅替换 OCR 与 HTTP 输入。
 
-case_id is deliberately unused. Observations come from persisted production tasks,
-candidate JSON, real sink queries and the existing review/ingestion/retrieval path.
-"""
+case_id 刻意不参与业务决策；观察值来自持久化任务、候选 JSON、真实存储查询
+及已有审核、入库和检索路径。测试结论须限定在实际配置和受测提交。"""
 import asyncio
 from dataclasses import replace
 import hashlib

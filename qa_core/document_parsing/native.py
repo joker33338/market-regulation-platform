@@ -1,4 +1,7 @@
-"""Reuse native extraction and preserve table structure without calling OCR."""
+"""直接读取原文件文本层和表格结构，不调用 OCR。
+
+PDF 保留文本块坐标，DOCX 按正文节点顺序提取并恢复合并单元格。
+DOCX 页号是逻辑页，不能视为 Word 排版后的真实页码。"""
 from __future__ import annotations
 
 import html
@@ -14,6 +17,11 @@ from .schemas import LayoutBlock, PageResult
 
 
 def pdf_page(page, page_number: int, source: dict) -> PageResult:
+    """从单个 PDF 页提取文本块和可恢复的原生表格，返回统一 PageResult。
+
+    表格检测失败记录警告后继续正文提取；成功提取的表格区域按文本块中心点
+    去重，避免重复正文。字体大小只用于启发式标题标记，不保证法律层级。
+    按纵坐标组合文本和 Markdown，并保留原块及表格行供追溯；不运行 OCR。"""
     tables = []
     warnings = []
     if hasattr(page, "find_tables"):
@@ -59,7 +67,10 @@ def pdf_page(page, page_number: int, source: dict) -> PageResult:
 
 
 def _docx_table_html(element) -> tuple[str, list[str]]:
-    """按 OOXML 网格追踪相邻行的合并锚点，再交给现有 HTML 标准化。"""
+    """按 OOXML 网格恢复横向及纵向合并，再输出可统一解析的 HTML。
+
+    使用上行合并锚点识别延续格；非空延续格文字追加到锚点并给出警告，
+    不静默丢弃。缺失锚点保留独立单元格；省略列及跨度超过限制时拒绝处理。"""
     rows, anchors, warnings = [], [], []
     active = {}
     for row_number, row in enumerate(element.findall(W + "tr")):
@@ -119,6 +130,11 @@ def _docx_table_html(element) -> tuple[str, list[str]]:
 
 
 def docx_document(path: Path, source: dict, max_bytes: int) -> PageResult:
+    """在展开体积限制内读取 DOCX 主体，按正文和表格顺序构建逻辑页。
+
+    无表格时复用正文加载器；含表格时分别保留文本块、表格和原始 XML。
+    返回的页号为逻辑第 1 页，不声称恢复了 Word 的实际分页；正文缺失或
+    解压体积超限时抛出 IngestionError。"""
     with ZipFile(path) as archive:
         if sum(info.file_size for info in archive.infolist()) > max_bytes:
             raise IngestionError("DOCX 解压后超过资源上限。")

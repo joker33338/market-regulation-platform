@@ -1,4 +1,4 @@
-"""Opt-in test against an explicitly supplied test database, never PG_DSN."""
+"""仅对明确提供的测试数据库执行集成验证，不读取正式 PG_DSN 作为测试连接。"""
 from __future__ import annotations
 
 import os

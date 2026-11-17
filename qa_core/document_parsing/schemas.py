@@ -1,4 +1,4 @@
-"""Versioned JSON-safe contract shared by native parsing, OCR and structure."""
+"""原生解析、OCR 与结构引擎共享的版本化、可序列化结果协议。"""
 from __future__ import annotations
 
 import dataclasses
@@ -90,7 +90,7 @@ class DocumentResult:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "DocumentResult":
-        """Restore a persisted result, retaining page order, tables and provenance."""
+        """从已持久化协议恢复结果对象，保留页顺序、表格及来源字段。"""
         def values(model, item):
             return {field.name: item[field.name] for field in dataclasses.fields(model) if field.name in item}
         pages = []

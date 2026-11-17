@@ -68,10 +68,11 @@ export function getDocumentHistory(
 }
 
 /**
- * DELETE /api/documents/{file_id} —— 文档删除（当前后端契约未声明，调用方必须先经方法级门控）
+ * DELETE /api/documents/{file_id} —— 文档软删除；调用方必须先确认运行实例具备该方法。
  *
  * 只有在运行期 GET /api/openapi.json 确实声明 DELETE 该方法时，页面才会解锁按钮并调用本函数。
- * 删除结果以后端真实响应为准：成功只代表请求被接受，页面随后重新拉取列表确认，绝不本地删除行。
+ * 删除结果以后端真实回执为准；当前后端隔离元数据并保留原始字节。
+ * 页面成功后重新拉取真实列表确认结果，不直接在本地移除行；重复删除的 404 不计作成功。
  */
 export function deleteDocument(fileId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
   return client

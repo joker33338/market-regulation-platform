@@ -1,4 +1,4 @@
-"""Hybrid retrieval against the compatible law_chunks current projection."""
+"""基于兼容 law_chunks 当前投影的混合检索及来源返回。"""
 from __future__ import annotations
 
 import json

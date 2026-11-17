@@ -1,4 +1,4 @@
-"""Explicit review metadata; recognition status is never inferred from body text."""
+"""显式 OCR 复核记录管理，不通过正文内容猜测识别或审核状态。"""
 from __future__ import annotations
 
 import json

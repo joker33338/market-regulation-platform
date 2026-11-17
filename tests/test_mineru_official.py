@@ -1,4 +1,4 @@
-"""Public v4 API fixtures, kept separate from self-hosted Tasks fixtures."""
+"""官方公共 v4 API 测试夹具，与自托管 Tasks 协议的夹具保持分离。"""
 import io
 import json
 from pathlib import Path

@@ -1,8 +1,7 @@
-"""Run QA acceptance file against an explicitly selected isolated source tree.
+"""针对显式指定的隔离源码目录运行历史 QA 验收文件。
 
-Use the existing Python interpreter and optional API dependencies. No dependency
-installation, network access, DDL or production configuration loading occurs here.
-"""
+复用已有 Python 及可选 API 依赖；不在此安装依赖、访问网络、执行 DDL
+或加载正式运行配置。受测来源由调用参数指定。"""
 import argparse
 from datetime import datetime, timezone
 import importlib.util

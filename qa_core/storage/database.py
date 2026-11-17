@@ -1,4 +1,6 @@
-"""PostgreSQL storage and a dependency-free SQLite demo using the same lifecycle."""
+"""PostgreSQL 存储与不依赖额外数据库服务的 SQLite 演示适配。
+
+两者复用版本生命周期接口；SQLite 演示能力不能当作正式 PostgreSQL 验证结果。"""
 from __future__ import annotations
 
 import contextlib

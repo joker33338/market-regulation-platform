@@ -1,4 +1,4 @@
-"""Transactional writer for an existing document_review schema; never executes DDL."""
+"""将解析结果事务性写入既有 document_review 结构，不执行建表或结构迁移。"""
 import hashlib
 import json
 

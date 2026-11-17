@@ -1,4 +1,4 @@
-"""Explicit synthetic Tasks server for development only; never parses user bytes."""
+"""仅供开发使用的合成 Tasks 服务，不解析真实用户文件内容。"""
 import io
 import json
 from urllib.parse import unquote

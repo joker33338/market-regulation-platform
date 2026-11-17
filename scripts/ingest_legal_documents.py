@@ -1,4 +1,4 @@
-"""Preview by default; database initialization and publication are explicit commands."""
+"""默认执行预览的法规入库命令行；数据库初始化和发布必须显式选择。"""
 from __future__ import annotations
 
 import argparse

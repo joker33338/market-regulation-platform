@@ -1,4 +1,4 @@
-"""Local BGE by default; HTTP and explicitly labelled demo providers are optional."""
+"""优先复用本地 BGE；HTTP 与明确标识的演示向量提供器按配置选择。"""
 from __future__ import annotations
 
 import hashlib
@@ -114,7 +114,7 @@ class HTTPEmbeddings:
 
 
 class DemoEmbeddings:
-    """Deterministic character hashing for pipeline tests, never a semantic model."""
+    """仅用于流程测试的确定性字符哈希向量，不具备语义模型能力，不可用于正式检索质量验证。"""
     def __init__(self, dimension: int = 32):
         self.dimension = dimension
         self.signature = stable_hash("DEMO-character-hash-v1", dimension)

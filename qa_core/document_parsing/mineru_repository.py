@@ -1,4 +1,7 @@
-"""Separate SQLite task store. Does not initialize or alter knowledge-base tables."""
+"""独立 SQLite 解析任务存储。
+
+保存任务及恢复所需状态，不初始化或修改知识库表。解析任务状态与业务审核、
+知识库版本状态属于不同职责，不能相互替代。"""
 import json
 from contextlib import contextmanager
 from pathlib import Path

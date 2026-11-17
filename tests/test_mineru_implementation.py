@@ -1,4 +1,4 @@
-"""Production-client acceptance with synthetic HTTP fixtures, never real endpoints."""
+"""使用合成 HTTP 夹具验收生产客户端，不访问真实远端服务。"""
 import asyncio
 from dataclasses import replace
 import io

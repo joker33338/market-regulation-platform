@@ -1,4 +1,4 @@
-"""Offline orchestration, following KnowForge's service/loader/chunker separation."""
+"""离线入库流程编排，沿用 KnowForge 的服务、加载器及切分器职责划分。"""
 from __future__ import annotations
 
 from collections.abc import Iterable

@@ -1,4 +1,7 @@
-"""Opt-in authenticated API factory. Run one ASGI process with the pilot SQLite store."""
+"""显式启用并带认证的解析 API 工厂。
+
+试点 SQLite 任务存储按单 ASGI 进程运行；应用创建不等于可以绕过 owner、
+任务状态及源文件权限校验。"""
 import asyncio
 from contextlib import asynccontextmanager
 import hashlib

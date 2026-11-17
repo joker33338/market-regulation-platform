@@ -1,4 +1,4 @@
-"""Streaming, read-only adapter for the existing source main/detail tables."""
+"""对已有来源主表和明细表执行流式只读适配，不迁移或覆盖来源数据。"""
 from __future__ import annotations
 
 import re

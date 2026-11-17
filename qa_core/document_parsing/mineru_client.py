@@ -1,4 +1,7 @@
-"""Self-hosted MinerU 4.1 Tasks transport. No implicit create or transfer retries."""
+"""自托管 MinerU 4.1 Tasks 传输适配器。
+
+统一校验请求来源、重定向和响应大小；创建任务及传输失败不会隐式重试，
+避免不确定结果造成重复任务。此协议与官方公共 v4 API 分开实现。"""
 import asyncio
 import json
 import re
@@ -18,6 +21,9 @@ class MinerUError(IngestionError):
 
 
 def validate_name(name: str):
+    """校验远程文件显示名，拒绝目录分隔符、控制字符及超长名称。
+
+    该值不作为服务端或本机输出路径；路径必须由受控存储逻辑生成。"""
     if (not isinstance(name, str) or not 1 <= len(name) <= 1024 or name in {".", ".."}
             or any(char in name for char in "/\\:")
             or any(unicodedata.category(char) == "Cc" for char in name)):
@@ -41,7 +47,7 @@ class MinerUClient:
         await self.http.aclose()
 
     async def before_request(self, method, url):
-        """Optional policy hook, applied to every HTTP attempt including redirects."""
+        """每次 HTTP 尝试前执行的可选策略钩子，重定向后的请求也必须再次检查。"""
 
     def _validate_url(self, url):
         if origin(url) not in self.allowed:
@@ -50,6 +56,11 @@ class MinerUClient:
             raise MinerUError("insecure_url", 400)
 
     async def request(self, method, url, *, headers=None, content=None, body=None, max_bytes=1024 * 1024):
+        """对单次业务请求执行来源限制、受控重定向及有界流式响应读取。
+
+        只向 API 原站注入凭据，重定向不携带身份请求头。最多跟随受控 GET 跳转，
+        非 GET 跳转拒绝。响应过大、长度不完整或不可信地址均失败；HTTP 错误仅
+        保留有界机器码。本函数不对创建、上传等操作进行隐式重试。"""
         import httpx
         headers = dict(headers or {})
         # 不接收服务端提供的携带身份凭据的传输请求头。
@@ -122,7 +133,7 @@ class MinerUClient:
         return result
 
     def bind(self, task):
-        """Self-hosted Tasks IDs are sufficient to resume without client memory."""
+        """自托管 Tasks 的任务标识足以恢复查询，因此此适配器无需额外绑定内存状态。"""
 
     async def detail(self, task_id):
         return (await self._json("GET", "/v1/tasks/" + quote(task_id, safe="")))[1]

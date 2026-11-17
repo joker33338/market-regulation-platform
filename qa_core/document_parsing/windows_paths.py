@@ -1,4 +1,4 @@
-"""Windows Paddle C++ paths need an ASCII runtime cache; source weights stay intact."""
+"""为 Windows Paddle C++ 组件准备 ASCII 运行缓存路径，原始模型权重保持不变。"""
 from __future__ import annotations
 
 import hashlib

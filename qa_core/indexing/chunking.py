@@ -1,4 +1,7 @@
-"""Article-first chunking. Paragraph/item metadata survives every fragment."""
+"""按法条优先切分检索片段，并保留款、项和原文位置。
+
+短条文整体保留，长条文按法律单元组合或继续拆分；日期、金额、文号等受保护
+字段不得从中截断。向量输入增加标题上下文，但展示正文与来源范围单独保存。"""
 from __future__ import annotations
 
 import re
@@ -15,6 +18,12 @@ PROTECTED_VALUE = re.compile(
 
 
 def bounded_parts(text: str, limit: int) -> list[str]:
+    """按字符预算切分正文，同时保护可识别的日期、数值和文号核心。
+
+    limit 至少为 32；优先选择预算窗口后部的句末或换行，必要时退回到受保护
+    字段之前。单个受保护字段本身超过预算时抛出 IngestionError，交由调用方
+    增大预算并复核。返回由非空片段组成的列表；空文本返回空列表。仅移除片段边界空白，
+    不改写内部正文。"""
     if limit < 32:
         raise IngestionError("max-chars 至少为 32。")
     result = []
@@ -43,7 +52,10 @@ def bounded_parts(text: str, limit: int) -> list[str]:
 
 
 def pack_units(units: list[LegalUnit], limit: int) -> list[tuple[str, list[LegalUnit]]]:
-    """相邻短款项合并；超长单元仍受上限约束，保留其来源范围。"""
+    """按原顺序把相邻法律单元组合成预算内片段，同时返回各片段的来源单元。
+
+    超长单元先交给 bounded_parts 拆分；组合时计入插入的换行。一个单元可对应
+    多个片段，每个片段内按对象身份去重来源单元，从而保留款项和位置依据。"""
     pieces = []
     text, sources = "", []
     for unit in units:
@@ -63,6 +75,12 @@ def pack_units(units: list[LegalUnit], limit: int) -> list[tuple[str, list[Legal
 # 以法条层级作为父块，按预算拆子块并保留原始来源，不能用截断掩盖超长条文。
 def split_articles(articles: list[Article], *, law_name: str, doc_version_id: str,
                    model_signature: str, max_chars: int = 800) -> list[Chunk]:
+    """将条文转换为带来源、父条文身份和模型签名的检索片段。
+
+    短条文完整保留，长条文先按款项单元组合。标题和必要的引导语只加入
+    embedding_text；正文 content 与来源 spans 另外保留，便于展示和引用核对。
+    max_chars 主要约束正文切分；标题及引导语另有预算，因此向量输入总长度
+    不能直接等同 max_chars。本函数不调用向量模型，也不执行入库或发布。"""
     chunks = []
     for article in articles:
         path = " / ".join(item for item in [article.part, article.chapter, article.section] if item)

@@ -1,4 +1,4 @@
-"""Focused safety/compatibility tests for production dual-engine orchestration."""
+"""双引擎业务编排的安全与兼容回归，测试范围由具体夹具限定。"""
 from dataclasses import replace
 import hashlib
 import json

@@ -1,4 +1,4 @@
-"""Stateful chapter/section/article/paragraph/item parsing, without LLM rewriting."""
+"""有状态的编、章、节、条、款、项解析，不调用语言模型改写原文。"""
 from __future__ import annotations
 
 import re

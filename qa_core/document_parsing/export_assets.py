@@ -1,4 +1,7 @@
-"""Materialize Paddle's image references from the original local page."""
+"""从同一原始文件重新导出 Paddle 识别结果引用的图片素材。
+
+按页级坐标裁剪照片、印章等区域，避免推理临时文件清理后引用失效。导出前
+验证原件摘要，输出文件名由程序生成，模型返回的路径不能直接作为写入位置。"""
 from __future__ import annotations
 
 import re
@@ -10,7 +13,14 @@ IMAGE_REF = re.compile(r"imgs/img_in_[A-Za-z_]+_box_(\d+)_(\d+)_(\d+)_(\d+)\.jpg
 
 
 def export_images(result, directory: Path) -> list[str]:
-    """Keep photo/seal crops usable after temporary inference files disappear."""
+    """将识别结果中的图片引用物化到 directory 下，并返回导出文件路径列表。
+
+    优先使用显式 export_images 元数据，否则从已知 Markdown 引用格式提取
+    坐标并去重。首次真正导出时校验原件 SHA256 与文档身份一致。
+    PDF 按记录的渲染比例还原页内裁剪框；图片按 EXIF 方向及识别尺寸恢复后
+    裁剪。坐标、比例或原件不满足要求时拒绝导出。
+    成功后同步更新页内 Markdown 引用和来源元数据；此函数有文件写入副作用，
+    不是纯预览。此前已完成的导出文件不会因后续区域失败而自动回滚。"""
     assets = []
     source_path = Path(result.source_location.get("file_path", ""))
     verified = False

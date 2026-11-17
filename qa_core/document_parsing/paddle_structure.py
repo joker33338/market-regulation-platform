@@ -1,4 +1,4 @@
-"""PP-StructureV3 service. Keep engine order, HTML cells and original JSON."""
+"""PP-StructureV3 版面结构服务，保留引擎顺序、HTML 单元格和原始 JSON。"""
 from __future__ import annotations
 
 from .normalizer import normalize_text, table_from_html

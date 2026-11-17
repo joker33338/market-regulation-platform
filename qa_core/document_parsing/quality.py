@@ -1,4 +1,4 @@
-"""Heuristic quality findings, never a legal correctness decision."""
+"""解析质量启发式检查，输出复核线索，不判定法律内容是否正确。"""
 from __future__ import annotations
 
 import re

@@ -1,4 +1,4 @@
-"""Small mandatory checks before any candidate can be published."""
+"""候选发布前的必要质量检查，检查通过不自动赋予审核或发布权限。"""
 from __future__ import annotations
 
 from qa_core.indexing.models import Chunk

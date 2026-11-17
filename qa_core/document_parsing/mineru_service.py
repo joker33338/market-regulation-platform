@@ -1,4 +1,4 @@
-"""Bounded, resumable task lifecycle and source/result associations."""
+"""有资源约束且可恢复的解析任务生命周期及源文件、结果关联管理。"""
 import asyncio
 from datetime import datetime, timezone
 import json

@@ -1,4 +1,4 @@
-"""Offline PaddleOCR adapter, adapted from KnowForge. Models must exist locally."""
+"""由 KnowForge 适配的离线 PaddleOCR 候选生成入口，要求模型预先存在于本机。"""
 from __future__ import annotations
 
 import json

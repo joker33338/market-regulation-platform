@@ -1,4 +1,4 @@
-"""Conservative cleanup: retain numbering, punctuation and paragraph evidence."""
+"""保守清理法规文本，保留条款编号、标点及段落证据，不擅自纠正法律事实。"""
 from __future__ import annotations
 
 from qa_core.indexing.models import SourceLine

@@ -1,4 +1,4 @@
-"""Explicit, approved-only official model download; inference never invokes this."""
+"""仅在明确授权后下载官方模型；正常推理不会隐式调用本脚本。"""
 from __future__ import annotations
 
 import argparse

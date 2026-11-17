@@ -1,4 +1,4 @@
-"""Synthetic, content-free reproducers for round 01 contract failures."""
+"""历史第一轮契约缺陷的合成复现，不包含真实业务正文。"""
 import tempfile
 import unittest
 from unittest.mock import patch
