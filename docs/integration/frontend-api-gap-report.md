@@ -51,3 +51,8 @@
 
 用户授权后已更新现有 8180，9 项真实认证只读冒烟通过，包含 document_review、public 和现有任务库查询。仍未进行浏览器前端联调、正式审核写入或独立 QA 验收。完整运行记录见 v0.2.2-local-runtime-handoff.md。
 2026-11-13 增量：法规与案例结构已在目标 PG 应用，新只读接口见 [专项报告](v023-postgresql-law-case-audit.md)。真实已发布数据仍为空，8180 仍为旧版；不把数据库建表成功计为两个页面已交付。
+
+
+## 2026-11-17 文件工作台开发补充（尚未启用）
+
+本节不改写上述历史交付及冻结契约。新工作台契约frontend-api-v0.2.3-workbench-draft-1，详见[接口说明](file-workbench-api-contract.md)、[独立草稿快照](frontend-openapi-workbench-draft-1.json)、[实际验证与启用限制](file-workbench-validation-20261117.md)及[用户操作说明](../guides/file-workbench-user-guide.md)。正式8180未切换，不凭此补充认定新方法已经对外运行。

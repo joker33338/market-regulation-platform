@@ -120,3 +120,8 @@ uploaded_at_source=metadata_mtime 表示历史上传缺乏显式时间戳，仅�
 
 运行时读取认证 OpenAPI：`GET /api/openapi.json`。离线文件：`frontend-openapi.json`。重新导出命令：在现有 API Python 环境执行 `python scripts/export_frontend_openapi.py docs/integration/frontend-openapi.json`。
 当前增量契约为 frontend-api-v0.2.3-draft-5（54 路径）：见 [法规与案例专项报告](v023-postgresql-law-case-audit.md) 和 [OpenAPI](frontend-openapi-v023-draft5.json)。目标库结构已获准升级；8180 尚未更新。
+
+
+## 2026-11-17 文件工作台开发补充（尚未启用）
+
+本节不改写上述历史交付及冻结契约。新工作台契约frontend-api-v0.2.3-workbench-draft-1，详见[接口说明](file-workbench-api-contract.md)、[独立草稿快照](frontend-openapi-workbench-draft-1.json)、[实际验证与启用限制](file-workbench-validation-20261117.md)及[用户操作说明](../guides/file-workbench-user-guide.md)。正式8180未切换，不凭此补充认定新方法已经对外运行。
