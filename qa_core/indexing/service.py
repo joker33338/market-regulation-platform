@@ -18,6 +18,9 @@ from qa_core.utils import IngestionError, stable_hash
 # 文档身份、正文摘要与处理签名共同决定修订号，配置变化不得误用旧向量。
 def prepare_document(document: LegalDocument, *, model_signature: str, max_chars: int,
                      namespace: str = "market_regulation"):
+    if document.metadata.get("document_type") == "case":
+        from qa_core.document_parsing.case_bridge import prepare_case_document
+        return prepare_case_document(document, model_signature=model_signature, max_chars=max_chars, namespace=namespace)
     if not document.law_name or not document.law_name.strip():
         raise IngestionError("法规名称为空。")
     lines, cleaner = clean_lines(document.lines)
@@ -25,8 +28,12 @@ def prepare_document(document: LegalDocument, *, model_signature: str, max_chars
     doc_id = stable_hash(namespace, document.law_id or document.law_name)
     processing = stable_hash(SCHEMA_VERSION, CLEANER_VERSION, CHUNKER_VERSION, model_signature, max_chars)
     revision = stable_hash(doc_id, document.law_name, document.source_hash, processing)
+    if document.metadata.get("api_review_reference"):
+        revision = stable_hash(revision, document.metadata["api_review_reference"])
     chunks = split_articles(articles, law_name=document.law_name, doc_version_id=revision,
                             model_signature=model_signature, max_chars=max_chars)
+    if document.metadata.get("source_range"):
+        for chunk in chunks: chunk.metadata["source_scope"]=document.metadata["source_range"]
     quality = validate_chunks(chunks, max_chars)
     return doc_id, revision, chunks, {
         **document.metadata, "cleaning": cleaner, "quality": quality, "source_path": document.source_path,

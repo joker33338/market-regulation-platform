@@ -60,6 +60,16 @@ class ReviewReader:
             raise MinerUError("document_not_found", 404)
         return dict(row)
 
+    def latest_parse_id(self, owner, file_id):
+        """核对离线导入的当前解析，避免没有SQLite历史时沿用旧结果。"""
+        where, args = self.scope(owner)
+        with self.cursor() as cursor:
+            cursor.execute("""SELECT parse_id FROM document_review.documents
+                WHERE source_location->>'source_file_id'=%s AND """ + where + """
+                ORDER BY imported_at DESC,parse_id DESC LIMIT 1""", [file_id, *args])
+            row = cursor.fetchone()
+        return row['parse_id'] if row else None
+
     def deletion_references(self,file_id,source_hash):
         with self.cursor() as cursor:
             cursor.execute("SELECT EXISTS(SELECT 1 FROM document_review.documents WHERE source_location->>'source_file_id'=%s OR document_id=%s) AS referenced",(file_id,source_hash))

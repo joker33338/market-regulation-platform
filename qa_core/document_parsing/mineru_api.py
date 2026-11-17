@@ -114,6 +114,17 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
         service = MinerUService(config, repository, client, result_sink=sink, dual_router=dual_router)
     workers = []
 
+    async def batch_worker():
+        while True:
+            batches = getattr(app.state, "file_batches", None)
+            if batches is not None:
+                try:
+                    await batches.dispatch(service, app.state.frontend_reader)
+                except Exception:
+                    # 批次状态存储故障不能阻断已有解析任务；下一轮重试领取。
+                    pass
+            await asyncio.sleep(0.2)
+
     async def worker(index):
         while True:
             tasks = await asyncio.to_thread(service.repository.resumable, config.queue_size)
@@ -121,10 +132,36 @@ def create_app(config=None, *, tokens=None, service=None, dual_config=None, clou
                 await service.run(task["id"])
             await asyncio.sleep(0.2)
 
+    async def knowledge_worker():
+        while True:
+            jobs=getattr(app.state,'workbench_ingestion',None)
+            if jobs is not None and jobs.root.exists():
+                try:
+                    await asyncio.to_thread(jobs.tick)
+                except Exception:
+                    # 后台业务状态存储故障留待恢复，不阻断解析队列。
+                    pass
+            await asyncio.sleep(0.5)
+
+    async def review_batch_worker():
+        while True:
+            batches=getattr(app.state,'review_batches',None)
+            if batches is not None and batches.root.exists():
+                try:
+                    await asyncio.to_thread(batches.tick)
+                except Exception:
+                    # 保留冻结请求，恢复后仍按同一身份、版本及幂等键检查。
+                    pass
+            await asyncio.sleep(0.2)
+
     @asynccontextmanager
     async def lifespan(app):
         if config.enabled:
+            # 排队独立于引擎执行，一份慢文件不会阻止后续文件提交到受控队列。
+            workers.append(asyncio.create_task(batch_worker()))
             workers.extend(asyncio.create_task(worker(i)) for i in range(config.concurrency))
+        workers.append(asyncio.create_task(knowledge_worker()))
+        workers.append(asyncio.create_task(review_batch_worker()))
         yield
         for job in workers:
             job.cancel()

@@ -2,6 +2,7 @@
 from fastapi import Depends
 import os
 from pydantic import BaseModel
+from .contracts import CONTRACT_VERSION
 from .principals import PrincipalInfo
 from .principals import principal_info
 
@@ -58,15 +59,15 @@ def register_capabilities(app,principal):
     @app.get('/api/system/capabilities',tags=['monitoring'],response_model=CapabilitiesResponse,
              responses={code:{'model':DocumentDeletionError} for code in (401,403,503)})
     def capabilities(identity=Depends(principal)):
-        return {'contract_version':'frontend-api-v0.2.3','admin_policy':'all_permissions',
+        return {'contract_version':CONTRACT_VERSION,'admin_policy':'all_permissions',
                 'identity':principal_info(identity),
                 'password_login':{'implemented':True,'configured':bool(app.state.account_store.filename),'registration':'admin_only'},
                 'review':{'implemented':True,'ledger_configured':app.state.review_ledger is not None,'per_object_gate':True},
                 'document_filters':['date_from','date_to','sort_by','order'],
-                'search_filters':['kb_version','issuing_authority','effective_status'],
+                'search_filters':['kb_version','issuing_authority','effective_status','document_type'],
                 'search_version_scope':'published_active_or_archived',
-                'ingestion':{'document_types':['law'],'review_required':True,'quality_required':True,
-                             'manual_revision_export':False,'auto_publish':False,'admin_required':True,
+                'ingestion':{'document_types':['law','case'],'review_required':True,'quality_required':True,
+                             'manual_revision_export':True,'auto_publish':False,'admin_required':True,
                              'write_configured':bool(os.getenv('KNOWLEDGE_WRITE_PG_DSN'))},
                 'task_logs':{'historical_backfill':False,'source':'persisted_state_transitions'},
                 'operational_logs':{'request_bodies':False,'credentials':False,'historical_backfill':False}}

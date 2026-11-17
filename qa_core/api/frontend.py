@@ -33,6 +33,18 @@ def register_frontend(app, service, config, owner, reader=None, principal=None):
     register_operational_logs(app, config, principal)
     from .ingestion import register_ingestion
     register_ingestion(app, principal, reader, config)
+    from .workbench_ingestion import register_workbench_ingestion
+    register_workbench_ingestion(app, principal, reader, config)
+    from .workbench_review_batches import register_workbench_review_batches
+    register_workbench_review_batches(app, principal, reader, config)
+    from .workbench_releases import register_workbench_releases
+    register_workbench_releases(app, principal, reader, config)
+    from .workbench_selections import register_workbench_selections
+    register_workbench_selections(app, principal, reader, config)
+    from .workbench_documents import register_workbench_documents
+    register_workbench_documents(app, principal, reader)
+    from .workbench_batches import register_workbench_batches
+    register_workbench_batches(app, principal, reader, config)
     from .capabilities import register_capabilities
     register_capabilities(app, principal)
     from .contracts import annotate_legacy

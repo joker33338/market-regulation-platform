@@ -218,7 +218,8 @@ class FrontendReader:
             raise MinerUError("local_embeddings_required", 503)
         return create_embeddings(settings)
 
-    def search(self, body):
+    def search(self, body, identity=None):
+        scope_filters={"owner_ids":identity.read_owners} if identity is not None else {}
         from qa_core.retrieval.store import keyword_search, retrieve
         database = self.kb_factory()
         try:
@@ -230,7 +231,7 @@ class FrontendReader:
                 if body.mode == "keyword":
                     try:
                         hits = keyword_search(database, body.query, body.limit,**{
-                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None})
+                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status','document_type') if getattr(body,key) is not None},**scope_filters)
                     except IngestionError:
                         raise MinerUError('search_version_unavailable',409) from None
             if body.mode == "hybrid":
@@ -240,7 +241,7 @@ class FrontendReader:
                     self._embeddings = self._embeddings or self.embeddings_factory()
                     try:
                         hits = retrieve(database, self._embeddings, body.query, body.limit,**{
-                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None})
+                            key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status','document_type') if getattr(body,key) is not None},**scope_filters)
                     except IngestionError:
                         raise MinerUError('search_version_or_model_mismatch',409) from None
                 finally:
@@ -265,6 +266,6 @@ class FrontendReader:
                              "score_kind": "rrf" if "rrf_score" in hit else "keyword_match",
                              "source": safe(metadata)})
             return {"status": "ready", "kb_version": active, "mode": body.mode, "list": rows, "count": len(rows),
-                    'applied_filters':{key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status') if getattr(body,key) is not None}}
+                    'applied_filters':{key:getattr(body,key) for key in ('kb_version','issuing_authority','effective_status','document_type') if getattr(body,key) is not None}}
         finally:
             database.close()

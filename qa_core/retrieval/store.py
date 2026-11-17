@@ -17,7 +17,7 @@ JOINS = """FROM law_chunks l JOIN mr_active_chunk_map m
     JOIN mr_document_versions v ON v.doc_version_id=c.doc_version_id"""
 
 
-def selection(database, kb_version=None, issuing_authority=None, effective_status=None):
+def selection(database, kb_version=None, issuing_authority=None, effective_status=None, document_type="law", owner_ids=None):
     """仅按实际保存的来源字段筛选，不推断机关或法律效力。"""
     joins=JOINS
     clauses=[];params={}
@@ -36,6 +36,29 @@ def selection(database, kb_version=None, issuing_authority=None, effective_statu
             expression=(f"COALESCE(CAST(c.metadata AS jsonb)->>'{key}',CAST(v.metadata AS jsonb)->>'{key}')" if database.postgres
                         else f"COALESCE(json_extract(c.metadata,'$.{key}'),json_extract(v.metadata,'$.{key}'))")
             clauses.append(expression+'=:'+key);params[key]=value
+    if document_type not in {'law','case','all'}:
+        raise IngestionError('不支持的资料类别。')
+    if document_type!='all':
+        expression=("COALESCE(CAST(c.metadata AS jsonb)->>'document_type',CAST(v.metadata AS jsonb)->>'document_type','law')" if database.postgres
+                    else "COALESCE(json_extract(c.metadata,'$.document_type'),json_extract(v.metadata,'$.document_type'),'law')")
+        clauses.append(expression+'=:document_type');params['document_type']=document_type
+    if owner_ids is not None:
+        from qa_core.access import is_all_owners
+        if not is_all_owners(owner_ids):
+            owners=[owner_ids] if isinstance(owner_ids,str) else list(owner_ids)
+            if not owners:
+                clauses.append('FALSE')
+            else:
+                expression=("COALESCE(CAST(v.metadata AS jsonb)->'api_review_reference'->>'owner_id',CAST(v.metadata AS jsonb)->>'owner_id')" if database.postgres
+                            else "COALESCE(json_extract(v.metadata,'$.api_review_reference.owner_id'),json_extract(v.metadata,'$.owner_id'))")
+                if database.postgres:
+                    relation=database.one("SELECT to_regclass('business_library.records') AS relation")
+                    if relation and relation['relation']:
+                        expression="COALESCE((SELECT r.owner_id FROM business_library.records r WHERE r.doc_version_id=v.doc_version_id),"+expression+")"
+                slots=[]
+                for index,owner in enumerate(owners):
+                    key='owner_'+str(index);slots.append(':'+key);params[key]=owner
+                clauses.append(expression+' IN ('+','.join(slots)+')')
     return joins,clauses,params
 
 

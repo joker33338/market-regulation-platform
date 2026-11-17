@@ -42,7 +42,7 @@ class LibraryDetail(BaseModel):
     record: LibraryRecord
     original_text: str
     original_file_name: str
-    text_status: Literal['ocr_not_manually_verified'] = 'ocr_not_manually_verified'
+    text_status: Literal['ocr_not_manually_verified', 'reviewed_copy'] = 'ocr_not_manually_verified'
     structured: dict | None = None
     source_url: str
 
@@ -152,6 +152,18 @@ class LibraryStore(ReviewReader):
             c.execute('SELECT raw_text,file_name FROM document_review.documents WHERE parse_id=%s',(row['parse_id'],))
             original=c.fetchone()
             text=original['raw_text']
+            text_status='ocr_not_manually_verified'
+            c.execute('SELECT metadata FROM public.mr_document_versions WHERE doc_version_id=%s',(id,))
+            metadata=c.fetchone()
+            if metadata:
+                import json
+                metadata=metadata['metadata']
+                if isinstance(metadata,str): metadata=json.loads(metadata)
+                if 'reviewed_text' in metadata:
+                    text=metadata['reviewed_text'];text_status='reviewed_copy'
+            full_text=text
+            scope=metadata.get('source_range') if isinstance(metadata,dict) else None
+            if scope: text=full_text[scope['start']:scope['end']]
             structured=None
             if article:
                 c.execute('''SELECT article_id,chapter_id,number,title,ordinal,raw_start,raw_end,page_start,page_end
@@ -160,7 +172,7 @@ class LibraryStore(ReviewReader):
                 if not value:
                     raise MinerUError('library_article_not_found',404)
                 structured=dict(value)
-                text=text[value['raw_start']:value['raw_end']]
+                text=full_text[value['raw_start']:value['raw_end']]
                 c.execute('SELECT chunk_id FROM business_library.article_chunks WHERE article_id=%s ORDER BY chunk_id',(article,))
                 structured['chunk_ids']=[x['chunk_id'] for x in c.fetchall()]
             elif kind=='case':
@@ -169,7 +181,7 @@ class LibraryStore(ReviewReader):
                     WHERE doc_version_id=%s''',(id,))
                 value=c.fetchone()
                 structured=dict(value) if value else None
-            return dict(record=row,original_text=text,original_file_name=original['file_name'],structured=structured,
+            return dict(record=row,original_text=text,original_file_name=original['file_name'],structured=structured,text_status=text_status,
                         source_url='/api/parse/files/'+row['source_file_id']+'/source')
 
 

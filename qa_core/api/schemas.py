@@ -43,6 +43,7 @@ class SearchRequest(BaseModel):
     kb_version: str | None = Field(default=None,min_length=1,max_length=128)
     issuing_authority: str | None = Field(default=None,min_length=1,max_length=200)
     effective_status: str | None = Field(default=None,min_length=1,max_length=80)
+    document_type: Literal["law","case","all"] = "law"
 
 
 class SearchResponse(BaseModel):

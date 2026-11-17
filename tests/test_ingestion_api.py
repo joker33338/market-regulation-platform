@@ -27,6 +27,8 @@ class IngestionAPITests(unittest.TestCase):
             raw_text='第一条 合成条文。',markdown_content='第一条 合成条文。')
         test=self
         class Review:
+            def latest_parse_id(self,owner,file_id):
+                return test.row['parse_id'] if owner=='alice' and file_id==test.row['source_location']['source_file_id'] else None
             def detail(self,owners,parse_id):
                 from qa_core.access import is_all_owners
                 if parse_id!=test.row['parse_id'] or not is_all_owners(owners) and 'alice' not in ([owners] if isinstance(owners,str) else owners):

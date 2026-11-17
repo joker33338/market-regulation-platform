@@ -20,8 +20,8 @@ def register_search(app, service, config, owner, reader):
 
     @router.post("/api/knowledge/search", response_model=SearchResponse)
     @guarded
-    def search(body: SearchRequest):
-        return reader.search(body)
+    def search(body: SearchRequest,identity=Depends(owner)):
+        return reader.search(body,identity=identity)
 
 
     app.include_router(router)

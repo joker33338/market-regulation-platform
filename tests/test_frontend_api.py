@@ -230,7 +230,7 @@ class FrontendAPITests(unittest.TestCase):
                       "合成规范", "input-hash", {"source_path": "private-location", "paragraph_nos": [1]},
                       [1.0] + [0.0] * 7)
         database.save_revision(version="synthetic-v1", doc_id="doc-synthetic", doc_version_id="revision-synthetic",
-            source_hash="synthetic-hash", law_name="合成法规", source_path="private-location", metadata={}, chunks=[chunk])
+            source_hash="synthetic-hash", law_name="合成法规", source_path="private-location", metadata={"owner_id":"alice"}, chunks=[chunk])
         database.finish_version("synthetic-v1", {})
         database.publish("synthetic-v1")
         database.close()

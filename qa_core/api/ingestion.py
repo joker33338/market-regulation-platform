@@ -11,6 +11,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 from qa_core.utils import IngestionError
 from .common import guarded, page_of
 from .private_operations import OperationStore, digest, grant
+from .source_segments import SourceRange, slice_result
 from .principals import owner_selector
 
 
@@ -20,6 +21,8 @@ class IngestionDocument(BaseModel):
     law_name: str=Field(min_length=1,max_length=256)
     law_id: str=Field(min_length=1,max_length=128)
     expected_review_version: int=Field(ge=1)
+    document_type: Literal["law","case"]="law"
+    source_range: SourceRange | None = None
 
 
 class IngestionBatchRequest(BaseModel):
@@ -127,8 +130,13 @@ def register_ingestion(app, principal, reader, config):
                 raise MinerUError('document_not_found',404)
             state=ledger.verify_for_ingestion(target_owner,item.parse_id,source_fingerprint(row),item.expected_review_version)
             # 人工修订尚无经确认的正文导出协议，不能默默把旧OCR正文入库。
-            if state.get('current_revision'):
-                raise MinerUError('reviewed_revision_export_required',409)
+            from .reviewed_export import export_reviewed_result
+            reviewed_result = export_reviewed_result(row, state, ledger, target_owner)
+            full_reviewed_text = reviewed_result.raw_text
+            if item.source_range is not None:
+                if not state.get('current_revision') and full_reviewed_text!=row.get('raw_text'):
+                    raise MinerUError('source_scope_source_mismatch',409)
+                reviewed_result = slice_result(reviewed_result, item.source_range)
             source_id=row.get('source_location',{}).get('source_file_id')
             value,path=reader.upload(target_owner,source_id or '')
             from qa_core.utils import file_sha256
@@ -138,11 +146,21 @@ def register_ingestion(app, principal, reader, config):
             if not events or events[0]['version']!=state['version'] or events[0]['action']!='approve' or not events[0].get('operator_id'):
                 raise MinerUError('review_approval_required',409)
             try:
-                document=to_legal_document(DocumentResult.from_dict(row['original_result']),
-                    reviewer=events[0]['operator_id'],law_name=item.law_name,law_id=item.law_id)
+                if item.document_type == "case":
+                    from qa_core.document_parsing.case_bridge import to_case_document
+                    document=to_case_document(reviewed_result,
+                        reviewer=events[0]['operator_id'],title=item.law_name,business_id=item.law_id)
+                else:
+                    document=to_legal_document(reviewed_result,
+                        reviewer=events[0]['operator_id'],law_name=item.law_name,law_id=item.law_id)
                 document.source_path=str(path)
+                if state.get('current_revision'):
+                    document.metadata['reviewed_text'] = full_reviewed_text
+                    document.metadata['reviewed_page_revisions'] = reviewed_result.quality['reviewed_page_revisions']
+                if item.source_range is not None:
+                    document.metadata['source_range'] = item.source_range.model_dump()
                 document.metadata['api_review_reference']={'owner_id':target_owner,'parse_id':item.parse_id,
-                    'source_digest':source_fingerprint(row),'version':state['version']}
+                    'source_digest':source_fingerprint(row),'version':state['version'], 'revision_id':state.get('current_revision')}
                 preview=preview_documents([document])
             except IngestionError:
                 raise MinerUError('ingestion_quality_blocked',409) from None
@@ -221,7 +239,7 @@ def register_ingestion(app, principal, reader, config):
             try:
                 database=reader.kb_write_factory()
                 from qa_core.storage.library_projection import ensure_projection_schema,project_library
-                ensure_projection_schema(database)
+                ensure_projection_schema(database, reviewed_text=any(doc.metadata.get("reviewed_text") and doc.metadata.get("document_type","law")=="law" for doc in documents))
                 with database.transaction(read_only=True):
                     if database.one('SELECT status FROM mr_kb_versions WHERE kb_version=:v',{'v':body.kb_version}):
                         raise MinerUError('knowledge_version_exists',409)
@@ -334,4 +352,5 @@ def register_ingestion(app, principal, reader, config):
 
     router.add_api_route('/api/ingestion/publish',release_endpoint('publish'),methods=['POST'],response_model=KnowledgeOperation)
     router.add_api_route('/api/ingestion/rollback',release_endpoint('rollback'),methods=['POST'],response_model=KnowledgeOperation)
+    app.state.knowledge_hooks = {"build": build, "precheck": precheck, "check": version_check, "publish": release_endpoint('publish')}
     app.include_router(router)

@@ -17,6 +17,7 @@ class ReviewAction(BaseModel):
     page: int | None = Field(default=None, ge=1)
     content: str | None = Field(default=None, min_length=1, max_length=200000)
     span: str | None = Field(default=None, max_length=2000)
+    revision_scope: Literal['page_body_v1'] | None = None
 
 
 class ReviewReceipt(BaseModel):
@@ -57,6 +58,12 @@ def register_review_writes(app, owner, reader):
         source, target_owner = review_source(reader, identity, parse_id)
         if not identity.can_review(target_owner):
             raise MinerUError("document_not_found",404)
+        history=reader.history(target_owner,source['source_location'].get('source_file_id'))
+        if history and (history[0][1]['status']!='completed' or history[0][1].get('database_parse_id')!=parse_id):
+            raise MinerUError('review_source_changed',409)
+        file_id=source['source_location'].get('source_file_id')
+        if file_id and not history and reader.review_store().latest_parse_id(target_owner,file_id)!=parse_id:
+            raise MinerUError('review_source_changed',409)
         ledger = app.state.review_ledger
         if ledger is None:
             raise MinerUError('review_ledger_not_configured', 503)
@@ -74,16 +81,33 @@ def register_review_writes(app, owner, reader):
                 raise MinerUError('review_reason_required', 422)
             if action == 'save-revision' and (body.content is None or not body.content.strip() or body.page is None):
                 raise MinerUError('review_revision_fields_required', 422)
+            if action != 'save-revision' and body.revision_scope is not None:
+                raise MinerUError('review_scope_not_allowed', 422)
             if action != 'save-revision' and body.content is not None:
                 raise MinerUError('review_content_not_allowed', 422)
             if action == 'mark-error' and body.page is None:
                 raise MinerUError('review_page_required', 422)
             if body.page is not None and body.page not in {page.get('page_number') for page in source['original_result'].get('pages', [])}:
                 raise MinerUError('review_page_not_found', 422)
-            return ledger.apply(target_owner, parse_id, action, body.model_dump(), idempotency_key,
+            payload = body.model_dump()
+            if payload.get('revision_scope') is None:
+                # 旧请求的指纹保持原样，不因新增可选字段破坏幂等重试。
+                payload.pop('revision_scope', None)
+            if body.revision_scope == 'page_body_v1' and body.content and any(ord(c) < 32 and c not in '\n\r\t' for c in body.content):
+                raise MinerUError('invalid_page_revision', 422)
+            receipt = ledger.apply(target_owner, parse_id, action, payload, idempotency_key,
                                 digest(canonical({'document_id': source['document_id'],
                                                   'original_result': source['original_result'],
                                                   'raw_text': source.get('raw_text'), 'markdown_content': source.get('markdown_content')})), operator_id=identity.principal_id)
+            # 审核回执先落账；后续构建故障不能伪装成审核失败或自动发布。
+            if action == 'approve' and identity.is_admin and receipt.get('write_performed'):
+                scheduler = getattr(app.state, 'workbench_ingestion', None)
+                if scheduler is not None:
+                    try:
+                        scheduler.delegate_approved(target_owner, source['source_location'].get('source_file_id'), identity)
+                    except Exception:
+                        pass
+            return receipt
         return write
 
     for action in ('approve', 'reject', 'mark-error', 'save-revision'):
@@ -109,4 +133,5 @@ def register_review_writes(app, owner, reader):
             raise MinerUError('review_ledger_not_configured', 503)
         return ledger.audit_logs(identity.read_owners, page, page_size, action)
 
+    app.state.review_hooks={action:endpoint(action) for action in ('approve','reject')}
     app.include_router(router)

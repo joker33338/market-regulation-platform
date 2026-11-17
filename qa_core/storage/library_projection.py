@@ -6,13 +6,19 @@ from qa_core.utils import IngestionError,stable_hash
 
 MARKER='business_library_source_v2'
 
-def ensure_projection_schema(database):
+def ensure_projection_schema(database, *, reviewed_text=False):
     if not database.postgres:return
     with database.connection.cursor() as c:
         c.execute("SELECT obj_description(to_regprocedure('business_library.check_record()'),'pg_proc') AS marker")
         row=c.fetchone()
     if not row or row['marker']!=MARKER:
         raise MinerUError('library_schema_upgrade_required',503)
+    if reviewed_text:
+        with database.connection.cursor() as c:
+            c.execute("SELECT obj_description(to_regprocedure('business_library.check_article()'),'pg_proc') AS marker")
+            row=c.fetchone()
+        if not row or row['marker']!='business_library_reviewed_ranges_v1':
+            raise MinerUError('library_reviewed_text_schema_upgrade_required',503)
 
 def project_library(database,version):
     if not database.postgres:return
@@ -35,11 +41,25 @@ def project_library(database,version):
                 file_id=source['source_location'].get('source_file_id')
                 if not file_id:raise IngestionError('法规原件身份缺失')
                 doc_version=document['doc_version_id']
-                c.execute("INSERT INTO business_library.records\n                    (doc_version_id,kind,owner_id,parse_id,source_file_id,title,facts_source)\n                    VALUES(%s,'law',%s,%s,%s,%s,'reviewed_parser_and_explicit_ingestion_title')\n                    ON CONFLICT(doc_version_id) DO NOTHING RETURNING doc_version_id",
-                    (doc_version,owner,parse_id,file_id,document['law_name']))
+                kind = metadata.get('document_type', 'law')
+                if kind not in {'law', 'case'}:
+                    raise IngestionError('不支持的业务资料类型')
+                c.execute("INSERT INTO business_library.records\n                    (doc_version_id,kind,owner_id,parse_id,source_file_id,title,facts_source)\n                    VALUES(%s,%s,%s,%s,%s,%s,'reviewed_parser_and_explicit_ingestion_title')\n                    ON CONFLICT(doc_version_id) DO NOTHING RETURNING doc_version_id",
+                    (doc_version,kind,owner,parse_id,file_id,document['law_name']))
                 if not c.fetchone():continue
+                if kind == 'case':
+                    c.execute('INSERT INTO business_library.case_profiles(doc_version_id) VALUES(%s) ON CONFLICT(doc_version_id) DO NOTHING',(doc_version,))
+                    continue
                 # 结构仍标为待核验；批准正文不代表法律元数据及自动条款已逐项核验。
-                chapters,articles=structure_ranges(source['raw_text'])
+                full_text=metadata.get('reviewed_text', source['raw_text'])
+                scope=metadata.get('source_range')
+                text=full_text[scope['start']:scope['end']] if scope else full_text
+                chapters,articles=structure_ranges(text)
+                if scope:
+                    for article in articles:
+                        article['raw_start']+=scope['start'];article['raw_end']+=scope['start']
+                        article['page_start']=full_text.count('\f',0,article['raw_start'])+1
+                        article['page_end']=full_text.count('\f',0,max(article['raw_start'],article['raw_end']-1))+1
                 for chapter in chapters:
                     chapter['id']=stable_hash('published-chapter-v1',doc_version,chapter['ordinal'])
                     c.execute('INSERT INTO business_library.chapters\n                        (chapter_id,doc_version_id,number,title,ordinal) VALUES(%s,%s,%s,%s,%s)',

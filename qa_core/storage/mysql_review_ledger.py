@@ -79,7 +79,7 @@ class MySQLReviewLedger:
                                (digest(reference['owner_id']),reference['parse_id']))
                 value=cursor.fetchone()
                 if (not value or value['status']!='approved' or value['version']!=reference['version']
-                        or value['source_digest']!=reference['source_digest'] or value['current_revision']):
+                        or value['source_digest']!=reference['source_digest'] or value['current_revision'] != reference.get('revision_id')):
                     raise MinerUError('review_approval_required',409)
             yield
 

@@ -10,6 +10,7 @@ from qa_core.document_parsing.mineru_client import MinerUError
 from qa_core.document_parsing.mineru_api import public
 from qa_core.utils import IngestionError
 from .common import guarded, page_of, safe
+from .workbench_schemas import ReviewedText
 from .principals import owner_selector, data_owner
 from .schemas import (DocumentInfo, DocumentList, HealthResponse, ListResponse, PreviewRequest,
                       PreviewResponse, ReviewDetail, SearchRequest, SearchResponse, StatsResponse, VersionInfo)
@@ -40,5 +41,22 @@ def register_review(app, service, config, owner, reader):
                 result['review_ledger'] = {'available': False, 'reason': 'ledger_unavailable'}
         return result
 
+
+    @router.get("/api/review/{parse_id}/reviewed-text",response_model=ReviewedText)
+    @guarded
+    def reviewed_text(parse_id: str,identity=Depends(owner)):
+        source=reader.review_store().detail(owner_selector(identity),parse_id)
+        target_owner=data_owner(identity,source)
+        ledger=app.state.review_ledger
+        if ledger is None:
+            from qa_core.document_parsing.mineru_client import MinerUError
+            raise MinerUError('review_ledger_not_configured',503)
+        state=ledger.state(target_owner,parse_id)
+        from .reviewed_export import export_reviewed_result
+        result=export_reviewed_result(source,state,ledger,target_owner)
+        return {'parse_id':parse_id,'review_version':state['version'],'approved':state['status']=='approved',
+                'original_unchanged':True,'pages':[{'page_number':page.page_number,'text':page.raw_text}
+                                                  for page in result.pages],
+                'revisions':result.quality.get('reviewed_page_revisions',[])}
 
     app.include_router(router)
