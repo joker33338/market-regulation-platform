@@ -107,7 +107,7 @@ class WorkbenchHTTPTests(unittest.TestCase):
         response=self.f.get('/api/openapi.json')
         self.assertEqual(response.status_code,200)
         schema=response.json()
-        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-workbench-draft-1')
+        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-workbench-1')
         for path,method in [('/api/workbench/documents','get'),('/api/workbench/selections','post'),
                             ('/api/workbench/review-batches','post'),('/api/workbench/releases/{release_id}/publish','post'),
                             ('/api/review/{parse_id}/reviewed-text','get')]:

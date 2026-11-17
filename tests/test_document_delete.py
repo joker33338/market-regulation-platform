@@ -168,7 +168,7 @@ class DocumentDeleteTests(unittest.TestCase):
         schema=self.client.get('/api/openapi.json',headers=self.f.auth).json()
         path=schema['paths']['/api/documents/{file_id}']
         self.assertIn('get',path);self.assertIn('delete',path)
-        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-workbench-draft-1')
+        self.assertEqual(schema['info']['x-contract-version'],'frontend-api-v0.2.3-workbench-1')
         self.assertIn('DocumentDeletion',schema['components']['schemas'])
         self.assertTrue(path['delete']['security'])
         for status in ('401','403','404','409','422','503'):

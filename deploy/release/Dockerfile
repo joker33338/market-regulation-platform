@@ -3,7 +3,7 @@ FROM ${LOCAL_BASE_IMAGE}
 ARG SOURCE_COMMIT
 ARG FRONTEND_COMMIT
 LABEL org.opencontainers.image.title="market-regulation-platform" \
-      org.opencontainers.image.version="0.2.3" \
+      org.opencontainers.image.version="0.2.3+workbench.1" \
       org.opencontainers.image.revision="${SOURCE_COMMIT}" \
       cn.market-regulation.frontend.revision="${FRONTEND_COMMIT}"
 USER root

@@ -39,7 +39,8 @@ class WorkbenchBrowserPGTests(unittest.TestCase):
             dimension=1024
             signature='synthetic-browser-vectors-1024'
             def embed_documents(self,texts):return [[1.0]+[0.0]*1023 for _ in texts]
-        reader.embeddings_factory=TestVectors
+        from tests.test_workbench_real_pg import workflow_embeddings
+        reader.embeddings_factory=workflow_embeddings(TestVectors)
         app=f.f.app;app.state.review_ledger=MySQLReviewLedger(self.mysql)
         nonce=uuid4().hex[:8];items=[]
         for index,kind in enumerate(['law','law','case']):

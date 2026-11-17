@@ -16,6 +16,21 @@ from tests import test_frontend_workflow_pg as baseline
 from tests import test_ingestion_api as fixtures
 
 
+_REAL_EMBEDDINGS = None
+
+
+def workflow_embeddings(fallback):
+    """显式选择真实本地模型；默认合成测试仍保持原范围。"""
+    if os.getenv('WORKFLOW_REAL_BGE') != '1':
+        return fallback
+    global _REAL_EMBEDDINGS
+    if _REAL_EMBEDDINGS is None:
+        from qa_core.retrieval.models import LocalEmbeddings
+        from qa_core.config.settings import Settings
+        _REAL_EMBEDDINGS = LocalEmbeddings(Settings.from_env())
+    return lambda: _REAL_EMBEDDINGS
+
+
 @unittest.skipUnless(os.getenv('FRONTEND_WORKFLOW_TEST_PG_ADMIN_DSN') and os.getenv('REVIEW_MYSQL_TEST_CONFIG'),
                      '需要明确的专用PG和隔离MySQL')
 class WorkbenchRealPGTests(unittest.TestCase):
@@ -44,7 +59,7 @@ class WorkbenchRealPGTests(unittest.TestCase):
             dimension=1024
             signature='synthetic-test-vectors-1024'
             def embed_documents(self,texts):return [[1.0]+[0.0]*1023 for _ in texts]
-        reader.embeddings_factory=TestVectors
+        reader.embeddings_factory=workflow_embeddings(TestVectors)
         f.f.app.state.review_ledger=MySQLReviewLedger(self.mysql)
         return f,upload,parse_id
 
